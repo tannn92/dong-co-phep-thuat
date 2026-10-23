@@ -443,7 +443,7 @@
   // ---------------------------------------------------------------- game state
   const G = { mode: "title", level: 0, t: 0, stars: 0, hearts: 5, energy: 0, camX: 0, shake: 0, fade: 0, fadeDir: 0, onFade: null,
     mons: [], parts: [], shots: [], foes: [], items: [], lamps: [], traps: [], plats: [], ground: [], deco: [], waves: [],
-    portal: null, boss: null, ult: null, drops: [], checkpoint: 250, nextId: 1, lvl: null, groundTex: null, platTex: {}, kills: 0, totalStars: 0, arenaLock: false };
+    portal: null, boss: null, ult: null, drops: [], pshots: [], checkpoint: 250, nextId: 1, lvl: null, groundTex: null, platTex: {}, kills: 0, totalStars: 0, arenaLock: false };
   const P = { x: 0, y: 0, vx: 0, vy: 0, dir: 1, onGround: false, jumps: 0, coyote: 0, buffer: 0, castT: 0, shootCd: 0, hurtT: 0, inv: 0,
     dist: 0, slowT: 0, winT: 0, airT: 0, dead: false, land: 0, elem: null, elemT: 0 };
   const IN = { ax: 0, run: false, jumpHeld: false, jumpPressed: false, shootHeld: false, ultPressed: false };
@@ -468,7 +468,7 @@
     G.nextId = 1;
     G.mons = L.mons.map(([kind, x, y]) => makeMon(kind, x, y, L.portal ? x > L.portal - 1500 : false));
     G.portal = L.portal ? { x: L.portal, open: false, t: 0 } : null;
-    G.boss = null; G.arenaLock = false; G.shots = []; G.foes = []; G.parts = []; G.waves = []; G.ult = null; G.drops = [];
+    G.boss = null; G.arenaLock = false; G.shots = []; G.foes = []; G.parts = []; G.waves = []; G.ult = null; G.drops = []; G.pshots = [];
     G.checkpoint = L.lanterns[0];
     G.groundTex = L.tint ? tinted("ground", L.tint, L.desat) : FR.ground;
     G.platTex = { grass: L.tint ? tinted("plat_grass", L.tint, L.desat) : FR.plat_grass, stone: L.tint ? tinted("plat_stone", L.tint, L.desat * 0.3) : FR.plat_stone, bridge: L.tint ? tinted("bridge", L.tint, L.desat * 0.3) : FR.bridge };
@@ -681,6 +681,7 @@
     if (G.boss && G.boss.alive) consider(G.boss.x, GY - 260);
     const ang = best ? clamp(Math.atan2(best.dy, best.dx), -0.75, 0.75) : 0;
     G.shots.push({ x: t.x, y: t.y, vx: P.dir * 1500 * Math.cos(ang), vy: 1500 * Math.sin(ang), life: 0.8, r: 24, elem: P.elem });
+    netEmit("shot", { x: t.x | 0, y: t.y | 0, a: Math.round(ang * 100), d: P.dir, el: ELS.indexOf(P.elem) });
     SFX.zap();
     burst(t.x, t.y, 6, ["#fff", ...HD().cols], 160, 0.3);
   }
@@ -1079,6 +1080,11 @@
     updateUlt(dt);
     if (P.elem) { P.elemT -= dt; if (P.elemT <= 0) { P.elem = null; showBanner("Hết phép đặc biệt"); } updateElemHud(); }
     netFrame(dt);
+    for (const sh of G.pshots) {
+      sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
+      if (G.mons.some((m) => m.alive && overlap({ x0: sh.x - 20, x1: sh.x + 20, y0: sh.y - 20, y1: sh.y + 20 }, monBox(m)))) sh.life = 0;
+    }
+    G.pshots = G.pshots.filter((sh) => sh.life > 0);
     if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
     // lanterns
     for (const l of G.lamps) {
@@ -1584,7 +1590,7 @@
   // and reports its spell hits, ultimate and portal entry back as room events.
   const MKINDS = Object.keys(MON), MST = ["idle", "walk", "prep", "atk", "rest", "web", "fly", "back"];
   const BST = ["enter", "walk", "prep", "slam", "rest"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
-  const NET = { room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
+  const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false };
   let Q = null;   // the other girl, as last reported in their presence
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
@@ -1607,7 +1613,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hit", "ult", "shoo", "portal", "hurt", "pick", "gain"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hit", "ult", "shoo", "portal", "hurt", "pick", "gain", "shot"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -1701,7 +1707,7 @@
   function netEmit(topic, data) { if (NET.room && NET.role) NET.room.emit(topic, data).catch(() => {}); }
   function setCo(co) { NET.co = co; if (NET.room) NET.room.presence({ co }).catch(() => {}); renderCoop(); }
   function beginHost(peer, pres) {
-    NET.role = "host"; NET.partner = peer; NET.pp = pres; NET.applied = null; Q = null;
+    NET.role = "host"; NET.partner = peer; NET.pp = pres; NET.applied = null; Q = null; NET.quietT = 0;
     setCo({ role: "play", with: peer, hero });
     $("coopScreen").hidden = true;
     startGame(Math.max(0, progress - 1));
@@ -1713,11 +1719,11 @@
     NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null;
     if (NET.state === "p2p") { p2pClose(); NET.stage = null; }
   }
-  function partnerLeft() {
-    const wasGuest = NET.role === "guest";
+  function partnerLeft(lost) {
+    const wasGuest = NET.role === "guest", msg = lost ? "Mất kết nối với bạn kia" : "Bạn kia đã rời phòng";
     leaveCoop();
-    if (wasGuest && G.mode !== "title") { toTitle(); showBanner("Bạn kia đã rời phòng"); }
-    else showBanner("Bạn kia đã rời phòng", "Bé chơi tiếp một mình");
+    if (wasGuest && G.mode !== "title") { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }
+    else showBanner(msg, "Bé chơi tiếp một mình");
   }
   function onNet(msg) {
     const d = msg.data && typeof msg.data === "object" ? msg.data : {};
@@ -1725,7 +1731,7 @@
     if (msg.topic === "start") {
       const ok = d.to === NET.me && ((NET.co && NET.co.role === "join" && NET.co.host === msg.peer) || (NET.role === "guest" && NET.partner === msg.peer));
       if (!ok) return;
-      NET.role = "guest"; NET.partner = msg.peer; NET.applied = null; Q = null;
+      NET.role = "guest"; NET.partner = msg.peer; NET.applied = null; Q = null; NET.quietT = 0;
       const p = NET.room.peers().find((p) => p.peer === msg.peer); NET.pp = p ? p.presence : null;
       setCo({ role: "play", with: msg.peer, hero });
       $("coopScreen").hidden = true;
@@ -1733,6 +1739,11 @@
       return;
     }
     if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
+    if (msg.topic === "shot") {   // partner's spell: only for show, her own page reports what it hits
+      const a = clamp(num(d.a) / 100, -0.8, 0.8), dir = d.d < 0 ? -1 : 1;
+      if (Q && G.pshots.length < 12) G.pshots.push({ x: num(d.x), y: num(d.y), vx: dir * 1500 * Math.cos(a), vy: 1500 * Math.sin(a), life: 0.8, elem: ELS[num(d.el)] || null, hk: Q.hero });
+      return;
+    }
     if (NET.role === "host") {
       if (msg.topic === "hit") {
         const el = ELS[num(d.el)] || null;
@@ -1761,16 +1772,20 @@
     const linked = pc && (pc.with === NET.me || (pc.role === "join" && pc.host === NET.me));
     NET.goneT = linked ? 0 : NET.goneT + dt;
     if (NET.goneT > 4) return partnerLeft();
+    // a link that died silently (e.g. the iPad changed network) stops the partner's heartbeat
+    const hb = NET.pp && NET.pp.hb;
+    if (hb !== NET.lastHb) { NET.lastHb = hb; NET.quietT = 0; } else NET.quietT = (NET.quietT || 0) + dt;
+    if (NET.quietT > 4) { NET.quietT = 0; return partnerLeft(true); }
     if (NET.role === "host" && pc && pc.role === "join" && (NET.startT -= dt) <= 0) sendStart();
     if ((NET.sendT -= dt) > 0) return;
-    NET.sendT = 1 / 15;
-    const patch = { gl: girlState(), sh: G.shots.slice(0, 6).map((s) => [s.x | 0, s.y | 0, ELS.indexOf(s.elem)]) };
+    NET.sendT = 1 / 20;
+    const patch = { gl: girlState(), hb: (NET.hb = (NET.hb + 1) % 1e6 || 1) };   // heartbeat: changes every send
     if (NET.role === "host") patch.w = worldState();
     NET.room.presence(patch).catch(() => {});
   }
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0);
-    return [P.x | 0, P.y | 0, P.dir, (G.mode === "play" && girlFrame()) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, mySkin()];
+    return [P.x | 0, P.y | 0, P.dir, (G.mode === "play" && girlFrame()) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, mySkin(), P.vx | 0, P.vy | 0];
   }
   function worldState() {
     const B = G.boss;
@@ -1792,9 +1807,12 @@
     if (!NET.role) return;
     const gl = NET.pp && Array.isArray(NET.pp.gl) ? NET.pp.gl : null;
     if (!gl) return;
-    const x = num(gl[0]), y = num(gl[1]);
-    if (!Q) Q = { x, y, hostInv: 0 };
-    const b = num(gl[4]), k = Math.min(1, dt * 14);
+    if (!Q) Q = { x: num(gl[0]), y: num(gl[1]), hostInv: 0 };
+    // dead-reckoning: carry the last report forward at its velocity, then glide toward that guess
+    if (gl !== Q.gl) { Q.gl = gl; Q.age = 0; }
+    Q.age += dt;
+    const ag = Math.min(Q.age, 0.15), x = num(gl[0]) + num(gl[10]) * ag, y = Math.min(num(gl[1]) + num(gl[11]) * ag, GY);
+    const b = num(gl[4]), k = Math.min(1, dt * 20);
     Q.x = Math.abs(x - Q.x) > 500 ? x : Q.x + (x - Q.x) * k; Q.y = Math.abs(y - Q.y) > 500 ? y : Q.y + (y - Q.y) * k;
     Q.dir = gl[2] < 0 ? -1 : 1; Q.hero = gl[7] === "s" ? "s" : "g";
     Q.skin = typeof gl[9] === "string" && /^[gs](\d\d)?$/.test(gl[9]) && gl[9][0] === Q.hero ? gl[9] : Q.hero;
@@ -1804,7 +1822,7 @@
     Q.fn = fn.startsWith(Q.skin + "_") && FR[fn] ? fn : fn.includes("_") && FR[base] ? base : FR[Q.hero + "_stand"] ? Q.hero + "_stand" : "";
     Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16);
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
-    Q.sh = Array.isArray(NET.pp.sh) ? NET.pp.sh.slice(0, 6) : [];
+
     Q.hostInv -= dt;
   }
 
@@ -1840,7 +1858,9 @@
         if (bits & 64) burst(x, y, 14, ["#b9a4ff", "#fff"], 220, 0.5);
       }
       if (!m.alive) continue;
-      m.tx = x; m.ty = y; m.dir = a[4] < 0 ? -1 : 1; m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]);
+      const now = performance.now() / 1000;
+      if (m.tt) { const gap = Math.max(0.03, now - m.tt); m.evx = clamp((x - m.tx) / gap, -1500, 1500); m.evy = clamp((y - m.ty) / gap, -1500, 1500); }
+      m.tt = now; m.tx = x; m.ty = y; m.dir = a[4] < 0 ? -1 : 1; m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]);
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
       m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.guard = !!(bits & 32);
     }
@@ -1889,8 +1909,9 @@
     for (const m of G.mons) {
       if (!m.alive) { m.die += dt; continue; }
       const ox = m.x;
-      m.x = Math.abs(m.tx - m.x) > 600 ? m.tx : m.x + (m.tx - m.x) * k;
-      m.y = Math.abs(m.ty - m.y) > 600 ? m.ty : m.y + (m.ty - m.y) * k;
+      const ag = Math.min(performance.now() / 1000 - (m.tt || 0), 0.15), px = m.tx + (m.evx || 0) * ag, py = m.ty + (m.evy || 0) * ag;
+      m.x = Math.abs(px - m.x) > 600 ? px : m.x + (px - m.x) * Math.min(1, dt * 20);
+      m.y = Math.abs(py - m.y) > 600 ? py : m.y + (py - m.y) * Math.min(1, dt * 20);
       m.dist += Math.abs(m.x - ox); m.t += dt; m.flash -= dt;
     }
     G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
@@ -1913,7 +1934,7 @@
   function drawPartner() {
     if (!Q || !NET.role) return;
     const H = HEROES[Q.hero];
-    for (const sh of Q.sh) drawBolt(num(sh[0]), num(sh[1]), Q.dir * 1500, 0, ELS[num(sh[2])] || null, Q.hero);
+    for (const sh of G.pshots) drawBolt(sh.x, sh.y, sh.vx, sh.vy, sh.elem, sh.hk);
     const L = G.camX - 120, R = G.camX + VW + 120, topY = Q.y - (Q.hero === "s" ? 290 : 245);
     if (Q.x < L || Q.x > R) {
       // off screen: an arrow at the edge pointing to her
