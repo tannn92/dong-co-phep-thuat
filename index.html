@@ -94,6 +94,11 @@
   .hero:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
   .roomcode { display: block; margin: .25em 0; font-family: var(--display); font-weight: 800; font-size: 3em; letter-spacing: .25em; color: var(--gold); text-shadow: 0 4px 0 #5b2d8f; }
   .codein { width: 5.5em; padding: .3em .4em; border: 0; border-radius: 16px; text-align: center; font-family: var(--display); font-weight: 800; font-size: 2em; letter-spacing: .3em; color: #3b2400; background: #fff6d8; box-shadow: inset 0 0 0 3px var(--gold); }
+  .card.wide { max-width: 62em; gap: .7em; }
+  .outfits { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.4em, 1fr)); gap: .5em; width: 100%; max-height: 58vh; overflow-y: auto; padding: .3em; }
+  .outfit { border: 0; border-radius: 16px; padding: .25em .2em .35em; display: grid; justify-items: center; gap: .1em; font-family: var(--display); font-weight: 800; font-size: .72em; line-height: 1.1; color: var(--cream); background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 2px rgba(255,255,255,.14); touch-action: manipulation; }
+  .outfit img, .outfit canvas { height: 7.4em; width: 100%; object-fit: contain; }
+  .outfit[aria-pressed="true"] { background: rgba(255,211,77,.22); box-shadow: inset 0 0 0 3px var(--gold), 0 0 16px rgba(255,211,77,.45); }
   .levels { display: flex; gap: .6em; flex-wrap: wrap; justify-content: center; }
   .lv { border: 0; border-radius: 16px; padding: .5em .9em; font-family: var(--display); font-weight: 800; font-size: .95em; color: var(--cream); background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); touch-action: manipulation; }
   .lv:disabled { opacity: .35; }
@@ -167,6 +172,14 @@
   <div class="card">
     <h1>Tạm <span>dừng</span></h1>
     <div class="row"><button class="btn" id="resumeBtn">Chơi tiếp</button><button class="btn ghost" id="homeBtn">Về màn đầu</button></div>
+  </div>
+</div>
+
+<div class="screen" id="wardScreen" hidden>
+  <div class="card wide">
+    <h1 id="wardTitle">Tủ <span>quần áo</span></h1>
+    <div class="outfits" id="outfits"></div>
+    <div class="row"><button class="btn" id="wardGo">Vào trận!</button><button class="btn ghost" id="wardBack">Quay lại</button></div>
   </div>
 </div>
 
@@ -402,6 +415,27 @@
   let hero = "g";
   try { if (localStorage.getItem("dcpt2-hero") === "s") hero = "s"; } catch (e) {}
   const HD = () => HEROES[hero];
+  // outfits: every sister can wear any of them; each is its own small atlas (assets/skins/<hero><id>.*), loaded on demand
+  let OUTFITS = [];                       // [{ id, name, heroes: "gs" }], from assets/skins/index.json
+  const outfit = { g: "", s: "" };        // chosen outfit id per sister ("" = her own costume)
+  try { for (const k of "gs") outfit[k] = localStorage.getItem("dcpt2-outfit-" + k) || ""; } catch (e) {}
+  const SKIN = {};                        // loaded outfit atlases: sid -> { tip, rcTip, rcN } or a pending promise
+  const skinOf = (h, o) => (o && OUTFITS.some((x) => x.id === o && x.heroes.includes(h)) ? h + o : h);
+  const mySkin = () => skinOf(hero, outfit[hero]);
+  const mySkinFor = (h) => skinOf(h, outfit[h]);
+  function loadSkin(sid) {
+    if (sid.length < 2 || SKIN[sid]) return Promise.resolve(SKIN[sid]);
+    const p = (async () => {
+      const [meta, img] = await Promise.all([fetch(`assets/skins/${sid}.json`).then((r) => r.json()), loadImg(`assets/skins/${sid}.webp`)]);
+      for (const [n, f] of Object.entries(meta.frames)) FR[sid + "_" + n] = { img, sx: f[0], sy: f[1], w: f[2], h: f[3], s: f[4], ax: f[5], ay: f[6] };
+      SKIN[sid] = { tip: meta.tip, rcTip: meta.rcTip, rcN: Object.keys(meta.frames).filter((n) => n.startsWith("rc")).length };
+      return SKIN[sid];
+    })().catch(() => { delete SKIN[sid]; });
+    SKIN[sid] = p; return p;
+  }
+  // first frame name that exists: outfits lack some of the base poses (walk, stride, the in-air "run")
+  const fr = (...names) => names.find((n) => FR[n]) || names[names.length - 1];
+  function skinTips() { const k = mySkin(), S = SKIN[k]; return S && S.tip ? S : HD(); }
   const WALK_N = { zombie: 10, skeleton: 10, mummy: 10, vampire: 12, witch: 12, spider: 10, ghost: 12, bat: 8 };
   const WALK_DIST = { zombie: 96, skeleton: 130, mummy: 116 };          // world units per gait cycle (rigged walkers)
   const WALK_PERIOD = { vampire: 2.4, witch: 0.8, spider: 0.9, ghost: 1.6, bat: 0.42 };
@@ -631,8 +665,8 @@
     }
   }
   // casting on the move uses the run-while-casting cycle, whose wand sits elsewhere
-  function castMoving() { return P.onGround && Math.abs(P.vx) > 40 && !!FR[hero + "_rc0"]; }
-  function wandTip() { const tp = castMoving() ? HD().rcTip : HD().tip; return { x: P.x + P.dir * tp[0], y: P.y + tp[1] }; }
+  function castMoving() { return P.onGround && Math.abs(P.vx) > 40 && !!FR[mySkin() + "_rc0"]; }
+  function wandTip() { const T = skinTips(), tp = castMoving() ? T.rcTip : T.tip; return { x: P.x + P.dir * tp[0], y: P.y + tp[1] }; }
   function castSpell() {
     P.shootCd = 0.3; P.castT = 0.38;   // outlasts the cooldown so holding Shoot keeps the casting pose
     const t = wandTip();
@@ -1409,15 +1443,15 @@
   }
   function girlFrame() {
     if (G.ult) return null;
-    const h = hero + "_";
+    const sk = mySkin(), h = sk + "_", rcN = (SKIN[sk] && SKIN[sk].rcN) || 6;
     if (P.winT) return h + "win";
     if (P.hurtT > 0 || P.dead) return h + "hurt";
-    if (P.castT > 0) return castMoving() ? h + "rc" + (Math.floor(P.dist / 300 * 6) % 6) : h + "cast";
-    if (!P.onGround) return h + (P.vy < -150 ? "jump" : P.vy < 750 ? "run" : "fall");
+    if (P.castT > 0) return castMoving() ? h + "rc" + (Math.floor(P.dist / 300 * rcN) % rcN) : h + "cast";
+    if (!P.onGround) return P.vy < -150 ? h + "jump" : P.vy < 750 ? fr(h + "run", h + "run2") : h + "fall";
     const sp = Math.abs(P.vx);
-    if (sp < 40) return h + (P.land > 0 ? "stride" : "stand");
+    if (sp < 40) return P.land > 0 ? fr(h + "stride", h + "stand") : h + "stand";
     if (sp > 470) return h + "run" + (Math.floor(P.dist / 300 * 6) % 6);
-    return h + "walk" + (Math.floor(P.dist / 180 * 5) % 5);
+    return FR[h + "walk0"] ? h + "walk" + (Math.floor(P.dist / 180 * 5) % 5) : h + "run" + (Math.floor(P.dist / 230 * 6) % 6);
   }
   function drawGirl() {
     const U = G.ult;
@@ -1426,7 +1460,7 @@
       const sx = Math.cos(spin), lt = ss(0.05, 0.4, U.t) * (1 - ss(1.9, 2.4, U.t));
       glow(P.x, P.y - 100, 260, hero === "s" ? "170,255,170" : "255,200,236", 0.55 * lt);
       ctx.save(); ctx.translate(P.x, P.y); ctx.scale(Math.abs(sx) < 0.08 ? 0.08 * Math.sign(sx || 1) : sx, 1);
-      spr(hero + "_jump", 0, 0, P.dir < 0, 1, 1 - lt);
+      spr(mySkin() + "_jump", 0, 0, P.dir < 0, 1, 1 - lt);
       spr(hero + "_light", 0, 0, P.dir < 0, 1, lt);
       ctx.restore();
       return;
@@ -1438,7 +1472,7 @@
     if (shY !== null) { const k = clamp(1 - (shY - P.y) / 500, 0.3, 1); ctx.ellipse(P.x, shY + 2, 48 * k, 9 * k, 0, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
     let sy = 1;
-    if (fn === hero + "_stand") sy = 1 + Math.sin(G.t * 2.6) * 0.008;
+    if (fn === mySkin() + "_stand") sy = 1 + Math.sin(G.t * 2.6) * 0.008;
     spr(fn, P.x, P.y, P.dir < 0, 1, blink ? 0.45 : 1, 0, sy);
     if (P.castT > 0.1) { const t = wandTip(); glow(t.x, t.y, 60, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.7); }
     if (P.elem && !G.ult) glow(P.x, P.y - 100, 150, ELEM[P.elem].rgb, 0.16 + 0.06 * Math.sin(G.t * 5));
@@ -1481,7 +1515,7 @@
     LEVELS.forEach((L, i) => {
       const b = document.createElement("button"); b.className = "lv"; b.disabled = i + 1 > progress;
       const [a, n] = L.name.split(": "); b.innerHTML = `<b>${a}</b>`; b.append(n);
-      b.addEventListener("click", () => startGame(i));
+      b.addEventListener("click", () => openWardrobe(() => startGame(i)));
       box.append(b);
     });
   }
@@ -1497,6 +1531,37 @@
       box.append(b);
     }
   }
+  let wardNext = null;
+  function openWardrobe(next) {
+    wardNext = next;
+    $("titleScreen").hidden = true; $("wardScreen").hidden = false;
+    $("wardTitle").innerHTML = ""; $("wardTitle").append("Tủ đồ của ");
+    const sp = document.createElement("span"); sp.textContent = HD().name; $("wardTitle").append(sp);
+    renderOutfits();
+  }
+  function renderOutfits() {
+    const box = $("outfits"); box.innerHTML = "";
+    const list = [{ id: "", name: HD().name === "Mochi" ? "Váy Kuromi" : "Tiên Hắc Ám" }, ...OUTFITS.filter((o) => o.heroes.includes(hero))];
+    for (const o of list) {
+      const b = document.createElement("button"); b.className = "outfit"; b.setAttribute("aria-pressed", o.id === outfit[hero]);
+      if (o.id) { const im = document.createElement("img"); im.alt = ""; im.src = `assets/skins/${hero}${o.id}_t.webp`; b.append(im); }
+      else {
+        const f = FR[hero + "_stand"], c = document.createElement("canvas"); c.width = 150; c.height = 240;
+        const k2 = Math.min(150 / f.w, 236 / f.h), g = c.getContext("2d");
+        g.drawImage(f.img, f.sx, f.sy, f.w, f.h, (150 - f.w * k2) / 2, 240 - f.h * k2, f.w * k2, f.h * k2); b.append(c);
+      }
+      b.append(o.name);
+      b.addEventListener("click", () => { outfit[hero] = o.id; try { localStorage.setItem("dcpt2-outfit-" + hero, o.id); } catch (e) {} renderOutfits(); loadSkin(mySkin()); });
+      box.append(b);
+    }
+  }
+  $("wardGo").addEventListener("click", async () => {
+    const b = $("wardGo"); b.disabled = true; b.textContent = "Đang mặc đồ…";
+    await loadSkin(mySkin());
+    b.disabled = false; b.textContent = "Vào trận!";
+    $("wardScreen").hidden = true; const n = wardNext; wardNext = null; n && n();
+  });
+  $("wardBack").addEventListener("click", () => { $("wardScreen").hidden = true; $("titleScreen").hidden = false; });
   function toTitle() {
     if (NET.role) leaveCoop();
     G.mode = "title"; renderLevels(); renderHeroes();
@@ -1511,7 +1576,7 @@
     $("titleScreen").hidden = true; $("winScreen").hidden = true; $("hud").hidden = false; $("controls").hidden = false; $("bossbar").hidden = true;
     showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
   }
-  $("startBtn").addEventListener("click", () => startGame(Math.max(0, progress - 1)));
+  $("startBtn").addEventListener("click", () => openWardrobe(() => startGame(Math.max(0, progress - 1))));
 
   // ---------------------------------------------------------------- two-player co-op (claude.ai room)
   // One iPad hosts: it runs the whole world as in solo play and treats the other girl as a second
@@ -1705,7 +1770,7 @@
   }
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0);
-    return [P.x | 0, P.y | 0, P.dir, (G.mode === "play" && girlFrame()) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts];
+    return [P.x | 0, P.y | 0, P.dir, (G.mode === "play" && girlFrame()) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, mySkin()];
   }
   function worldState() {
     const B = G.boss;
@@ -1732,7 +1797,11 @@
     const b = num(gl[4]), k = Math.min(1, dt * 14);
     Q.x = Math.abs(x - Q.x) > 500 ? x : Q.x + (x - Q.x) * k; Q.y = Math.abs(y - Q.y) > 500 ? y : Q.y + (y - Q.y) * k;
     Q.dir = gl[2] < 0 ? -1 : 1; Q.hero = gl[7] === "s" ? "s" : "g";
-    Q.fn = typeof gl[3] === "string" && gl[3].startsWith(Q.hero + "_") && FR[gl[3]] ? gl[3] : "";
+    Q.skin = typeof gl[9] === "string" && /^[gs](\d\d)?$/.test(gl[9]) && gl[9][0] === Q.hero ? gl[9] : Q.hero;
+    if (Q.skin.length > 1 && !SKIN[Q.skin]) loadSkin(Q.skin);
+    // until the partner's outfit has loaded, show her own costume in the same pose
+    const fn = typeof gl[3] === "string" ? gl[3] : "", base = Q.hero + fn.slice(fn.indexOf("_"));
+    Q.fn = fn.startsWith(Q.skin + "_") && FR[fn] ? fn : fn.includes("_") && FR[base] ? base : FR[Q.hero + "_stand"] ? Q.hero + "_stand" : "";
     Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16);
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
     Q.sh = Array.isArray(NET.pp.sh) ? NET.pp.sh.slice(0, 6) : [];
@@ -1913,7 +1982,7 @@
     msg.textContent = NET.stage === "error" ? NET.err : "Hai iPad cần có mạng, tốt nhất cùng một wifi. Một bé bấm “Mở phòng”, bé kia bấm “Vào phòng” rồi nhập mã.";
     btn("Mở phòng", p2pHost); btn("Vào phòng", () => { NET.stage = "join"; NET.err = ""; renderCoop(); }, true);
   }
-  $("coopBtn").addEventListener("click", () => { initAudio(); $("titleScreen").hidden = true; $("coopScreen").hidden = false; renderCoop(); });
+  $("coopBtn").addEventListener("click", () => { initAudio(); openWardrobe(() => { $("coopScreen").hidden = false; renderCoop(); }); });
   $("coopBack").addEventListener("click", () => {
     if (NET.co && !NET.role) setCo(null);
     if (NET.state === "p2p" && !NET.role) { p2pClose(); NET.stage = null; NET.err = ""; } $("coopScreen").hidden = true; $("titleScreen").hidden = false; });
@@ -1938,6 +2007,8 @@
   async function boot() {
     try { await loadAssets(); }
     catch (e) { $("loading").textContent = "Không tải được hình ảnh. Hãy tải lại trang."; return; }
+    try { OUTFITS = (await (await fetch("assets/skins/index.json")).json()).outfits || []; } catch (e) { OUTFITS = []; }
+    for (const k of "gs") if (mySkinFor(k).length > 1) loadSkin(mySkinFor(k));
     buildLevel(0); G.mode = "title"; ready = true;
     renderLevels(); renderHeroes();
     $("loading").hidden = true; $("startBtn").hidden = false; $("coopBtn").hidden = false;
