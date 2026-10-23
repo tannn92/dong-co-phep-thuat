@@ -860,7 +860,11 @@
     const goal = G.portal || G.arena, gt = guideTarget(), pr = G.arena ? G.arena.r + 380 : 520;
     tx = gt.x; ty = gt.y;
     // detour to a treasure or a cage close by
-    for (const c of [...G.chests, ...G.cages]) if (!c.open && d2(P.x, P.y, c.x, c.y) < 650 * 650) { tx = c.x; ty = c.y; break; }
+    // (give up on one it cannot reach within a few seconds)
+    for (const c of [...G.chests, ...G.cages]) if (!c.open && !c.botSkip && d2(P.x, P.y, c.x, c.y) < 650 * 650) {
+      c.botT = (c.botT || 0) + 1 / 60; if (c.botT > 4) { c.botSkip = true; continue; }
+      tx = c.x; ty = c.y; break;
+    }
     if (goal && !goal.open && d2(P.x, P.y, goal.x, goal.y) < (pr + 400) ** 2) {
       // the gate is still sealed: patrol around it
       const a = G.t * 0.35; tx = goal.x + Math.cos(a) * pr; ty = goal.y + Math.sin(a) * pr;
@@ -1910,7 +1914,14 @@
     }
   }
   function drawDeco(d) {
-    spr(d.name, d.x, d.y, d.flip, d.m);
+    // a tree or bush in front of a girl turns see-through so the child never loses her
+    let a = 1;
+    if (d.name !== "lantern_on") {
+      const f = FR[d.name], h = f ? f.h * f.s * d.m : 300, w = f ? f.w * f.s * d.m * 0.45 : 120;
+      for (const g of (Q && NET.role ? [P, Q] : [P])) if (g.y < d.y && g.y > d.y - h * 0.9 && Math.abs(g.x - d.x) < w) a = 0.38;
+    }
+    d.fa = (d.fa === undefined ? 1 : d.fa) + (a - (d.fa === undefined ? 1 : d.fa)) * 0.15;
+    spr(d.name, d.x, d.y, d.flip, d.m, d.fa);
     if (d.lamp) glow(d.x + (d.flip ? -1 : 1) * 48 * d.m, d.y - 160 * d.m, 130, "255,200,110", 0.42 * (0.9 + 0.1 * Math.sin(G.t * 6 + d.x)));
   }
   // ground layer: things lying flat or hovering low, drawn under everyone
