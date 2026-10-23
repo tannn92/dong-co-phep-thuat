@@ -396,8 +396,8 @@
   const ELEM_TIME = 20;
   // playable heroes: sprite prefix, wand tip in the cast pose (world units from the feet), spell colours
   const HEROES = {
-    g: { name: "Mochi", tip: [60, -148], idle: [44, -138], rgb: "255,190,240", cols: ["#ffd3f0", "#fff4c2", "#c9b6ff"] },
-    s: { name: "Matcha", tip: [90, -169], idle: null, rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"] },
+    g: { name: "Mochi", tip: [74, -167], rcTip: [60, -128], idle: [44, -138], rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"] },
+    s: { name: "Matcha", tip: [104, -185], rcTip: [70, -148], idle: null, rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"] },
   };
   let hero = "g";
   try { if (localStorage.getItem("dcpt2-hero") === "s") hero = "s"; } catch (e) {}
@@ -630,9 +630,11 @@
       P.dist += Math.abs(P.vx) * dt;
     }
   }
-  function wandTip() { return { x: P.x + P.dir * HD().tip[0], y: P.y + HD().tip[1] }; }
+  // casting on the move uses the run-while-casting cycle, whose wand sits elsewhere
+  function castMoving() { return P.onGround && Math.abs(P.vx) > 40 && !!FR[hero + "_rc0"]; }
+  function wandTip() { const tp = castMoving() ? HD().rcTip : HD().tip; return { x: P.x + P.dir * tp[0], y: P.y + tp[1] }; }
   function castSpell() {
-    P.shootCd = 0.3; P.castT = 0.26;
+    P.shootCd = 0.3; P.castT = 0.38;   // outlasts the cooldown so holding Shoot keeps the casting pose
     const t = wandTip();
     // point-blank: a monster between the girl and the wand tip is hit at once
     const near = { x0: Math.min(P.x, t.x) - 10, x1: Math.max(P.x, t.x) + 10, y0: t.y - 100, y1: P.y };
@@ -1122,7 +1124,7 @@
   function updateShots(dt) {
     for (const s of G.shots) {
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
-      const sc = s.elem ? ELEM[s.elem].cols : HD().cols;
+      const sc = s.elem && Math.random() < 0.6 ? ELEM[s.elem].cols : HD().cols;
       if (Math.random() < 0.8) G.parts.push({ type: "dot", x: s.x - Math.sign(s.vx) * 10, y: s.y + rnd(-8, 8), vx: -s.vx * 0.05, vy: rnd(-30, 30), life: 0.3, max: 0.3, r: rnd(3, 7), col: sc[Math.floor(Math.random() * sc.length)] });
       const b = { x0: s.x - s.r, x1: s.x + s.r, y0: s.y - s.r, y1: s.y + s.r };
       for (const m of G.mons) {
@@ -1290,8 +1292,10 @@
   function drawWeb(x, y, r, a) { spr("web", x, y, false, r / 52, a, Math.sin(G.t * 3 + x) * 0.15); }
   // a spell in flight: the bolt's head sits on the hit point, its trail behind
   function drawBolt(x, y, vx, vy, elem, hk) {
-    const n = elem ? "fx_bolt_" + elem : hk === "s" ? "fx_bolt_s" : "fx_bolt_g", sp = Math.hypot(vx, vy) || 1;
-    glow(x, y, 60, elem ? ELEM[elem].rgb : HEROES[hk].rgb, 0.45);
+    // each sister keeps her own bolt; a picked-up element only adds its coloured aura
+    const n = hk === "s" ? "fx_bolt_s" : "fx_bolt_g", sp = Math.hypot(vx, vy) || 1;
+    if (elem) glow(x, y, 95, ELEM[elem].rgb, 0.55 + 0.1 * Math.sin(G.t * 20));
+    glow(x, y, 60, HEROES[hk].rgb, 0.45);
     fxDir(n, x - vx / sp * 55, y - vy / sp * 55, vx, vy, 1, 1);
   }
   function drawPortal() {
@@ -1408,7 +1412,7 @@
     const h = hero + "_";
     if (P.winT) return h + "win";
     if (P.hurtT > 0 || P.dead) return h + "hurt";
-    if (P.castT > 0 && !(P.onGround && Math.abs(P.vx) > 470)) return h + "cast";   // running keeps its stride while casting
+    if (P.castT > 0) return castMoving() ? h + "rc" + (Math.floor(P.dist / 300 * 6) % 6) : h + "cast";
     if (!P.onGround) return h + (P.vy < -150 ? "jump" : P.vy < 750 ? "run" : "fall");
     const sp = Math.abs(P.vx);
     if (sp < 40) return h + (P.land > 0 ? "stride" : "stand");
