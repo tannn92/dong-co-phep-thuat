@@ -1,0 +1,1948 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Đồng Cỏ Phép Thuật"><meta name="theme-color" content="#120e26">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon-192.png">
+</head><body><title>Đồng Cỏ Phép Thuật</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@600;800&family=Nunito:wght@600;800&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --night: #120e26;
+    --gold: #f6c453;
+    --gold-deep: #e08a1e;
+    --rose: #ff6fa8;
+    --mint: #7cf2c6;
+    --cream: #fff6e5;
+    --muted: #b9add8;
+    --display: "Grandstander", "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+    --body: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --u: min(1vh, 1.6vw);
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--night); color: var(--cream); font-family: var(--body);
+    overflow: hidden; overscroll-behavior: none; position: fixed; inset: 0;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* HUD */
+  .hud { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 1.6 * var(--u)); left: calc(env(safe-area-inset-left, 0px) + 2 * var(--u)); right: calc(env(safe-area-inset-right, 0px) + 2 * var(--u)); display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; font-size: calc(2.6 * var(--u)); }
+  .col { display: grid; gap: calc(1 * var(--u)); justify-items: start; }
+  .pill { display: flex; align-items: center; gap: .45em; padding: .3em .75em; border-radius: 999px; background: rgba(18,14,38,.6); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); font-weight: 800; }
+  .hearts { display: flex; gap: .18em; }
+  .hearts img { width: 1.35em; height: 1.35em; transition: transform .2s, opacity .2s; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+  .hearts img.lost { opacity: .7; transform: scale(.82); }
+  .energy { width: 10em; display: grid; gap: .2em; }
+  .energy-label { font-size: .62em; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  .bar { height: .8em; border-radius: 999px; background: rgba(18,14,38,.72); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); overflow: hidden; position: relative; }
+  .fill { position: absolute; inset: 0; width: 0%; border-radius: inherit; background: linear-gradient(90deg, var(--gold-deep), var(--gold) 70%, #fff3c4); box-shadow: 0 0 14px rgba(246,196,83,.7); transition: width .25s ease-out; }
+  .bar.full .fill { animation: shimmer 1s linear infinite; background-size: 200% 100%; background-image: linear-gradient(90deg, var(--gold-deep), #fff3c4, var(--gold), #fff3c4, var(--gold-deep)); }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .elem { --ec: #fff; font-size: .8em; gap: .5em; box-shadow: inset 0 0 0 2px var(--ec), 0 0 16px var(--ec); }
+  .elem canvas { width: 2em; height: 2em; margin: -.25em 0; filter: drop-shadow(0 0 4px var(--ec)); }
+  .elem-body { display: grid; gap: .2em; min-width: 6em; }
+  .elem .bar { height: .45em; }
+  .efill2 { height: 100%; width: 100%; border-radius: inherit; background: var(--ec); }
+  .star-ico { width: 1.3em; height: 1.3em; }
+  .num { font-family: var(--display); font-variant-numeric: tabular-nums; }
+  .lvl { font-family: var(--display); font-weight: 800; font-size: .8em; color: var(--cream); text-shadow: 0 2px 6px rgba(0,0,0,.7); padding-top: .4em; text-align: center; }
+  .right { display: flex; gap: .5em; pointer-events: auto; }
+  .iconbtn { width: 2.1em; height: 2.1em; border-radius: 50%; border: 0; background: rgba(18,14,38,.6); color: var(--cream); font-size: 1em; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); display: grid; place-items: center; padding: 0; touch-action: manipulation; }
+  .iconbtn svg { width: 1.05em; height: 1.05em; }
+  #bossbar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 9 * var(--u)); width: min(46vw, 60 * var(--u)); display: grid; gap: .25em; text-align: center; font-family: var(--display); font-weight: 800; font-size: calc(2.4 * var(--u)); text-shadow: 0 2px 6px #000; pointer-events: none; }
+  #bossbar .bar { height: .9em; }
+  #bossbar .fill { background: linear-gradient(90deg, #a3122b, #ff6a3d 70%, #ffc06a); box-shadow: 0 0 14px rgba(255,90,60,.7); }
+
+  /* Touch controls */
+  #joyZone { position: fixed; left: 0; bottom: 0; width: 46vw; height: 72vh; touch-action: none; }
+  #joy { position: fixed; width: calc(22 * var(--u)); height: calc(22 * var(--u)); margin: calc(-11 * var(--u)) 0 0 calc(-11 * var(--u)); border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.05) 55%, rgba(255,255,255,.14)); box-shadow: inset 0 0 0 2px rgba(255,255,255,.28); pointer-events: none; opacity: .55; transition: opacity .2s; }
+  #joy.on { opacity: 1; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #e6dcff 50%, #9d86e8); box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  #joy.run #knob { background: radial-gradient(circle at 35% 30%, #fff, #ffe6a6 50%, var(--gold-deep)); }
+  .pad { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 2.5 * var(--u)); bottom: calc(env(safe-area-inset-bottom, 0px) + 3 * var(--u)); width: calc(44 * var(--u)); height: calc(40 * var(--u)); pointer-events: none; }
+  .btn-c { position: absolute; border: 0; border-radius: 50%; pointer-events: auto; touch-action: none; padding: 0; background: center / contain no-repeat; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); opacity: .95; }
+  .btn-c.down { transform: scale(.92); opacity: 1; }
+  #bJump { right: 0; bottom: 0; width: calc(17 * var(--u)); height: calc(17 * var(--u)); background-image: url(assets/ui_btn_jump.webp); }
+  #bShoot { right: calc(19 * var(--u)); bottom: calc(1 * var(--u)); width: calc(15 * var(--u)); height: calc(15 * var(--u)); background-image: url(assets/ui_btn_shoot.webp); }
+  #bUlt { right: calc(5 * var(--u)); bottom: calc(19.5 * var(--u)); width: calc(14 * var(--u)); height: calc(14 * var(--u)); background-image: url(assets/ui_btn_ult.webp); }
+  #bUlt.off { filter: grayscale(.9) brightness(.55) drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+  #bUlt:not(.off) { animation: pulse 1.1s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 5px rgba(255,255,255,.5), 0 0 34px 10px rgba(246,196,83,.8); } }
+
+  #banner { position: fixed; left: 0; right: 0; top: 26%; text-align: center; font-family: var(--display); font-weight: 800; font-size: calc(7 * var(--u)); line-height: 1.05; color: var(--cream); text-shadow: 0 4px 0 rgba(0,0,0,.35), 0 0 30px rgba(255,111,168,.7); pointer-events: none; opacity: 0; transform: scale(.9); transition: opacity .35s, transform .35s; }
+  #banner small { display: block; font-family: var(--body); font-size: .38em; font-weight: 800; color: var(--gold); letter-spacing: .04em; margin-top: .3em; text-shadow: 0 2px 6px #000; }
+  #banner.show { opacity: 1; transform: scale(1); }
+
+  /* Screens */
+  .screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 4vh 6vw; background: radial-gradient(90% 90% at 50% 40%, rgba(18,14,38,.45), rgba(18,14,38,.9)); font-size: calc(2.7 * var(--u)); z-index: 5; }
+  .card { width: 100%; max-width: 34em; display: grid; gap: 1em; text-align: center; justify-items: center; }
+  .card h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 2.9em; line-height: .98; text-wrap: balance; color: var(--cream); text-shadow: 0 5px 0 #5b2d8f, 0 0 34px rgba(255,111,168,.55); }
+  .card h1 span { color: var(--gold); }
+  .card p { margin: 0; line-height: 1.45; opacity: .95; text-wrap: pretty; max-width: 30em; }
+  .heroes { display: flex; gap: .8em; justify-content: center; }
+  .hero { border: 0; border-radius: 18px; padding: .3em 1em .45em; display: grid; justify-items: center; gap: .15em; font-family: var(--display); font-weight: 800; font-size: .95em; color: var(--cream); background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 2px rgba(255,255,255,.15); touch-action: manipulation; }
+  .hero canvas { height: 6.6em; width: auto; }
+  .hero[aria-pressed="true"] { background: rgba(255,211,77,.2); box-shadow: inset 0 0 0 3px var(--gold), 0 0 18px rgba(255,211,77,.45); }
+  .hero:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+  .roomcode { display: block; margin: .25em 0; font-family: var(--display); font-weight: 800; font-size: 3em; letter-spacing: .25em; color: var(--gold); text-shadow: 0 4px 0 #5b2d8f; }
+  .codein { width: 5.5em; padding: .3em .4em; border: 0; border-radius: 16px; text-align: center; font-family: var(--display); font-weight: 800; font-size: 2em; letter-spacing: .3em; color: #3b2400; background: #fff6d8; box-shadow: inset 0 0 0 3px var(--gold); }
+  .levels { display: flex; gap: .6em; flex-wrap: wrap; justify-content: center; }
+  .lv { border: 0; border-radius: 16px; padding: .5em .9em; font-family: var(--display); font-weight: 800; font-size: .95em; color: var(--cream); background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); touch-action: manipulation; }
+  .lv:disabled { opacity: .35; }
+  .lv b { display: block; font-size: .7em; color: var(--muted); font-family: var(--body); }
+  .btn { border: 0; border-radius: 999px; padding: .7em 2.2em; font-family: var(--display); font-weight: 800; font-size: 1.35em; color: #3b2400; background: linear-gradient(180deg, #ffe9a6, var(--gold) 55%, var(--gold-deep)); box-shadow: 0 6px 0 #9a5410, 0 12px 26px rgba(0,0,0,.45); touch-action: manipulation; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #9a5410, 0 6px 16px rgba(0,0,0,.45); }
+  .btn.ghost { background: rgba(255,255,255,.12); color: var(--cream); box-shadow: inset 0 0 0 2px rgba(255,255,255,.3); }
+  .btn:focus-visible, .lv:focus-visible, .iconbtn:focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+  .help { display: flex; gap: 1.2em; justify-content: center; flex-wrap: wrap; font-size: .82em; color: var(--muted); font-weight: 700; }
+  .help span b { color: var(--cream); }
+  .row { display: flex; gap: .8em; justify-content: center; flex-wrap: wrap; }
+  #loading { font-weight: 800; color: var(--muted); }
+  #rotate { position: fixed; inset: 0; z-index: 9; display: none; place-items: center; text-align: center; background: var(--night); font-family: var(--display); font-weight: 800; font-size: 6vw; padding: 10vw; }
+  @media (orientation: portrait) and (max-width: 900px) { #rotate { display: grid; } }
+  @media (prefers-reduced-motion: reduce) { #bUlt:not(.off), .bar.full .fill { animation: none; } }
+</style>
+
+<canvas id="game" aria-label="Màn chơi đi cảnh"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="col">
+    <div class="pill"><div class="hearts" id="hearts" aria-label="Số tim"></div></div>
+    <div class="energy"><div class="energy-label">Năng lượng phép</div><div class="bar" id="ebar"><div class="fill" id="efill"></div></div></div>
+    <div class="pill elem" id="elemPill" hidden><canvas id="elemIcon" width="96" height="96"></canvas><div class="elem-body"><span id="elemName"></span><div class="bar"><div class="efill2" id="elemFill"></div></div></div></div>
+  </div>
+  <div class="lvl" id="lvlName"></div>
+  <div class="col" style="justify-items:end">
+    <div class="right">
+      <div class="pill"><img class="star-ico" src="assets/ui_star.webp" alt=""><span class="num" id="stars">0</span></div>
+      <button class="iconbtn" id="mute" aria-label="Tắt hoặc bật âm thanh"></button>
+      <button class="iconbtn" id="pause" aria-label="Tạm dừng"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+</div>
+<div id="bossbar" hidden><div>Vua Bí Ngô</div><div class="bar"><div class="fill" id="bfill"></div></div></div>
+
+<div id="controls" hidden>
+  <div id="joyZone"></div>
+  <div id="joy"><div id="knob"></div></div>
+  <div class="pad">
+    <button class="btn-c" id="bUlt" aria-label="Tuyệt chiêu"></button>
+    <button class="btn-c" id="bShoot" aria-label="Bắn phép"></button>
+    <button class="btn-c" id="bJump" aria-label="Nhảy"></button>
+  </div>
+</div>
+
+<div id="banner"></div>
+
+<div class="screen" id="titleScreen">
+  <div class="card">
+    <h1>Đồng Cỏ <span>Phép Thuật</span></h1>
+    <p>Yêu quái chiếm bốn vùng đất. Chọn Mochi hoặc chị Matcha, cầm gậy phép đi qua đồng cỏ, rừng ma, nghĩa địa và lâu đài để đánh bại <b>Vua Bí Ngô</b>.</p>
+    <div class="heroes" id="heroes"></div>
+    <div class="levels" id="levels"></div>
+    <div class="help"><span>Cần trái: <b>đi</b>, đẩy xa: <b>chạy</b></span><span>Nhảy hai lần được</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
+    <p id="loading">Đang tải hình ảnh…</p>
+    <div class="row"><button class="btn" id="startBtn" hidden>Bắt đầu</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
+  </div>
+</div>
+
+<div class="screen" id="coopScreen" hidden>
+  <div class="card">
+    <h1>Chơi <span>cùng nhau</span></h1>
+    <p id="coopMsg"></p>
+    <div class="row" id="coopBtns"></div>
+    <button class="btn ghost" id="coopBack">Quay lại</button>
+  </div>
+</div>
+
+<div class="screen" id="pauseScreen" hidden>
+  <div class="card">
+    <h1>Tạm <span>dừng</span></h1>
+    <div class="row"><button class="btn" id="resumeBtn">Chơi tiếp</button><button class="btn ghost" id="homeBtn">Về màn đầu</button></div>
+  </div>
+</div>
+
+<div class="screen" id="winScreen" hidden>
+  <div class="card">
+    <h1>Bé đã <span>chiến thắng!</span></h1>
+    <p>Vua Bí Ngô đã bị đánh bại. Đồng Cỏ Phép Thuật lại bình yên.</p>
+    <p id="winStats"></p>
+    <button class="btn" id="againBtn">Chơi lại</button>
+  </div>
+</div>
+
+<div id="rotate">Xoay ngang iPad để chơi nhé</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const cv = $("game"), ctx = cv.getContext("2d");
+  const VH = 1080, GY = 900;
+  let VW = 1600, SCALE = 1, DPR = 1;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+  function fit() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth, h = window.innerHeight;
+    SCALE = h / VH; VW = Math.round(clamp(w / SCALE, 1200, 2400));
+    SCALE = Math.min(h / VH, w / VW);
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+  }
+  window.addEventListener("resize", fit); fit();
+
+  // ---------------------------------------------------------------- assets
+  const IMG = {}, FR = {};
+  let META = null, ready = false;
+  function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+  async function loadAssets() {
+    META = await (await fetch("assets/atlas.json")).json();
+    const sheets = await Promise.all(META.sheets.map((s) => loadImg("assets/" + s)));
+    for (const [n, f] of Object.entries(META.frames)) FR[n] = { img: sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
+    const bgs = await Promise.all([1, 2, 3, 4].map((i) => loadImg(`assets/bg${i}.jpg`)));
+    bgs.forEach((b, i) => (IMG["bg" + (i + 1)] = b));
+    FR.potion_energy = recolor("potion", "#ffc21a");
+  }
+  // recolour a frame into its own canvas (multiply tint, optional desaturate)
+  function tinted(name, col, desat) {
+    const f = FR[name], c = document.createElement("canvas"); c.width = f.w; c.height = f.h;
+    const g = c.getContext("2d");
+    g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, f.w, f.h);
+    if (desat) { g.globalCompositeOperation = "saturation"; g.fillStyle = "#808080"; g.globalAlpha = desat; g.fillRect(0, 0, f.w, f.h); g.globalAlpha = 1; }
+    g.globalCompositeOperation = "multiply"; g.fillStyle = col; g.fillRect(0, 0, f.w, f.h);
+    g.globalCompositeOperation = "destination-in"; g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, f.w, f.h);
+    return { img: c, sx: 0, sy: 0, w: f.w, h: f.h, s: f.s, ax: f.ax, ay: f.ay };
+  }
+
+  // hue-shift a frame (keeps its shading), used for the golden energy potion
+  function recolor(name, col) {
+    const f = FR[name], c = document.createElement("canvas"); c.width = f.w; c.height = f.h;
+    const g = c.getContext("2d");
+    g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, f.w, f.h);
+    g.globalCompositeOperation = "hue"; g.fillStyle = col; g.fillRect(0, 0, f.w, f.h);
+    g.globalCompositeOperation = "screen"; g.globalAlpha = 0.4; g.fillRect(0, 0, f.w, f.h); g.globalAlpha = 1;
+    g.globalCompositeOperation = "destination-in"; g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, f.w, f.h);
+    return { img: c, sx: 0, sy: 0, w: f.w, h: f.h, s: f.s, ax: f.ax, ay: f.ay };
+  }
+
+  // draw a frame with its anchor at world (x, y)
+  function spr(f, x, y, flip = false, m = 1, alpha = 1, rot = 0, sy = 1) {
+    if (typeof f === "string") f = FR[f];
+    if (!f) return;
+    const k = f.s * m;
+    ctx.save();
+    ctx.translate(x, y);
+    if (rot) ctx.rotate(rot);
+    ctx.scale(flip ? -1 : 1, sy);
+    if (alpha !== 1) ctx.globalAlpha *= alpha;
+    ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, -f.ax * k, -f.ay * k, f.w * k, f.h * k);
+    ctx.restore();
+  }
+  // a glowing effect sprite, added onto the scene as light
+  function fx(f, x, y, m = 1, a = 1, rot = 0, flip = false, sy = 1) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; spr(f, x, y, flip, m, a, rot, sy); ctx.restore();
+  }
+  // draw a sprite that faces right so that it points along (vx, vy) without turning upside down
+  function fxDir(f, x, y, vx, vy, m, a) {
+    if (vx >= 0) fx(f, x, y, m, a, Math.atan2(vy, vx));
+    else fx(f, x, y, m, a, Math.atan2(-vy, -vx), true);
+  }
+  function sprFlash(f, x, y, flip, m, a, rot = 0) {
+    ctx.save(); ctx.globalCompositeOperation = "lighter"; spr(f, x, y, flip, m, a, rot); ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- audio
+  let AC = null, master = null, muted = false, music = null;
+  try { muted = localStorage.getItem("dcpt2-muted") === "1"; } catch (e) {}
+  const ICON_ON = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  const ICON_OFF = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const setMuteIcon = () => ($("mute").innerHTML = muted ? ICON_OFF : ICON_ON);
+  setMuteIcon();
+  $("mute").addEventListener("click", () => {
+    muted = !muted; setMuteIcon();
+    try { localStorage.setItem("dcpt2-muted", muted ? "1" : "0"); } catch (e) {}
+    if (master) master.gain.setTargetAtTime(muted ? 0 : 0.9, AC.currentTime, 0.05);
+  });
+  function initAudio() {
+    if (AC) { if (AC.state !== "running") AC.resume(); return; }
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      master = AC.createGain(); master.gain.value = muted ? 0 : 0.9; master.connect(AC.destination);
+      startMusic();
+    } catch (e) { AC = null; }
+  }
+  const NB = {};
+  function noiseBuf(dur) {
+    const key = Math.round(dur * 20); if (NB[key]) return NB[key];
+    const b = AC.createBuffer(1, Math.max(1, Math.floor(AC.sampleRate * dur)), AC.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return (NB[key] = b);
+  }
+  function tone(type, f0, f1, dur, vol, when = 0) {
+    if (!AC) return; const t = AC.currentTime + when;
+    const o = AC.createOscillator(), g = AC.createGain(); o.type = type;
+    o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise(dur, vol, fq, q = 1, when = 0, type = "bandpass") {
+    if (!AC) return; const t = AC.currentTime + when;
+    const s = AC.createBufferSource(); s.buffer = noiseBuf(dur);
+    const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = fq; f.Q.value = q;
+    const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(master); s.start(t);
+  }
+  const SFX = {
+    zap() { tone("sawtooth", 2000, 420, 0.16, 0.06); tone("sine", 2800, 1200, 0.1, 0.06); },
+    hit() { tone("triangle", 700, 380, 0.09, 0.12); noise(0.06, 0.08, 2500, 1); },
+    pop() { tone("sine", 180, 50, 0.3, 0.3); noise(0.22, 0.2, 1800, 0.6); [2349, 2960, 3520].forEach((f, i) => tone("sine", f, f, 0.22, 0.04, 0.04 + i * 0.05)); },
+    hurt() { tone("square", 240, 90, 0.28, 0.1); noise(0.18, 0.1, 400, 1); },
+    jump() { tone("sine", 380, 760, 0.14, 0.08); },
+    jump2() { tone("sine", 560, 1180, 0.16, 0.07); tone("triangle", 1500, 2400, 0.12, 0.03, 0.03); },
+    land() { noise(0.07, 0.05, 300, 1); },
+    star() { [1568, 2093].forEach((f, i) => tone("triangle", f, f, 0.18, 0.07, i * 0.06)); },
+    heal() { [660, 880, 1320].forEach((f, i) => tone("sine", f, f, 0.25, 0.08, i * 0.07)); },
+    candy() { [988, 1319, 1568].forEach((f, i) => tone("triangle", f, f, 0.16, 0.06, i * 0.05)); },
+    lamp() { [523, 784, 1046].forEach((f, i) => tone("sine", f, f * 1.01, 0.5, 0.06, i * 0.09)); },
+    ready() { [880, 1108, 1318, 1760].forEach((f, i) => tone("triangle", f, f, 0.35, 0.08, i * 0.08)); },
+    charge() { tone("sawtooth", 110, 900, 1.5, 0.06); noise(1.5, 0.05, 6000, 0.5); },
+    boom() { tone("sine", 110, 28, 1.4, 0.6); noise(1.2, 0.45, 600, 0.4, 0, "lowpass"); noise(0.3, 0.25, 4000, 0.5); [587, 740, 880, 1175].forEach((f, i) => tone("sine", f, f, 1.5, 0.05, 0.25 + i * 0.09)); },
+    fire() { noise(0.35, 0.12, 900, 0.7); tone("sawtooth", 300, 120, 0.3, 0.04); },
+    web() { noise(0.2, 0.1, 3000, 2); },
+    swoosh() { noise(0.25, 0.08, 1200, 0.8); },
+    portal() { [392, 523, 659, 784, 1046].forEach((f, i) => tone("sine", f, f, 0.6, 0.06, i * 0.08)); noise(0.8, 0.05, 5000, 0.5); },
+    unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone("triangle", f, f, 0.4, 0.07, i * 0.1)); },
+    slam() { tone("sine", 90, 30, 0.8, 0.6); noise(0.6, 0.4, 300, 0.6, 0, "lowpass"); },
+    roar() { tone("sawtooth", 120, 70, 1.0, 0.12); noise(1.0, 0.12, 500, 1.5); },
+    win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone("triangle", f, f, 0.4, 0.08, i * 0.13)); },
+  };
+  function startMusic() {
+    const MAJ = [587.3, 659.3, 740, 880, 987.8, 1174.7], MIN = [587.3, 698.5, 784, 880, 1046.5, 1174.7];
+    let next = AC.currentTime + 0.2, step = 0;
+    music = { tick() {
+      const minor = G.level >= 2 || (G.boss && G.boss.alive);
+      while (next < AC.currentTime + 0.4) {
+        const sc = minor ? MIN : MAJ, pat = [0, 2, 4, 2, 5, 4, 2, 1];
+        const f = sc[pat[step % 8]] * (step % 16 < 8 ? 1 : 0.5), when = next - AC.currentTime;
+        if (G.mode === "play" || G.mode === "title") tone("triangle", f, f, 0.45, 0.026, when);
+        next += G.boss && G.boss.alive ? 0.22 : 0.3; step++;
+      }
+    } };
+  }
+
+  // ---------------------------------------------------------------- levels
+  // ground: [x0,x1] solid strips at GY; plats: [x, topY, type]; mons: [kind, x, y?]; items: [type, x, y]; deco: [name, x, scale]
+  const LEVELS = [
+    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", bg: "bg1", len: 7400,
+      ground: [[0, 7400]],
+      plats: [[1250, 700, "grass"], [1650, 540, "stone"], [3150, 690, "grass"], [3520, 520, "stone"], [4410, 760, "grass"], [5250, 700, "grass"], [5650, 540, "stone"], [6050, 690, "grass"]],
+      lanterns: [250, 2780, 4700, 6300],
+      items: [["star", 1250, 630], ["star", 1650, 470], ["candy", 1650, 360], ["star", 2485, 820], ["star", 3150, 620], ["star", 3520, 450], ["potion", 3520, 330], ["star", 4410, 690], ["star", 5250, 630], ["candy", 5650, 470], ["star", 6050, 620], ["star", 800, 830], ["star", 900, 830]],
+      deco: [["bush", 120, 1], ["pumpkin2", 560, 1], ["tree", 1500, 1], ["mushrooms", 2200, 1], ["pumpkin1", 3000, 1], ["bush", 3700, 1.1], ["pumpkin3", 4200, 1], ["tree", 5500, 0.9], ["bush", 6150, 1], ["pumpkin2", 6800, 1]],
+      mons: [["zombie", 1000], ["bat", 1450, 560], ["skeleton", 2100], ["zombie", 3050], ["ghost", 3500, 640], ["skeleton", 4050], ["bat", 4850, 520], ["zombie", 5500], ["ghost", 5900, 600], ["skeleton", 6450], ["zombie", 6700]],
+      portal: 6800 },
+    { name: "Màn 2: Rừng Ma", bg: "bg2", len: 8000, tint: "#a79cd0", desat: 0.15,
+      ground: [[0, 8000]],
+      plats: [[900, 690, "grass"], [1350, 540, "grass"], [2025, 760, "grass"], [2700, 680, "stone"], [3100, 520, "grass"], [4500, 700, "grass"], [4900, 540, "stone"], [5750, 760, "stone"], [6500, 690, "grass"], [6900, 530, "grass"]],
+      lanterns: [250, 2300, 4150, 6050],
+      items: [["star", 900, 620], ["star", 1350, 470], ["candy", 1350, 300], ["star", 2025, 690], ["star", 2700, 610], ["potion", 3100, 450], ["star", 3850, 820], ["star", 4500, 630], ["star", 4900, 470], ["candy", 4900, 300], ["star", 5750, 690], ["star", 6500, 620], ["star", 6900, 460], ["potion", 7000, 820]],
+      deco: [["mushrooms", 200, 1], ["tree", 700, 1.1], ["mushrooms", 1750, 0.9], ["bush", 2600, 1], ["mushrooms", 3300, 1.1], ["tree", 4300, 1], ["mushrooms", 5100, 1], ["bush", 6100, 1], ["mushrooms", 7200, 1.2], ["tree", 7600, 1]],
+      mons: [["spider", 1100], ["ghost", 1500, 600], ["bat", 2300, 520], ["spider", 2900], ["ghost", 3300, 620], ["mummy", 4300], ["bat", 4700, 480], ["spider", 5200], ["bat", 6000, 520], ["ghost", 6600, 600], ["spider", 7200], ["mummy", 7450], ["bat", 7350, 500]],
+      portal: 7400 },
+    { name: "Màn 3: Nghĩa Địa Trăng Máu", bg: "bg3", len: 8400, tint: "#b39ab8", desat: 0.25,
+      ground: [[0, 8400]],
+      plats: [[1000, 700, "stone"], [1400, 540, "stone"], [2900, 690, "stone"], [3300, 530, "grass"], [3700, 690, "stone"], [4350, 760, "stone"], [5000, 700, "grass"], [5400, 540, "stone"], [7000, 690, "stone"]],
+      lanterns: [250, 2450, 4650, 6550],
+      items: [["star", 1000, 630], ["star", 1400, 470], ["potion", 1400, 300], ["star", 2150, 820], ["star", 2900, 620], ["candy", 3300, 460], ["star", 3700, 620], ["star", 4350, 690], ["star", 5000, 630], ["star", 5400, 470], ["candy", 5400, 300], ["star", 6250, 820], ["star", 7000, 620], ["potion", 7300, 820]],
+      deco: [["grave1", 300, 1], ["grave2", 650, 1], ["tree", 1200, 1.1], ["grave1", 1850, 0.9], ["pumpkin3", 2500, 1], ["grave2", 3100, 1], ["grave1", 3550, 1.1], ["tree", 4800, 1], ["grave2", 5600, 1], ["pumpkin1", 6600, 1], ["grave1", 7400, 1], ["grave2", 7700, 0.9], ["tree", 8100, 1]],
+      mons: [["skeleton", 1000], ["mummy", 1500], ["witch", 2600, 400], ["skeleton", 3200], ["vampire", 3800], ["bat", 4400, 520], ["mummy", 5000], ["witch", 5500, 380], ["skeleton", 6000], ["vampire", 7000], ["skeleton", 7400], ["witch", 7300, 400]],
+      portal: 7800 },
+    { name: "Màn 4: Lâu Đài Phù Thuỷ", bg: "bg4", len: 7300, tint: "#a9a3bd", desat: 0.85, arena: 5500,
+      ground: [[0, 7300]],
+      plats: [[800, 690, "stone"], [1200, 540, "stone"], [1950, 760, "stone"], [2600, 690, "stone"], [3000, 530, "stone"], [4400, 690, "stone"], [4800, 540, "stone"], [5900, 640, "stone"], [6700, 640, "stone"]],
+      lanterns: [250, 2250, 4000, 5300],
+      items: [["star", 800, 620], ["star", 1200, 470], ["candy", 1200, 300], ["star", 1950, 690], ["star", 2600, 620], ["potion", 3000, 460], ["star", 3750, 820], ["star", 4400, 620], ["star", 4800, 470], ["potion", 5150, 820], ["candy", 5300, 820]],
+      deco: [["pumpkin1", 400, 1], ["pumpkin3", 1000, 1], ["grave2", 1650, 1], ["pumpkin2", 2400, 1], ["pumpkin1", 3200, 1.1], ["pumpkin3", 4100, 1], ["pumpkin2", 4600, 1], ["pumpkin1", 5560, 1.1], ["pumpkin1", 7180, 1.1]],
+      mons: [["vampire", 1000], ["witch", 1600, 380], ["mummy", 2500], ["bat", 2900, 480], ["vampire", 3300], ["witch", 4300, 380], ["skeleton", 4700], ["mummy", 5000]],
+      portal: 0 },
+  ];
+
+  const MON = {
+    zombie:   { hp: 4, en: 10, spd: 75,  aggro: 650, reach: 150, prep: 0.6,  atk: 0.45, cd: 1.3, lunge: 260 },
+    skeleton: { hp: 3, en: 9,  spd: 100, aggro: 650, reach: 170, prep: 0.5,  atk: 0.4,  cd: 1.1, lunge: 200 },
+    mummy:    { hp: 5, en: 12, spd: 65,  aggro: 620, reach: 180, prep: 0.65, atk: 0.45, cd: 1.3, lunge: 420 },
+    vampire:  { hp: 8, en: 18, spd: 125, aggro: 750, reach: 280, prep: 0.55, atk: 0.45, cd: 1.1, lunge: 700 },
+    spider:   { hp: 4, en: 10, spd: 140, aggro: 650, reach: 170, prep: 0.45, atk: 0.35, cd: 1.0, lunge: 460, web: true },
+    witch:    { hp: 5, en: 12, spd: 170, aggro: 950, prep: 0.7, atk: 0.35, cd: 2.3, fly: true },
+    ghost:    { hp: 2, en: 7,  spd: 95,  aggro: 700, reach: 380, prep: 0.5, atk: 0.55, cd: 1.3, fly: true },
+    bat:      { hp: 1, en: 5,  spd: 150, aggro: 600, reach: 520, prep: 0.35, atk: 0.6, cd: 1.5, fly: true },
+  };
+  // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows
+  const ELEM = {
+    fire:   { name: "Phép Lửa", tip: "Đốt cháy quái", rgb: "255,130,40", cols: ["#ff6a1a", "#ffb03a", "#fff0b0"], dot: 2.0, tick: 0.5 },
+    ice:    { name: "Phép Băng", tip: "Làm chậm quái", rgb: "110,205,255", cols: ["#7fd6ff", "#d8f4ff", "#ffffff"], slow: 3.5 },
+    poison: { name: "Phép Độc", tip: "Quái mất máu dần", rgb: "130,235,70", cols: ["#7be04a", "#c8ff8a", "#3f9e2a"], dot: 6.0, tick: 1.0 },
+  };
+  const ELEM_TIME = 20;
+  // playable heroes: sprite prefix, wand tip in the cast pose (world units from the feet), spell colours
+  const HEROES = {
+    g: { name: "Mochi", tip: [60, -148], idle: [44, -138], rgb: "255,190,240", cols: ["#ffd3f0", "#fff4c2", "#c9b6ff"] },
+    s: { name: "Matcha", tip: [90, -169], idle: null, rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"] },
+  };
+  let hero = "g";
+  try { if (localStorage.getItem("dcpt2-hero") === "s") hero = "s"; } catch (e) {}
+  const HD = () => HEROES[hero];
+  const WALK_N = { zombie: 10, skeleton: 10, mummy: 10, vampire: 12, witch: 12, spider: 10, ghost: 12, bat: 8 };
+  const WALK_DIST = { zombie: 96, skeleton: 130, mummy: 116 };          // world units per gait cycle (rigged walkers)
+  const WALK_PERIOD = { vampire: 2.4, witch: 0.8, spider: 0.9, ghost: 1.6, bat: 0.42 };
+
+  // ---------------------------------------------------------------- game state
+  const G = { mode: "title", level: 0, t: 0, stars: 0, hearts: 5, energy: 0, camX: 0, shake: 0, fade: 0, fadeDir: 0, onFade: null,
+    mons: [], parts: [], shots: [], foes: [], items: [], lamps: [], traps: [], plats: [], ground: [], deco: [], waves: [],
+    portal: null, boss: null, ult: null, drops: [], checkpoint: 250, nextId: 1, lvl: null, groundTex: null, platTex: {}, kills: 0, totalStars: 0, arenaLock: false };
+  const P = { x: 0, y: 0, vx: 0, vy: 0, dir: 1, onGround: false, jumps: 0, coyote: 0, buffer: 0, castT: 0, shootCd: 0, hurtT: 0, inv: 0,
+    dist: 0, slowT: 0, winT: 0, airT: 0, dead: false, land: 0, elem: null, elemT: 0 };
+  const IN = { ax: 0, run: false, jumpHeld: false, jumpPressed: false, shootHeld: false, ultPressed: false };
+  let progress = 1;
+  try { progress = Math.max(1, Math.min(4, +localStorage.getItem("dcpt2-progress") || 1)); } catch (e) {}
+
+  function surfaceAt(x, w = 0) {
+    for (const s of G.ground) if (x + w > s[0] && x - w < s[1]) return GY;
+    return null;
+  }
+  function buildLevel(i) {
+    const L = LEVELS[i]; G.lvl = L; G.level = i;
+    G.ground = L.ground.map((g) => g.slice());
+    G.plats = L.plats.map(([x, y, type]) => {
+      const f = FR[type === "bridge" ? "bridge" : "plat_" + type];
+      const w = f.w * f.s;
+      return { x, y, type, w, x0: x - w / 2 + (type === "bridge" ? 10 : 22), x1: x + w / 2 - (type === "bridge" ? 10 : 22) };
+    });
+    G.lamps = L.lanterns.map((x) => ({ x, on: false, glow: 0 }));
+    G.items = L.items.map(([type, x, y]) => ({ type, x, y, got: false, ph: Math.random() * 6 }));
+    G.deco = L.deco.map(([name, x, m]) => ({ name, x, m, flip: Math.random() < 0.5 }));
+    G.nextId = 1;
+    G.mons = L.mons.map(([kind, x, y]) => makeMon(kind, x, y, L.portal ? x > L.portal - 1500 : false));
+    G.portal = L.portal ? { x: L.portal, open: false, t: 0 } : null;
+    G.boss = null; G.arenaLock = false; G.shots = []; G.foes = []; G.parts = []; G.waves = []; G.ult = null; G.drops = [];
+    G.checkpoint = L.lanterns[0];
+    G.groundTex = L.tint ? tinted("ground", L.tint, L.desat) : FR.ground;
+    G.platTex = { grass: L.tint ? tinted("plat_grass", L.tint, L.desat) : FR.plat_grass, stone: L.tint ? tinted("plat_stone", L.tint, L.desat * 0.3) : FR.plat_stone, bridge: L.tint ? tinted("bridge", L.tint, L.desat * 0.3) : FR.bridge };
+    G.totalStars = G.items.filter((it) => it.type === "star").length;
+    G.levelStars = 0;
+    $("lvlName").textContent = L.name;
+    respawnGirl(true);
+    G.camX = clamp(P.x - VW * 0.35, 0, L.len - VW);
+    // a co-op guest only mirrors the host's monsters
+    if (NET.role === "guest") { G.mons = []; P.x -= 110; }
+    NET.portalSent = false;
+  }
+  function makeMon(kind, x, y, guard) {
+    const c = MON[kind], f = FR[kind + "_w0"] || FR[kind + "_prep"];
+    const m = { id: G.nextId++, kind, c, x, y: 0, hx: x, hy: y || 0, vx: 0, vy: 0, dir: -1, hp: c.hp, st: "idle", t: 0, cd: rnd(0.3, 1.2), dist: 0, hurt: 0, flash: 0,
+      awake: false, guard, alive: true, die: 0, ph: Math.random() * 10, bw: 0, bh: 0, minX: x - 300, maxX: x + 300 };
+    if (c.fly) { m.y = y || 560; m.bw = f.w * f.s * 0.55; m.bh = f.h * f.s * 0.55; }
+    else {
+      // find the solid strip (ground or platform) under the spawn point and patrol inside it
+      m.y = GY; let seg = G.ground.find((s) => x >= s[0] && x <= s[1]);
+      if (y) { const p = G.plats.find((p) => Math.abs(p.x - x) < p.w / 2 && Math.abs(p.y - y) < 20); if (p) { m.y = p.y; seg = [p.x0, p.x1]; } }
+      if (seg) { m.minX = Math.max(seg[0] + 60, x - 900); m.maxX = Math.min(seg[1] - 60, x + 900); }
+      m.bw = Math.min(110, f.w * f.s * 0.5); m.bh = kind === "spider" ? 100 : 190;
+    }
+    return m;
+  }
+  function respawnGirl(fresh) {
+    Object.assign(P, { x: G.checkpoint + 90, y: GY, vx: 0, vy: 0, dir: 1, onGround: true, jumps: 0, castT: 0, hurtT: 0, inv: fresh ? 0 : 1.6, slowT: 0, winT: 0, dead: false });
+    if (!fresh) G.hearts = 5;
+    renderHearts();
+  }
+
+  // ---------------------------------------------------------------- input
+  const keys = {};
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat) { if (["Space", "ArrowUp", "KeyW"].includes(e.code)) e.preventDefault(); return; }
+    keys[e.code] = true;
+    if (["Space", "ArrowUp", "KeyW", "KeyZ"].includes(e.code)) { IN.jumpPressed = true; e.preventDefault(); }
+    if (["KeyK", "KeyC"].includes(e.code)) IN.ultPressed = true;
+    if (e.code === "Escape" || e.code === "KeyP") togglePause();
+    initAudio();
+  });
+  window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+  function readKeys() {
+    const l = keys.ArrowLeft || keys.KeyA, r = keys.ArrowRight || keys.KeyD;
+    return { ax: (r ? 1 : 0) - (l ? 1 : 0), run: !(keys.ShiftLeft || keys.ShiftRight), jump: keys.Space || keys.ArrowUp || keys.KeyW || keys.KeyZ, shoot: keys.KeyJ || keys.KeyX };
+  }
+  // virtual joystick (floating) on the left
+  const joy = { id: null, cx: 0, cy: 0, ax: 0, run: false };
+  const joyEl = $("joy"), knob = $("knob"), zone = $("joyZone");
+  function joyHome() {
+    const u = Math.min(window.innerHeight / 100, window.innerWidth * 0.016);
+    joyEl.style.left = 16 * u + "px"; joyEl.style.top = window.innerHeight - 17 * u + "px";
+    knob.style.transform = "";
+  }
+  joyHome(); window.addEventListener("resize", joyHome);
+  zone.addEventListener("pointerdown", (e) => {
+    if (joy.id !== null) return;
+    initAudio(); joy.id = e.pointerId; joy.cx = e.clientX; joy.cy = e.clientY;
+    try { zone.setPointerCapture(e.pointerId); } catch (_) {}
+    joyEl.style.left = e.clientX + "px"; joyEl.style.top = e.clientY + "px"; joyEl.classList.add("on");
+    e.preventDefault();
+  });
+  zone.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== joy.id) return;
+    const R = joyEl.offsetWidth * 0.5, dx = e.clientX - joy.cx, dy = e.clientY - joy.cy;
+    const d = Math.hypot(dx, dy), k = d > R ? R / d : 1;
+    knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    const nx = clamp(dx / R, -1, 1);
+    joy.ax = Math.abs(nx) < 0.18 ? 0 : Math.sign(nx);
+    joy.run = Math.abs(nx) > 0.68;
+    joyEl.classList.toggle("run", joy.run && joy.ax !== 0);
+    e.preventDefault();
+  });
+  const joyEnd = (e) => { if (e.pointerId !== joy.id) return; joy.id = null; joy.ax = 0; joy.run = false; joyEl.classList.remove("on", "run"); joyHome(); };
+  zone.addEventListener("pointerup", joyEnd); zone.addEventListener("pointercancel", joyEnd); zone.addEventListener("lostpointercapture", joyEnd);
+  function holdBtn(el, down, up) {
+    const ids = new Set();
+    el.addEventListener("pointerdown", (e) => { initAudio(); ids.add(e.pointerId); try { el.setPointerCapture(e.pointerId); } catch (_) {} el.classList.add("down"); down(); e.preventDefault(); });
+    const end = (e) => { if (!ids.delete(e.pointerId)) return; if (!ids.size) { el.classList.remove("down"); up && up(); } };
+    el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); el.addEventListener("lostpointercapture", end);
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
+  let touchJump = false, touchShoot = false;
+  holdBtn($("bJump"), () => { touchJump = true; IN.jumpPressed = true; }, () => (touchJump = false));
+  holdBtn($("bShoot"), () => { touchShoot = true; }, () => (touchShoot = false));
+  holdBtn($("bUlt"), () => { IN.ultPressed = true; });
+  document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+  // ---------------------------------------------------------------- girl
+  const GW = 56, GH = 175;
+  function girlBox() { return { x0: P.x - GW / 2, x1: P.x + GW / 2, y0: P.y - GH, y1: P.y }; }
+  const overlap = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  // everyone monsters can hit: this girl, plus the co-op partner on the host
+  function girls() { return Q && NET.role === "host" ? [P, Q] : [P]; }
+  function targetFor(x, y) {
+    let best = P, bd = 1e9;
+    for (const g of girls()) { if (g.dead) continue; const d = Math.abs(g.x - x) + Math.abs(g.y - y) * 0.5; if (d < bd) { bd = d; best = g; } }
+    return best;
+  }
+  function boxOf(g) { return { x0: g.x - GW / 2, x1: g.x + GW / 2, y0: g.y - GH, y1: g.y }; }
+  function hurtTarget(g, fromX, web) {
+    if (g === P) return web ? webGirl() : hurtGirl(fromX);
+    if (g.dead || g.inv || g.ultT > 0 || g.win || (!web && g.hostInv > 0)) return;
+    if (!web) g.hostInv = 1.5;
+    netEmit("hurt", { to: NET.partner, fx: fromX | 0, web: web ? 1 : 0 });
+  }
+  function webGirl() {
+    if (P.inv > 0 || G.ult || P.dead) return;
+    P.slowT = 2.2; SFX.web(); burst(P.x, P.y - 90, 10, ["#fff", "#ddd"], 160, 0.4);
+  }
+  function hurtGirl(fromX, dmg = 1) {
+    if (P.inv > 0 || P.dead || G.ult || P.winT) return;
+    G.hearts -= dmg; renderHearts(); SFX.hurt();
+    P.hurtT = 0.45; P.inv = 1.5; G.shake = Math.max(G.shake, 10);
+    const d = Math.sign(P.x - fromX) || -P.dir;
+    P.vx = d * 280; P.vy = -360; P.onGround = false;
+    burst(P.x, P.y - 110, 10, ["#ff9ab8", "#fff"], 260, 0.5);
+    if (G.hearts <= 0) girlDown("Bé mệt rồi!");
+  }
+  function girlDown(msg) {
+    if (P.dead) return;
+    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = 1.4;
+    showBanner(msg, "Nghỉ một chút rồi đứng dậy");
+  }
+  // get back up on the spot (no teleport), and shoo nearby monsters away
+  function reviveGirl() {
+    P.dead = false; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
+    burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
+    if (NET.role === "guest") netEmit("shoo", { x: P.x | 0 }); else shoo(P.x);
+  }
+  function shoo(x) {
+    for (const m of G.mons) {
+      if (!m.alive || Math.abs(m.x - x) > 550) continue;
+      m.x = clamp(m.x + (Math.sign(m.x - x) || 1) * 320, 40, G.lvl.len - 40);
+      m.st = m.c.fly ? "fly" : "rest"; m.t = 0; m.cd = 2;
+    }
+  }
+
+  function updateGirl(dt) {
+    const k = readKeys();
+    const ax = joy.ax || k.ax, run = joy.ax ? joy.run : k.run;
+    const jumpHeld = touchJump || k.jump, shoot = touchShoot || k.shoot;
+    if (P.dead || G.ult || P.winT) {
+      IN.jumpPressed = false;
+      if (P.dead && (G.reviveT -= dt) <= 0) reviveGirl();
+      if (P.winT) { P.vx *= 0.85; }
+      if (!G.ult) physicsGirl(dt, 0, false);
+      return;
+    }
+    const slow = P.slowT > 0 ? 0.5 : 1;
+    const target = ax * (run ? 650 : 360) * slow;
+    const acc = P.onGround ? 4200 : 2600;
+    if (P.hurtT <= 0) {
+      if (ax) P.dir = ax;
+      P.vx += clamp(target - P.vx, -acc * dt, acc * dt);
+    }
+    // jumping: coyote time + buffer + double jump
+    if (IN.jumpPressed) { P.buffer = 0.14; IN.jumpPressed = false; }
+    if (P.buffer > 0 && P.hurtT <= 0) {
+      if (P.onGround || P.coyote > 0) { P.vy = -1520; P.onGround = false; P.coyote = 0; P.jumps = 1; P.buffer = 0; SFX.jump(); dust(P.x, P.y, 6); }
+      else if (P.jumps < 2) { P.vy = -1300; P.jumps = 2; P.buffer = 0; SFX.jump2(); burst(P.x, P.y - 20, 12, ["#fff4c2", "#ffb3e0", "#b9a4ff"], 220, 0.45); }
+    }
+    if (!jumpHeld && P.vy < -500) P.vy = lerp(P.vy, -500, 0.35);
+    // casting
+    P.shootCd -= dt;
+    if (shoot && P.shootCd <= 0 && P.hurtT <= 0) castSpell();
+    physicsGirl(dt, ax, run);
+  }
+  function physicsGirl(dt, ax, run) {
+    P.buffer -= dt; P.coyote -= dt; P.castT -= dt; P.hurtT -= dt; P.inv -= dt; P.slowT -= dt; P.land -= dt;
+    if (!P.onGround) P.airT += dt; else P.airT = 0;
+    if (!G.ult) P.vy = Math.min(P.vy + 3600 * dt, 1700);
+    if (P.onGround && !ax && P.hurtT <= 0) P.vx *= Math.pow(0.0005, dt);
+    const prevY = P.y;
+    P.x += P.vx * dt; P.y += P.vy * dt;
+    // level bounds + boss arena walls
+    let lo = 40, hi = G.lvl.len - 40;
+    if (G.arenaLock && P.x > G.lvl.arena) { lo = G.lvl.arena + 40; hi = G.lvl.arena + arenaW() - 40; }
+    if (P.x < lo) { P.x = lo; P.vx = Math.max(0, P.vx); }
+    if (P.x > hi) { P.x = hi; P.vx = Math.min(0, P.vx); }
+    const was = P.onGround; P.onGround = false;
+    if (P.vy >= 0) {
+      const onG = G.ground.some((s) => P.x > s[0] - 6 && P.x < s[1] + 6);
+      if (onG && P.y >= GY) { P.y = GY; P.vy = 0; P.onGround = true; }
+      for (const p of G.plats) {
+        if (P.x > p.x0 - 8 && P.x < p.x1 + 8 && prevY <= p.y + 2 && P.y >= p.y) { P.y = p.y; P.vy = 0; P.onGround = true; }
+      }
+    }
+    if (P.onGround) {
+      P.jumps = 0; P.coyote = 0.1;
+      if (!was && P.airT > 0.25) { SFX.land(); dust(P.x, P.y, 5); P.land = 0.12; }
+      P.dist += Math.abs(P.vx) * dt;
+    }
+  }
+  function wandTip() { return { x: P.x + P.dir * HD().tip[0], y: P.y + HD().tip[1] }; }
+  function castSpell() {
+    P.shootCd = 0.3; P.castT = 0.26;
+    const t = wandTip();
+    // point-blank: a monster between the girl and the wand tip is hit at once
+    const near = { x0: Math.min(P.x, t.x) - 10, x1: Math.max(P.x, t.x) + 10, y0: t.y - 100, y1: P.y };
+    const m = G.mons.find((m) => m.alive && overlap(near, monBox(m)));
+    if (m) { hitMon(m, P.elem); SFX.zap(); hitFx(t.x, t.y); burst(t.x, t.y, 8, ["#fff", HD().cols[0]], 220, 0.35); return; }
+    // gentle auto-aim: tilt the spell toward the nearest monster (or the boss) in front of the girl
+    let best = null, bd = 1e9;
+    const consider = (x, y) => { const dx = (x - t.x) * P.dir, dy = y - t.y; if (dx > 20 && dx < 1150 && Math.abs(dy) < dx * 0.9 + 60 && dx < bd) { bd = dx; best = { dx, dy }; } };
+    for (const m of G.mons) if (m.alive && m.awake) { const c = monCenter(m); consider(c.x, c.y); }
+    if (G.boss && G.boss.alive) consider(G.boss.x, GY - 260);
+    const ang = best ? clamp(Math.atan2(best.dy, best.dx), -0.75, 0.75) : 0;
+    G.shots.push({ x: t.x, y: t.y, vx: P.dir * 1500 * Math.cos(ang), vy: 1500 * Math.sin(ang), life: 0.8, r: 24, elem: P.elem });
+    SFX.zap();
+    burst(t.x, t.y, 6, ["#fff", ...HD().cols], 160, 0.3);
+  }
+
+  // ---------------------------------------------------------------- monsters
+  function nearGirl(m) {
+    const my = m.c.fly ? m.y : m.y - 100, T = targetFor(m.x, my); m.tg = T;
+    return { T, dx: T.x - m.x, dy: (T.y - 100) - my };
+  }
+  function monBox(m) {
+    if (m.c.fly) return { x0: m.x - m.bw / 2, x1: m.x + m.bw / 2, y0: m.y - m.bh / 2, y1: m.y + m.bh / 2 };
+    return { x0: m.x - m.bw / 2, x1: m.x + m.bw / 2, y0: m.y - m.bh, y1: m.y };
+  }
+  function atkBox(m) {
+    if (m.c.fly) return monBox(m);
+    const r = m.kind === "spider" ? 110 : m.kind === "vampire" ? 140 : 130;
+    return { x0: m.dir > 0 ? m.x : m.x - r, x1: m.dir > 0 ? m.x + r : m.x, y0: m.y - (m.kind === "spider" ? 110 : 200), y1: m.y };
+  }
+  function updateMon(m, dt) {
+    if (!m.alive) { m.die += dt; return; }
+    const camC = G.camX + VW / 2;
+    if (!m.awake) { if (Math.abs(m.x - camC) < VW / 2 + 250 || (Q && NET.role === "host" && Math.abs(m.x - Q.x) < VW / 2 + 250)) m.awake = true; else return; }
+    m.t += dt; m.cd -= dt; m.hurt -= dt; m.flash -= dt;
+    const c = m.c, g = nearGirl(m), adx = Math.abs(g.dx);
+    const T = g.T, sees = !T.dead && adx < c.aggro && Math.abs(g.dy) < (c.fly ? 700 : 260);
+    if (m.hurt > 0) {
+      m.x += m.vx * dt; m.vx *= Math.pow(0.02, dt);
+      if (c.fly) { m.y += m.vy * dt; m.vy *= Math.pow(0.02, dt); }
+      clampMon(m); return;
+    }
+    if (c.fly) return updateFlyer(m, dt, g, adx, sees);
+    // ---- ground walkers
+    if (m.st === "prep") {
+      if (m.t > c.prep) { m.st = "atk"; m.t = 0; m.vx = m.dir * c.lunge; if (m.kind === "vampire" || m.kind === "mummy") SFX.swoosh(); }
+    } else if (m.st === "atk") {
+      m.x += m.vx * dt; m.vx *= Math.pow(0.05, dt);
+      // the lunge stops in front of the girl instead of passing through her
+      if (m.dir > 0 && m.x > T.x - 95 && m.x - m.vx * dt <= T.x - 95) { m.x = T.x - 95; m.vx = 0; }
+      if (m.dir < 0 && m.x < T.x + 95 && m.x - m.vx * dt >= T.x + 95) { m.x = T.x + 95; m.vx = 0; }
+      if (m.t > 0.06 && m.t < c.atk * 0.8) for (const gg of girls()) if (overlap(atkBox(m), boxOf(gg))) hurtTarget(gg, m.x);
+      if (m.t > c.atk) { m.st = "rest"; m.t = 0; m.cd = c.cd; }
+    } else if (m.st === "web") {
+      if (m.t > 0.35 && !m.shot) { m.shot = true; const sx = m.x + m.dir * 70, sy = m.y - 60; const a = Math.atan2(T.y - 90 - sy, T.x - sx);
+        G.foes.push({ type: "web", x: sx, y: sy, vx: Math.cos(a) * 650, vy: Math.sin(a) * 650, life: 2 }); SFX.web(); }
+      if (m.t > 0.7) { m.st = "rest"; m.t = 0; m.cd = c.cd * 1.4; }
+    } else {
+      let want = 0;
+      if (sees) {
+        m.dir = Math.sign(g.dx) || m.dir;
+        if (adx > c.reach * 0.75) want = m.dir;
+        if (m.cd <= 0 && adx < c.reach && Math.abs(g.dy) < 200) { m.st = "prep"; m.t = 0; m.shot = false; }
+        else if (c.web && m.cd <= 0 && adx > 300 && adx < 620 && Math.random() < dt * 0.8) { m.st = "web"; m.t = 0; m.shot = false; }
+      } else {
+        if (m.x <= m.minX + 5) m.dir = 1; else if (m.x >= m.maxX - 5) m.dir = -1;
+        want = m.dir * 0.55;
+        if (m.st === "rest" && m.t < 0.6) want = 0;
+      }
+      if (m.st === "rest" && m.t > 0.4) m.st = "walk";
+      if (m.st === "idle") m.st = "walk";
+      const v = want * c.spd;
+      const nx = clamp(m.x + v * dt, m.minX, m.maxX);
+      m.dist += Math.abs(nx - m.x); m.x = nx;
+    }
+    clampMon(m);
+  }
+  function clampMon(m) {
+    if (m.c.fly) { m.y = clamp(m.y, 160, GY - 60); return; }
+    m.x = clamp(m.x, m.minX, m.maxX);
+  }
+  function updateFlyer(m, dt, g, adx, sees) {
+    const c = m.c, T = g.T;
+    const gy = T.y - 100;
+    if (m.kind === "witch") {
+      if (m.st === "prep") {
+        if (m.t > c.prep) { m.st = "atk"; m.t = 0;
+          const hx = m.x + m.dir * 95, hy = m.y - 10, a = Math.atan2(gy - hy, T.x - hx);
+          G.foes.push({ type: "fire", x: hx, y: hy, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, life: 3.2 }); SFX.fire(); }
+      } else if (m.st === "atk") { if (m.t > c.atk) { m.st = "fly"; m.t = 0; m.cd = c.cd; } }
+      else if (sees) {
+        m.dir = Math.sign(g.dx) || 1;
+        const tx = T.x - m.dir * 480, ty = clamp(T.y - 360, 200, 640) + Math.sin(m.ph + G.t * 1.6) * 40;
+        m.x += clamp(tx - m.x, -c.spd * dt, c.spd * dt); m.y += clamp(ty - m.y, -c.spd * dt, c.spd * dt);
+        if (m.cd <= 0 && adx < 820) { m.st = "prep"; m.t = 0; }
+      } else { m.x = m.hx + Math.sin(m.ph + G.t * 0.6) * 160; m.y = m.hy + Math.sin(m.ph + G.t * 1.7) * 30; m.dir = Math.cos(m.ph + G.t * 0.6) > 0 ? 1 : -1; }
+      return clampMon(m);
+    }
+    // ghost and bat: hover, then dash/dive at the girl
+    if (m.st === "prep") {
+      m.y -= (m.kind === "bat" ? 90 : 30) * dt;
+      if (m.t > c.prep) { m.st = "atk"; m.t = 0; const a = Math.atan2(gy - m.y, T.x - m.x), sp = m.kind === "bat" ? 980 : 820;
+        m.vx = Math.cos(a) * sp; m.vy = Math.sin(a) * sp; SFX.swoosh(); }
+    } else if (m.st === "atk") {
+      m.x += m.vx * dt; m.y += m.vy * dt; m.vx *= Math.pow(0.4, dt); m.vy *= Math.pow(0.4, dt);
+      if (Math.abs(m.vx) > 1) m.dir = Math.sign(m.vx);
+      for (const gg of girls()) if (overlap(monBox(m), boxOf(gg))) hurtTarget(gg, m.x);
+      if (m.t > c.atk || m.y > GY - 70) { m.st = "back"; m.t = 0; m.cd = c.cd; }
+    } else if (m.st === "back") {
+      const ty = m.hy; m.y += clamp(ty - m.y, -260 * dt, 260 * dt);
+      m.x += clamp(T.x - m.dir * 300 - m.x, -120 * dt, 120 * dt);
+      if (m.t > 0.9) { m.st = "fly"; m.t = 0; }
+    } else {
+      if (sees) {
+        m.dir = Math.sign(g.dx) || 1;
+        const tx = T.x - m.dir * (m.kind === "bat" ? 260 : 300);
+        m.x += clamp(tx - m.x, -c.spd * dt, c.spd * dt);
+        const ty = (m.kind === "bat" ? clamp(T.y - 330, 220, 640) : clamp(T.y - 180, 260, 760)) + Math.sin(m.ph + G.t * 2.4) * 30;
+        m.y += clamp(ty - m.y, -c.spd * dt, c.spd * dt);
+        if (m.cd <= 0 && adx < c.reach) { m.st = "prep"; m.t = 0; }
+      } else {
+        m.x = lerp(m.x, m.hx + Math.sin(m.ph + G.t * 0.7) * 140, 0.02);
+        m.y = lerp(m.y, m.hy + Math.sin(m.ph + G.t * 2.1) * 26, 0.05);
+        m.dir = Math.cos(m.ph + G.t * 0.7) >= 0 ? 1 : -1;
+      }
+    }
+    clampMon(m);
+  }
+  function damageMon(m, dmg, fromX, dot, by) {
+    if (!m.alive) return;
+    m.hp -= dmg; m.flash = 0.12;
+    if (m.hp <= 0) return killMon(m, true, by);
+    if (dot) return;
+    SFX.hit();
+    if (m.st !== "atk" || m.kind === "bat" || m.kind === "ghost") {
+      m.hurt = 0.32; m.st = m.c.fly ? "fly" : "rest"; m.t = 0; m.cd = Math.max(m.cd, 0.5);
+      const d = Math.sign(m.x - fromX) || 1; m.vx = d * 380; m.vy = m.c.fly ? -120 : 0;
+    }
+  }
+  function killMon(m, give, by) {
+    m.alive = false; m.die = 0; G.kills++;
+    SFX.pop();
+    const c = monCenter(m);
+    burst(c.x, c.y, 22, ["#fff4c2", "#ffd34d", "#ff9ad5", "#b9a4ff"], 420, 0.8);
+    if (give && by === "q" && NET.role === "host") netEmit("gain", { to: NET.partner, n: m.c.en, x: c.x | 0, y: c.y | 0 });
+    else if (give) addEnergy(m.c.en, c.x, c.y);
+    if (!m.summoned && Math.random() < (give ? 0.5 : 0.2)) spawnDrop(c.x, c.y);
+    checkPortal();
+  }
+  function hitMon(m, el) {
+    if (NET.role === "guest") { netEmit("hit", { id: m.id, el: ELS.indexOf(el) }); m.flash = 0.12; SFX.hit(); return; }
+    damageMon(m, 1, P.x, false, "p"); applyElem(m, el, "p");
+  }
+  function hitBoss(el, x, y) {
+    if (NET.role === "guest") { netEmit("hit", { boss: 1, el: ELS.indexOf(el) }); G.boss.flash = 0.12; SFX.hit(); return; }
+    damageBoss(1, x, y); applyElem(G.boss, el, "p");
+  }
+  // ---------------------------------------------------------------- drops and elements
+  function spawnDrop(x, y) {
+    const w = [["heart", G.hearts < 5 ? 24 : 0], ["energy", 26], ["fire", 17], ["ice", 17], ["poison", 17]];
+    let r = Math.random() * w.reduce((a, b) => a + b[1], 0), type = "energy";
+    for (const [k, v] of w) { if ((r -= v) < 0) { type = k; break; } }
+    G.drops.push({ id: G.nextId++, type, x, y, vx: rnd(-90, 90), vy: -620, life: 14, landed: false, ph: Math.random() * 6 });
+  }
+  function dropFloor(d, prevY) {
+    if (d.vy < 0) return null;
+    for (const p of G.plats) if (d.x > p.x0 && d.x < p.x1 && prevY <= p.y - 28 && d.y >= p.y - 28) return p.y - 28;
+    if (G.ground.some((s) => d.x > s[0] && d.x < s[1]) && prevY <= GY - 28 && d.y >= GY - 28) return GY - 28;
+    return null;
+  }
+  function updateDrops(dt) {
+    for (const d of G.drops) {
+      d.life -= dt;
+      // drift toward the nearest girl
+      let T = null, dist = 1e9;
+      for (const gg of girls()) { if (gg.dead) continue; const dd = Math.hypot(gg.x - d.x, gg.y - 90 - d.y); if (dd < dist) { dist = dd; T = gg; } }
+      const dx = T ? T.x - d.x : 0, dy = T ? T.y - 90 - d.y : 0;
+      if (T && dist < 170) { d.x += dx / dist * 520 * dt; d.y += dy / dist * 520 * dt; d.landed = false; d.vy = 0; }
+      else if (!d.landed) {
+        const py = d.y; d.vy += 2200 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+        const f = dropFloor(d, py); if (f !== null) { d.y = f; d.landed = true; d.vy = 0; }
+        if (d.y > VH + 100) d.life = 0;
+      }
+      if (T && dist < 70) { d.life = 0; if (T === P) pickDrop(d); else netEmit("pick", { to: NET.partner, ty: d.type, x: d.x | 0, y: d.y | 0 }); }
+    }
+    G.drops = G.drops.filter((d) => d.life > 0);
+  }
+  function pickDrop(d) {
+    if (d.type === "heart") {
+      if (G.hearts < 5) { G.hearts++; renderHearts(); G.parts.push({ type: "text", x: d.x, y: d.y - 40, vx: 0, vy: -90, life: 1, max: 1, txt: "+1 tim" }); }
+      else addEnergy(10, d.x, d.y);
+      SFX.heal(); burst(d.x, d.y, 14, ["#ff6f8f", "#fff"], 260, 0.5);
+    } else if (d.type === "energy") {
+      SFX.candy(); addEnergy(25, d.x, d.y); burst(d.x, d.y, 14, ["#ffd34d", "#fff4c2"], 260, 0.5);
+    } else {
+      P.elem = d.type; P.elemT = ELEM_TIME; SFX.ready();
+      burst(P.x, P.y - 110, 24, ELEM[d.type].cols, 320, 0.7);
+      showBanner(ELEM[d.type].name + "!", ELEM[d.type].tip);
+      updateElemHud();
+    }
+  }
+  function applyElem(o, el, by) {
+    if (!el || !o) return;
+    const E = ELEM[el]; o.elBy = by;
+    if (el === "fire") { o.burn = E.dot; o.burnT = o.burnT > 0 ? o.burnT : E.tick; }
+    else if (el === "poison") { o.poison = E.dot; o.poisonT = o.poisonT > 0 ? o.poisonT : E.tick; }
+    else if (el === "ice") o.slow = E.slow;
+  }
+  // ticks burn/poison/slow on a monster or the boss; returns the time scale for its movement
+  function statusTick(o, dt, hurt, cx, cy) {
+    if (o.slow > 0) { o.slow -= dt; if (Math.random() < dt * 8) G.parts.push({ type: "dot", x: cx + rnd(-40, 40), y: cy + rnd(-60, 40), vx: 0, vy: 40, life: 0.6, max: 0.6, r: rnd(3, 6), col: Math.random() < 0.5 ? "#d8f4ff" : "#7fd6ff" }); }
+    if (o.burn > 0) {
+      o.burn -= dt; o.burnT -= dt;
+      if (Math.random() < dt * 40) G.parts.push({ type: "dot", x: cx + rnd(-45, 45), y: cy + rnd(-30, 50), vx: rnd(-20, 20), vy: rnd(-280, -150), life: 0.5, max: 0.5, r: rnd(6, 13), col: ELEM.fire.cols[Math.floor(Math.random() * 3)] });
+      if (o.burnT <= 0) { o.burnT = ELEM.fire.tick; hurt(1); }
+    }
+    if (o.poison > 0) {
+      o.poison -= dt; o.poisonT -= dt;
+      if (Math.random() < dt * 18) G.parts.push({ type: "dot", x: cx + rnd(-45, 45), y: cy + rnd(-20, 50), vx: rnd(-15, 15), vy: rnd(-110, -60), life: 0.9, max: 0.9, r: rnd(5, 10), col: ELEM.poison.cols[Math.floor(Math.random() * 3)] });
+      if (o.poisonT <= 0) { o.poisonT = ELEM.poison.tick; hurt(1); }
+    }
+    return o.slow > 0 ? 0.4 : 1;
+  }
+  function statusGlow(o, x, y, r) {
+    if (o.burn > 0) glow(x, y, r, ELEM.fire.rgb, 0.55 + 0.12 * Math.sin(G.t * 20));
+    if (o.poison > 0) glow(x, y, r, ELEM.poison.rgb, 0.5 + 0.1 * Math.sin(G.t * 6));
+    if (o.slow > 0) glow(x, y, r, ELEM.ice.rgb, 0.55);
+  }
+  // flickering flame tongues drawn over a burning body
+  // flickering flames drawn over a burning body
+  function drawFlames(x, y, w, h, seed) {
+    for (let i = 0; i < 3; i++) {
+      const fx0 = x + (i - 1) * w * 0.28, k = (h / 400) * (0.75 + 0.25 * Math.sin(G.t * 14 + i * 2.1 + seed));
+      fx("fx_flame", fx0, y + h * 0.18 - 40 * k, k * 1.4, 0.85, Math.sin(G.t * 9 + i + seed) * 0.12, i === 1, 1 + 0.15 * Math.sin(G.t * 17 + i));
+    }
+  }
+  function drawDrops() {
+    for (const d of G.drops) {
+      if (d.life < 3 && Math.floor(d.life * 8) % 2 === 0) continue;
+      const y = d.y + (d.landed ? Math.sin(G.t * 4 + d.ph) * 6 : 0);
+      if (d.type === "heart") { glow(d.x, y, 70, "255,110,140", 0.45); spr("potion", d.x, y, false, 0.9); }
+      else if (d.type === "energy") { glow(d.x, y, 70, "255,205,70", 0.5); spr(FR.potion_energy, d.x, y, false, 0.9); }
+      else { glow(d.x, y - 18, 80, ELEM[d.type].rgb, 0.45); spr("orb_" + d.type, d.x, y - 18, false, 1, 1, Math.sin(G.t * 3 + d.ph) * 0.12); }
+    }
+  }
+  function updateElemHud() {
+    const el = $("elemPill");
+    if (!P.elem) { el.hidden = true; return; }
+    el.hidden = false; const E = ELEM[P.elem];
+    if (el.dataset.k !== P.elem) {
+      el.dataset.k = P.elem; el.style.setProperty("--ec", `rgb(${E.rgb})`);
+      const f = FR["orb_" + P.elem], g = $("elemIcon").getContext("2d"), k = 96 / Math.max(f.w, f.h);
+      g.clearRect(0, 0, 96, 96); g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 48 - f.w * k / 2, 48 - f.h * k / 2, f.w * k, f.h * k);
+      $("elemName").textContent = E.name;
+    }
+    $("elemFill").style.width = (100 * P.elemT / ELEM_TIME) + "%";
+  }
+  function monCenter(m) { return m.c.fly ? { x: m.x, y: m.y } : { x: m.x, y: m.y - m.bh * 0.5 }; }
+  function checkPortal() {
+    if (!G.portal || G.portal.open) return;
+    const left = G.mons.filter((m) => m.alive && m.guard).length;
+    if (!left) { G.portal.open = true; SFX.unlock(); showBanner("Cổng phép đã mở!", "Đi vào cổng để sang màn mới"); }
+  }
+  function addEnergy(n, x, y) {
+    const was = G.energy;
+    G.energy = Math.min(100, G.energy + n);
+    if (x !== undefined) G.parts.push({ type: "text", x, y: y - 40, vx: 0, vy: -90, life: 1, max: 1, txt: "+" + n });
+    if (was < 100 && G.energy >= 100) { SFX.ready(); showBanner("Đầy năng lượng!", "Bấm Tuyệt chiêu"); }
+    updateHud();
+  }
+
+  // ---------------------------------------------------------------- boss
+  function arenaW() { return Math.max(VW, 1700); }
+  function startBoss() {
+    const ax = G.lvl.arena;
+    G.arenaLock = true;
+    if (P.x < ax + 40) fadeTo(() => { P.x = ax + 250; P.vx = 0; });
+    G.boss = { x: ax + arenaW() - 360, y: GY, dir: -1, hp: 70, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700 };
+    $("bossbar").hidden = false; updateBossBar();
+    SFX.roar(); showBanner("Vua Bí Ngô!", "Nhảy qua sóng xung kích");
+    G.shake = 18;
+  }
+  function updateBossBar() { if (G.boss) $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; }
+  function updateBoss(dt) {
+    const B = G.boss; if (!B) return;
+    B.t += dt; B.flash -= dt; B.hurtPose -= dt;
+    if (!B.alive) { B.die += dt; if (B.die > 2.4 && G.mode === "play" && !G.won) winGame(); return; }
+    const T = targetFor(B.x, GY - 200), dx = T.x - B.x, fast = B.hp < B.max / 2;
+    const lo = G.lvl.arena + 150, hi = G.lvl.arena + arenaW() - 150;
+    if (B.st === "enter") { B.dropY = Math.min(0, B.dropY + 1800 * dt); if (B.dropY >= 0 && B.t > 0.5) { if (B.t < 0.6) { SFX.slam(); G.shake = 20; dust(B.x, GY, 20); } if (B.t > 1.2) { B.st = "walk"; B.t = 0; } } return; }
+    if (B.st === "walk") {
+      B.dir = Math.sign(dx) || B.dir;
+      if (Math.abs(dx) > 260) B.x += B.dir * (fast ? 210 : 150) * dt;
+      B.x = clamp(B.x, lo, hi);
+      if ((Math.abs(dx) < 380 && B.t > 0.6) || B.t > 3.2) { B.st = "prep"; B.t = 0; SFX.roar(); }
+    } else if (B.st === "prep") {
+      if (B.t > (fast ? 0.7 : 1.0)) { B.st = "slam"; B.t = 0; slam(B); }
+    } else if (B.st === "slam") {
+      const hb = { x0: B.dir > 0 ? B.x : B.x - 300, x1: B.dir > 0 ? B.x + 300 : B.x, y0: GY - 200, y1: GY };
+      if (B.t < 0.25) for (const gg of girls()) if (overlap(hb, boxOf(gg))) hurtTarget(gg, B.x);
+      if (B.t > 0.9) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0) summonBats(B); }
+    } else if (B.st === "rest") {
+      if (B.t > (fast ? 0.7 : 1.1)) { B.st = "walk"; B.t = 0; }
+    }
+    // body contact
+    const bb = { x0: B.x - 70, x1: B.x + 70, y0: GY - 380, y1: GY };
+    for (const gg of girls()) if (overlap(bb, boxOf(gg))) hurtTarget(gg, B.x);
+  }
+  function slam(B) {
+    SFX.slam(); G.shake = 24;
+    const ix = B.x + B.dir * 200;
+    dust(ix, GY, 26);
+    for (const d of [-1, 1]) G.waves.push({ x: ix, d, life: 2.2, sp: 640 });
+  }
+  function summonBats(B) {
+    for (let i = 0; i < 2; i++) {
+      const m = makeMon("bat", G.lvl.arena + (i ? arenaW() - 200 : 200), 380, false);
+      m.awake = true; m.summoned = true; G.mons.push(m);
+      burst(m.x, m.y, 14, ["#b9a4ff", "#fff"], 220, 0.5);
+    }
+  }
+  function damageBoss(dmg, x, y, dot) {
+    const B = G.boss; if (!B || !B.alive || B.st === "enter") return;
+    B.hp -= dmg; B.flash = 0.12; if (!dot && (B.st === "walk" || B.st === "rest")) B.hurtPose = 0.18;
+    if (!dot) SFX.hit();
+    updateBossBar();
+    if (B.hp <= 0) {
+      B.alive = false; B.die = 0; SFX.boom(); G.shake = 26;
+      burst(B.x, GY - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4);
+      for (const m of G.mons) if (m.alive) killMon(m, false);
+    }
+  }
+  function winGame() {
+    G.won = true; P.winT = 99; SFX.win();
+    $("againBtn").hidden = NET.role === "guest";
+    try { localStorage.setItem("dcpt2-progress", "4"); } catch (e) {}
+    setTimeout(() => {
+      $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
+      G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true;
+    }, 2200);
+  }
+
+  // ---------------------------------------------------------------- ultimate
+  const ULT_PACE = 0.62;   // the ultimate's show runs slower than real time so it can be enjoyed
+  function startUlt() {
+    if (G.energy < 100 || G.ult || P.dead || P.winT) return;
+    G.energy = 0; updateHud();
+    G.ult = { t: 0, x: P.x, y0: P.y, fired: false };
+    P.vx = 0; P.vy = 0; P.inv = 2.6 / ULT_PACE + 0.4;
+    SFX.charge();
+  }
+  function updateUlt(dt) {
+    const U = G.ult; if (!U) return;
+    U.t += dt * ULT_PACE;
+    P.y = U.y0 - 190 * ss(0, 0.6, U.t) + 190 * ss(2.0, 2.5, U.t);
+    if (U.t > 0.2 && U.t < 1.6) for (let i = 0; i < 3; i++) {
+      const a = Math.random() * Math.PI * 2, r = rnd(180, 320);
+      G.parts.push({ type: "dot", x: P.x + Math.cos(a) * r, y: P.y - 100 + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.2, vy: -Math.sin(a) * r * 2.2, life: 0.42, max: 0.42, r: rnd(4, 9), col: hero === "s" ? ["#fff4c2", "#b8ffb0", "#7be04a"][i % 3] : ["#fff4c2", "#ffd34d", "#ffb3e0"][i % 3] });
+    }
+    if (!U.fired && U.t > 1.5) {
+      U.fired = true; SFX.boom(); G.shake = 28;
+
+      if (NET.role === "guest") netEmit("ult", { cx: (G.camX + VW / 2) | 0, hw: (VW / 2 + 120) | 0 });
+      else ultBlast(G.camX + VW / 2, VW / 2 + 120);
+    }
+    if (U.t > 2.6) { G.ult = null; P.y = U.y0; P.vy = 0; }
+  }
+
+  function ultBlast(cx, hw) {
+    for (const m of G.mons) if (m.alive && m.awake && Math.abs(m.x - cx) < hw) killMon(m, false);
+    G.foes = [];
+    if (G.boss && G.boss.alive) damageBoss(14, G.boss.x, GY - 200);
+  }
+
+  // ---------------------------------------------------------------- particles
+  function hitFx(x, y) { G.parts.push({ type: "fx", name: hero === "s" ? "fx_hit_s" : "fx_hit_g", x, y, sc: 0.55, life: 0.3, max: 0.3, rot: Math.random() * 6 }); }
+  function burst(x, y, n, cols, sp, life) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = sp * (0.3 + Math.random() * 0.7);
+      G.parts.push({ type: "dot", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: life * rnd(0.6, 1), max: life, r: rnd(3, 8), col: cols[i % cols.length], g: 400 });
+    }
+  }
+  function dust(x, y, n) {
+    for (let i = 0; i < n; i++) G.parts.push({ type: "dust", x: x + rnd(-30, 30), y: y - 4, vx: rnd(-160, 160), vy: rnd(-120, -20), life: rnd(0.35, 0.6), max: 0.6, r: rnd(8, 18) });
+  }
+  function updateParts(dt) {
+    for (const p of G.parts) {
+      p.life -= dt;
+      if (p.type === "ring") { p.r += p.vr * dt; continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.g) p.vy += p.g * dt;
+      if (p.type === "dust") { p.vx *= 0.92; p.vy *= 0.92; p.r += 20 * dt; }
+    }
+    G.parts = G.parts.filter((p) => p.life > 0);
+    if (G.parts.length > 500) G.parts.splice(0, G.parts.length - 500);
+  }
+
+  // ---------------------------------------------------------------- world update
+  function update(dt) {
+    G.t += dt;
+    if (G.fadeDir) {
+      G.fade = clamp(G.fade + G.fadeDir * dt / 0.45, 0, 1);
+      if (G.fadeDir > 0 && G.fade >= 1) { const f = G.onFade; G.onFade = null; G.fadeDir = -1; f && f(); }
+      else if (G.fadeDir < 0 && G.fade <= 0) G.fadeDir = 0;
+    }
+    if (IN.ultPressed) { IN.ultPressed = false; startUlt(); }
+    updateGirl(dt);
+    updateUlt(dt);
+    if (P.elem) { P.elemT -= dt; if (P.elemT <= 0) { P.elem = null; showBanner("Hết phép đặc biệt"); } updateElemHud(); }
+    netFrame(dt);
+    if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
+    // lanterns
+    for (const l of G.lamps) {
+      l.glow = lerp(l.glow, l.on ? 1 : 0, 0.08);
+      if (!l.on && P.x > l.x - 40) {
+        l.on = true; G.checkpoint = l.x; if (G.lamps.indexOf(l) > 0) { SFX.lamp(); burst(l.x + 40, GY - 175, 14, ["#ffd38a", "#fff"], 200, 0.6); }
+      }
+    }
+    // camera
+    let tx = P.x - VW * 0.42 + P.dir * 90;
+    let lo = 0, hi = G.lvl.len - VW;
+    if (G.arenaLock && P.x > G.lvl.arena) { lo = G.lvl.arena; hi = G.lvl.arena + arenaW() - VW; }
+    tx = clamp(tx, lo, Math.max(lo, hi));
+    G.camX = lerp(G.camX, tx, 1 - Math.pow(0.004, dt));
+    if (G.arenaLock && P.x > G.lvl.arena) G.camX = clamp(G.camX, lo, Math.max(lo, hi));
+    G.shake = Math.max(0, G.shake - 40 * dt);
+    updateParts(dt);
+    $("bUlt").classList.toggle("off", G.energy < 100);
+  }
+  function hostWorld(dt) {
+    for (const m of G.mons) {
+      let k = 1;
+      if (m.alive && m.awake) { const c = monCenter(m); k = statusTick(m, dt, (n) => damageMon(m, n, m.x, true, m.elBy), c.x, c.y); }
+      updateMon(m, dt * k);
+    }
+    G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
+    let bk = 1;
+    if (G.boss && G.boss.alive && G.boss.st !== "enter") bk = statusTick(G.boss, dt, (n) => damageBoss(n, G.boss.x, GY - 200, true), G.boss.x, GY - 220) * 0.5 + 0.5;
+    updateBoss(dt * bk);
+    updateDrops(dt);
+    updateShots(dt);
+    // enemy projectiles
+    for (const f of G.foes) {
+      f.x += f.vx * dt; f.y += f.vy * dt; f.life -= dt;
+      if (f.type === "fire" && Math.random() < 0.9) G.parts.push({ type: "dot", x: f.x, y: f.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
+      if (f.type === "web") f.vy += 500 * dt;
+      const r = f.type === "fire" ? 26 : 30;
+      for (const gg of girls()) if (f.life > 0 && overlap({ x0: f.x - r, x1: f.x + r, y0: f.y - r, y1: f.y + r }, boxOf(gg))) { f.life = 0; hurtTarget(gg, f.x, f.type === "web"); }
+      if (f.y > GY + 10) f.life = 0;
+      // the girl's spells can pop fireballs
+      for (const s of G.shots) if (s.life > 0 && f.life > 0 && Math.abs(s.x - f.x) < 40 && Math.abs(s.y - f.y) < 40) { s.life = 0; f.life = 0; burst(f.x, f.y, 10, ["#9dff6a", "#fff"], 200, 0.4); SFX.hit(); }
+    }
+    G.foes = G.foes.filter((f) => f.life > 0);
+    // boss shockwaves
+    for (const w of G.waves) {
+      w.x += w.d * w.sp * dt; w.life -= dt;
+      if (Math.random() < 0.6) dust(w.x, GY, 1);
+      for (const gg of girls()) if (Math.abs(gg.x - w.x) < 45 && gg.y > GY - 70) hurtTarget(gg, w.x - w.d * 50);
+    }
+    G.waves = G.waves.filter((w) => w.life > 0);
+    // items
+    for (const it of G.items) {
+      if (it.got) continue;
+      const iy = it.y + Math.sin(G.t * 3 + it.ph) * 8;
+      for (const gg of girls()) {
+        if (gg.dead || !(Math.abs(gg.x - it.x) < 60 && iy > gg.y - GH - 30 && iy < gg.y + 20)) continue;
+        it.got = true;
+        if (it.type === "star") { G.stars++; G.levelStars++; }
+        if (gg === P) pickItem(it.type, it.x, iy); else netEmit("pick", { to: NET.partner, ty: it.type, x: it.x | 0, y: iy | 0 });
+        updateHud(); break;
+      }
+    }
+    // portal
+    if (G.portal) {
+      G.portal.t += dt;
+      if (G.portal.open && !P.winT && girls().some((gg) => !gg.dead && Math.abs(gg.x - G.portal.x) < 70)) enterPortal();
+    }
+    // boss arena trigger
+    if (G.lvl.arena && !G.boss && girls().some((gg) => !gg.dead && gg.x > G.lvl.arena + 300)) startBoss();
+  }
+  function pickItem(type, x, y) {
+    if (type === "star") { SFX.star(); burst(x, y, 14, ["#ffd34d", "#fff4c2"], 260, 0.5); }
+    else if (type === "potion") { G.hearts = Math.min(5, G.hearts + 1); renderHearts(); SFX.heal(); burst(x, y, 14, ["#ff6f8f", "#fff"], 260, 0.5); G.parts.push({ type: "text", x, y: y - 40, vx: 0, vy: -90, life: 1, max: 1, txt: "+1 tim" }); }
+    else { SFX.candy(); addEnergy(15, x, y); burst(x, y, 14, ["#b06cff", "#ffa64d"], 260, 0.5); }
+  }
+  // this girl's own spells (on a guest they hit the mirrored monsters and are reported to the host)
+  function updateShots(dt) {
+    for (const s of G.shots) {
+      s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+      const sc = s.elem ? ELEM[s.elem].cols : HD().cols;
+      if (Math.random() < 0.8) G.parts.push({ type: "dot", x: s.x - Math.sign(s.vx) * 10, y: s.y + rnd(-8, 8), vx: -s.vx * 0.05, vy: rnd(-30, 30), life: 0.3, max: 0.3, r: rnd(3, 7), col: sc[Math.floor(Math.random() * sc.length)] });
+      const b = { x0: s.x - s.r, x1: s.x + s.r, y0: s.y - s.r, y1: s.y + s.r };
+      for (const m of G.mons) {
+        if (!m.alive || s.life <= 0) continue;
+        if (overlap(b, monBox(m))) { s.life = 0; hitMon(m, s.elem); hitFx(s.x, s.y); burst(s.x, s.y, 6, ["#fff", HD().cols[0]], 200, 0.35); }
+      }
+      const B = G.boss;
+      if (B && B.alive && s.life > 0 && B.st !== "enter" && overlap(b, { x0: B.x - 90, x1: B.x + 90, y0: GY - 420, y1: GY })) { s.life = 0; hitBoss(s.elem, s.x, s.y); hitFx(s.x, s.y); burst(s.x, s.y, 8, ["#fff", "#ffd34d"], 220, 0.35); }
+    }
+    G.shots = G.shots.filter((s) => s.life > 0);
+  }
+  function enterPortal() {
+    P.winT = 1.6; P.vx = 0; SFX.portal();
+    burst(G.portal.x, GY - 150, 40, ["#c08bff", "#fff", "#ffb3e0"], 420, 1);
+    const next = G.level + 1;
+    progress = Math.max(progress, next + 1);
+    try { localStorage.setItem("dcpt2-progress", String(progress)); } catch (e) {}
+    setTimeout(() => fadeTo(() => { buildLevel(next); showBanner(LEVELS[next].name.split(": ")[1], LEVELS[next].name.split(": ")[0]); }), 1100);
+  }
+  function fadeTo(fn) { G.onFade = fn; G.fadeDir = 1; }
+
+  // ---------------------------------------------------------------- render
+  function drawBg() {
+    // one wide copy of the painting, scrolled slowly so its edges never show
+    const img = IMG[G.lvl.bg]; if (!img) return;
+    const w = Math.max(VW * 1.18, VH * 1.25 * img.width / img.height), h = w * img.height / img.width;
+    const span = Math.max(1, G.lvl.len - VW), t = clamp(G.camX / span, 0, 1);
+    ctx.drawImage(img, G.camX - t * (w - VW), GY - 0.74 * h, w, h);
+  }
+  function drawGroundStrip(x0, x1) {
+    const f = G.groundTex, k = f.s, tw = f.w * k, top = GY - f.ay * k;
+    // dark earth below the strip
+    const grd = ctx.createLinearGradient(0, GY + 60, 0, VH);
+    grd.addColorStop(0, G.level === 3 ? "#2a2533" : "#2c1d14"); grd.addColorStop(1, "#0b0710");
+    ctx.fillStyle = grd; ctx.fillRect(x0 + 18, GY + 80, x1 - x0 - 36, VH - GY);
+    const n = Math.max(1, Math.round((x1 - x0) / (tw * 0.9))), seg = (x1 - x0) / n;
+    for (let i = 0; i < n; i++) {
+      const sx = x0 + i * seg, w = seg + (i < n - 1 ? 40 : 0);
+      ctx.save(); ctx.translate(sx + (i & 1 ? w : 0), top); ctx.scale(i & 1 ? -1 : 1, 1);
+      ctx.drawImage(f.img, f.sx, f.sy, f.w, f.h, 0, 0, w, f.h * k);
+      ctx.restore();
+    }
+  }
+  function render() {
+    const W = cv.width, H = cv.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#0b0710"; ctx.fillRect(0, 0, W, H);
+    if (!G.lvl) return;
+    const sc = SCALE * DPR, offX = (W - VW * sc) / 2, offY = (H - VH * sc) / 2;
+    const shx = G.shake ? rnd(-G.shake, G.shake) : 0, shy = G.shake ? rnd(-G.shake, G.shake) : 0;
+    ctx.setTransform(sc, 0, 0, sc, offX + (shx - G.camX) * sc, offY + shy * sc);
+    const L = G.camX - 400, R = G.camX + VW + 400;
+    drawBg();
+    // background props
+    for (const d of G.deco) if (d.x > L && d.x < R) spr(d.name, d.x, GY + 14, d.flip, d.m);
+    // ground
+    for (const s of G.ground) if (s[1] > L && s[0] < R) drawGroundStrip(s[0], s[1]);
+    // lanterns
+    for (const l of G.lamps) if (l.x > L && l.x < R) {
+      spr(l.on ? "lantern_on" : "lantern_off", l.x, GY + 10);
+      if (l.glow > 0.02) glow(l.x + 52, GY - 165, 120, "255,200,110", 0.45 * l.glow * (0.9 + 0.1 * Math.sin(G.t * 6)));
+    }
+    // portal
+    if (G.portal && G.portal.x > L && G.portal.x < R) drawPortal();
+    // platforms
+    for (const p of G.plats) if (p.x > L && p.x < R) spr(G.platTex[p.type], p.x, p.y);
+    // traps
+    // items
+    for (const it of G.items) if (!it.got && it.x > L && it.x < R) {
+      const y = it.y + Math.sin(G.t * 3 + it.ph) * 8;
+      glow(it.x, y, 60, it.type === "star" ? "255,220,120" : it.type === "potion" ? "255,110,140" : "190,120,255", 0.35);
+      spr(it.type, it.x, y, false, 1, 1, it.type === "candy" ? Math.sin(G.t * 2 + it.ph) * 0.2 : 0);
+    }
+    drawDrops();
+    // boss
+    if (G.boss) drawBoss();
+    // monsters
+    for (const m of G.mons) if (m.x > L && m.x < R) drawMon(m);
+    // shockwaves
+    for (const w of G.waves) drawWave(w);
+    // ultimates: magic circles and vines behind the girls, meteors / dragon in front
+    if (G.ult) drawUltFx(hero, P.x, G.ult.y0, P.dir, G.ult.t, G.camX + VW / 2, 0);
+    if (Q && NET.role && Q.ultT > 0) drawUltFx(Q.hero, Q.x, Q.y, Q.dir, Q.ultT, Q.x, 0);
+    // girls (the partner behind)
+    drawPartner();
+    drawGirl();
+    if (G.ult) drawUltFx(hero, P.x, G.ult.y0, P.dir, G.ult.t, G.camX + VW / 2, 1);
+    if (Q && NET.role && Q.ultT > 0) drawUltFx(Q.hero, Q.x, Q.y, Q.dir, Q.ultT, Q.x, 1);
+    // spells / projectiles
+    for (const s of G.shots) drawBolt(s.x, s.y, s.vx, s.vy, s.elem, hero);
+    for (const f of G.foes) {
+      if (f.type === "fire") { glow(f.x, f.y, 70, "130,255,90", 0.4); fxDir("fx_witchfire", f.x - Math.sign(f.vx) * 20, f.y, f.vx, f.vy, 1, 1); }
+      else drawWeb(f.x, f.y, 26, 0.9);
+    }
+    drawParts();
+    // ultimate flash
+    if (G.ult) {
+      const U = G.ult, fl = U.t > 1.5 ? Math.max(0, 1 - (U.t - 1.5) / 0.5) : 0;
+      if (fl > 0) { ctx.fillStyle = hero === "s" ? `rgba(210,255,200,${fl * 0.6})` : `rgba(255,228,245,${fl * 0.6})`; ctx.fillRect(G.camX - 50, -50, VW + 100, VH + 100); }
+    }
+    // vignette and fade (screen space)
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const vg = ctx.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.45, W / 2, H * 0.5, Math.max(W, H) * 0.75);
+    vg.addColorStop(0, "rgba(10,6,20,0)"); vg.addColorStop(1, "rgba(10,6,20,0.45)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    if (G.fade > 0) { ctx.fillStyle = `rgba(11,7,16,${G.fade})`; ctx.fillRect(0, 0, W, H); }
+  }
+  // the ultimate's show, played from its clock t (0..2.6; the blast lands at 1.5) around screen centre cx.
+  // Little sister: heart-meteor shower. Older sister: thorns, an emerald fire dragon and fire pillars.
+  function drawUltFx(hk, x, y, dir, t, cx, layer) {
+    const env = ss(0, 0.45, t) * (1 - ss(2.1, 2.55, t)), span = VW * 0.92, ox = cx - span / 2;
+    if (hk === "g") {
+      if (layer === 0) {
+        glow(x, y - 110, 420, "255,140,210", 0.35 * env);
+        fx("fx_circle_g", x, y - 120, 0.9 * env, 0.95 * env, t * 0.8);
+        fx("fx_circle_g", x, y - 120, 0.55 * env, 0.6 * env, -t * 1.3);
+        return;
+      }
+      for (let i = 0; i < 16; i++) {
+        const t0 = 0.3 + i * 0.065, k = (t - t0) / 0.42, lx = ox + ((i * 0.618034 + 0.13) % 1) * span, ly = GY - 30;
+        if (k > 0 && k < 1) {
+          const px = lx - 760 * (1 - k), py = ly - 760 * (1 - k);
+          fx("fx_meteor", px - 120, py - 75, 0.8, 1);
+        } else if (k >= 1 && k < 1.9) {
+          const q = (k - 1) / 0.9;
+          fx("fx_heartboom", lx, ly - 90, 0.18 + 0.12 * q, 1 - q);
+        }
+      }
+      if (t > 1.45) {
+        const q = clamp((t - 1.45) / 0.9, 0, 1);
+        fx("fx_ring", cx, GY - 320, 0.3 + 2.6 * q, 1 - q);
+        fx("fx_heartboom", cx, GY - 320, 0.45 + 0.7 * q, (1 - q) * 0.75);
+      }
+      return;
+    }
+    // older sister
+    if (layer === 0) {
+      glow(x, y - 110, 420, "120,255,120", 0.3 * env);
+      fx("fx_circle_s", x, y - 120, 0.85 * env, 0.95 * env, -t * 0.7);
+      ctx.save(); ctx.translate(x, GY); ctx.scale(1, 0.26); fx("fx_circle_s", 0, 0, 1.5 * env, 0.8 * env, t * 0.9); ctx.restore();
+      for (let i = 0; i < 7; i++) {
+        const vx = ox + (i + 0.5) * span / 7, g = ss(0.25 + i * 0.05, 0.6 + i * 0.05, t) * (1 - ss(2.0, 2.4, t)), h = FR.thorn_vines.h * FR.thorn_vines.s;
+        if (g > 0.01) spr("thorn_vines", vx, GY + 20 - h * 0.5 * g, i % 2 === 1, 1.05, 1, 0, g);
+      }
+      return;
+    }
+    if (t > 0.5 && t < 1.8) {
+      const q = (t - 0.5) / 1.3, dx = (span + 2600) * q - span / 2 - 1300;
+      const dxs = dir < 0 ? cx - dx : cx + dx;
+      fx("fx_dragon", dxs, GY - 470 + Math.sin(t * 6) * 25, 1.05, ss(0.5, 0.7, t) * (1 - ss(1.6, 1.8, t)), Math.sin(t * 4) * 0.04, dir < 0);
+    }
+    if (t > 1.4) {
+      const q = clamp((t - 1.4) / 1.0, 0, 1);
+      for (let i = 0; i < 7; i++) {
+        const px = ox + (i + 0.5) * span / 7, m = 1.5 * ss(0, 0.25, q) * (1 - 0.3 * q);
+        fx("fx_pillar", px, GY - 150 * m, m, 1 - ss(0.55, 1, q), 0, i % 2 === 1);
+      }
+    }
+  }
+  function glow(x, y, r, rgb, a) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  function drawWeb(x, y, r, a) { spr("web", x, y, false, r / 52, a, Math.sin(G.t * 3 + x) * 0.15); }
+  // a spell in flight: the bolt's head sits on the hit point, its trail behind
+  function drawBolt(x, y, vx, vy, elem, hk) {
+    const n = elem ? "fx_bolt_" + elem : hk === "s" ? "fx_bolt_s" : "fx_bolt_g", sp = Math.hypot(vx, vy) || 1;
+    glow(x, y, 60, elem ? ELEM[elem].rgb : HEROES[hk].rgb, 0.45);
+    fxDir(n, x - vx / sp * 55, y - vy / sp * 55, vx, vy, 1, 1);
+  }
+  function drawPortal() {
+    const pt = G.portal, x = pt.x;
+    if (pt.open) glow(x, GY - 150, 260, "190,110,255", 0.45 + 0.15 * Math.sin(G.t * 3));
+    spr("portal", x, GY + 12, false, 1, pt.open ? 1 : 0.9);
+    if (!pt.open) {
+      // sealed: dark veil + chains of light
+      ctx.save(); ctx.globalAlpha = 0.6; ctx.fillStyle = "#1a1030";
+      ctx.beginPath(); ctx.ellipse(x - 2, GY - 140, 72, 110, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      const left = G.mons.filter((m) => m.alive && m.guard).length;
+      ctx.save(); ctx.font = "800 34px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.fillStyle = "#ffe9a6";
+      const txt = left ? `Hạ ${left} quái canh cổng` : "";
+      ctx.strokeText(txt, x, GY - 330); ctx.fillText(txt, x, GY - 330); ctx.restore();
+    } else if (Math.random() < 0.5) {
+      const a = Math.random() * Math.PI * 2;
+      G.parts.push({ type: "dot", x: x + Math.cos(a) * 90, y: GY - 140 + Math.sin(a) * 120, vx: -Math.cos(a) * 80, vy: -Math.sin(a) * 100, life: 0.8, max: 0.8, r: rnd(3, 6), col: Math.random() < 0.5 ? "#e0b8ff" : "#fff" });
+    }
+  }
+  function drawWave(w) {
+    const a = clamp(w.life / 0.6, 0, 1);
+    glow(w.x, GY - 30, 90, "255,160,70", 0.45 * a);
+    fx("fx_wave", w.x - w.d * 40, GY - 52, 1, a, 0, w.d < 0, 1 + Math.sin(G.t * 30) * 0.06);
+  }
+  // which effect sprite a coloured spark is drawn with
+  const DOT_SPR = {};
+  for (const c of ["#ffb3e0", "#ff9ad5", "#ffd3f0", "#ff6f8f", "#ffb3e0", "#c9b6ff", "#b9a4ff"]) DOT_SPR[c] = "fx_heart";
+  for (const c of ["#fff", "#fff4c2", "#ffd34d", "#ffd38a", "#e0b8ff", "#ffa64d", "#b06cff", "#f0fff0"]) DOT_SPR[c] = "fx_twinkle";
+  for (const c of ELEM.ice.cols) DOT_SPR[c] = "fx_snow";
+  for (const c of ELEM.poison.cols) DOT_SPR[c] = "fx_bubble";
+  for (const c of ELEM.fire.cols) DOT_SPR[c] = "fx_flame";
+  function drawParts() {
+    for (const p of G.parts) {
+      const a = clamp(p.life / p.max, 0, 1);
+      if (p.type === "dot") {
+        const sp = DOT_SPR[p.col];
+        if (sp) { ctx.globalAlpha = 1; fx(sp, p.x, p.y, p.r * (sp === "fx_flame" ? 0.13 : 0.11) * (0.6 + a * 0.6), a, sp === "fx_twinkle" ? p.life * 3 : 0); continue; }
+        ctx.globalAlpha = a; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.5 + a * 0.5), 0, Math.PI * 2); ctx.fill();
+      }
+      else if (p.type === "dust") { ctx.globalAlpha = 1; spr("fx_smoke", p.x, p.y, p.x % 2 > 1, p.r / 34, a * 0.55); }
+      else if (p.type === "fx") { ctx.globalAlpha = 1; fx(p.name, p.x, p.y, p.sc * (1 + (1 - a) * (p.grow || 0.6)), a, p.rot || 0, !!p.flip); }
+      else if (p.type === "ring") { ctx.globalAlpha = a; ctx.strokeStyle = `rgba(${p.col},1)`; ctx.lineWidth = 26 * a + 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke(); }
+      else if (p.type === "text") {
+        ctx.globalAlpha = a; ctx.font = "800 40px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.lineWidth = 6; ctx.strokeStyle = "rgba(40,20,0,.7)"; ctx.fillStyle = "#ffd34d";
+        ctx.strokeText(p.txt, p.x, p.y); ctx.fillText(p.txt, p.x, p.y);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function monFrame(m) {
+    const k = m.kind;
+    if (m.hurt > 0 || !m.alive) return k + "_hurt";
+    if (m.st === "prep" || m.st === "web" && m.t < 0.35) return k + "_prep";
+    if (m.st === "atk" || m.st === "web") return k + "_atk";
+    if (k === "vampire") return "vampire_prep";     // his idle art faces the camera; the stalking pose reads better while gliding
+    let i;
+    if (WALK_DIST[k]) i = Math.floor((m.dist / WALK_DIST[k]) * WALK_N[k]) % WALK_N[k];
+    else i = Math.floor(((G.t + m.ph) / WALK_PERIOD[k]) * WALK_N[k]) % WALK_N[k];
+    return k + "_w" + i;
+  }
+  function drawMon(m) {
+    const fn = monFrame(m), f = FR[fn];
+    // the vampire, ghost and bat idle sprites are front-facing: never mirror them
+    const flip = m.dir < 0 && !(/_w\d+$/.test(fn) && (m.kind === "ghost" || m.kind === "bat"));
+    let y = m.y, a = 1, rot = 0, mul = 1;
+    if (!m.alive) { const t = m.die / 0.6; a = 1 - t; mul = 1 - 0.4 * t; rot = (m.dir > 0 ? -1 : 1) * t * 0.8; y -= t * 40; }
+    if (!m.c.fly) {
+      ctx.save(); ctx.globalAlpha = 0.28 * a; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.ellipse(m.x, m.y + 2, m.bw * 0.7, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    if (m.st === "prep" && m.alive && m.hurt <= 0) {
+      // telegraph: red glow behind the monster
+      const c = monCenter(m); glow(c.x, c.y, 130, "255,60,60", 0.25 + 0.2 * Math.sin(G.t * 25));
+    }
+    if (m.kind === "vampire" && m.alive && m.st !== "prep" && m.st !== "atk" && m.hurt <= 0) y -= Math.abs(Math.sin(G.t * 3 + m.ph)) * 8;
+    if (m.alive) { const c = monCenter(m); statusGlow(m, c.x, c.y, 130); }
+    spr(f, m.x, y, flip, mul, a, rot);
+    if (m.alive && m.slow > 0) sprFlash(f, m.x, y, flip, mul, 0.35, rot);
+    if (m.alive && m.burn > 0) { const c = monCenter(m); drawFlames(c.x, c.y, m.bw * 1.4, m.c.fly ? m.bh : m.bh * 0.8, m.ph); }
+    if (m.flash > 0) sprFlash(f, m.x, y, flip, mul, 0.6, rot);
+    if (m.kind === "witch" && m.st === "prep" && m.alive) glow(m.x + m.dir * 60, m.y - 80, 50, "130,255,90", 0.5);
+    // health pips once hurt
+    if (m.alive && m.hp < m.c.hp) {
+      const top = (m.c.fly ? m.y - m.bh * 0.75 : m.y - f.ay * f.s - 4) - 16, n = m.c.hp, wpip = 14;
+      for (let i = 0; i < n; i++) {
+        ctx.fillStyle = i < m.hp ? "#ff5a6a" : "rgba(0,0,0,.45)";
+        ctx.fillRect(m.x - (n * wpip) / 2 + i * wpip + 1, top, wpip - 3, 8);
+      }
+    }
+  }
+  function drawBoss() {
+    const B = G.boss;
+    let name = "boss_stand";
+    if (!B.alive) name = B.die < 0.4 ? "boss_hurt" : "boss_dead";
+    else if (B.st === "prep") name = "boss_prep";
+    else if (B.st === "slam") name = B.t < 0.7 ? "boss_slam" : "boss_stand";
+    else if (B.hurtPose > 0) name = "boss_hurt";
+    const f = FR[name], flip = B.dir < 0;
+    let y = GY + (B.dropY || 0), sy = 1;
+    if (B.alive && B.st === "walk") { y -= Math.abs(Math.sin(B.t * 6)) * 10; }
+    if (B.alive && B.st !== "enter") sy = 1 + Math.sin(G.t * 2) * 0.012;
+    const a = 1;
+    ctx.save(); ctx.globalAlpha = 0.35 * a; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.ellipse(B.x, GY + 3, 150, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    if (B.alive && B.st === "prep") glow(B.x, GY - 220, 300, "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
+    if (B.alive) glow(B.x + (flip ? -1 : 1) * 30, y - 380, 110, "255,170,60", 0.3);
+    else glow(B.x, GY - 60, 200, "255,220,140", 0.35 * clamp(1 - B.die / 2, 0, 1));
+    if (B.alive) statusGlow(B, B.x, GY - 220, 280);
+    spr(f, B.x, y, flip, 1, a, 0, sy);
+    if (B.alive && B.slow > 0) sprFlash(f, B.x, y, flip, 1, 0.3);
+    if (B.alive && B.burn > 0) drawFlames(B.x, GY - 200, 220, 360, 1);
+    if (B.flash > 0) sprFlash(f, B.x, y, flip, 1, 0.5);
+  }
+  function girlFrame() {
+    if (G.ult) return null;
+    const h = hero + "_";
+    if (P.winT) return h + "win";
+    if (P.hurtT > 0 || P.dead) return h + "hurt";
+    if (P.castT > 0 && !(P.onGround && Math.abs(P.vx) > 470)) return h + "cast";   // running keeps its stride while casting
+    if (!P.onGround) return h + (P.vy < -150 ? "jump" : P.vy < 750 ? "run" : "fall");
+    const sp = Math.abs(P.vx);
+    if (sp < 40) return h + (P.land > 0 ? "stride" : "stand");
+    if (sp > 470) return h + "run" + (Math.floor(P.dist / 300 * 6) % 6);
+    return h + "walk" + (Math.floor(P.dist / 180 * 5) % 5);
+  }
+  function drawGirl() {
+    const U = G.ult;
+    if (U) {
+      const spin = U.t > 0.25 && U.t < 1.7 ? (U.t - 0.25) * 9 : 0;
+      const sx = Math.cos(spin), lt = ss(0.05, 0.4, U.t) * (1 - ss(1.9, 2.4, U.t));
+      glow(P.x, P.y - 100, 260, hero === "s" ? "170,255,170" : "255,200,236", 0.55 * lt);
+      ctx.save(); ctx.translate(P.x, P.y); ctx.scale(Math.abs(sx) < 0.08 ? 0.08 * Math.sign(sx || 1) : sx, 1);
+      spr(hero + "_jump", 0, 0, P.dir < 0, 1, 1 - lt);
+      spr(hero + "_light", 0, 0, P.dir < 0, 1, lt);
+      ctx.restore();
+      return;
+    }
+    const fn = girlFrame();
+    const blink = P.inv > 0 && !P.dead && Math.floor(G.t * 16) % 2 === 0;
+    ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = "#000"; ctx.beginPath();
+    const shY = shadowY();
+    if (shY !== null) { const k = clamp(1 - (shY - P.y) / 500, 0.3, 1); ctx.ellipse(P.x, shY + 2, 48 * k, 9 * k, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    let sy = 1;
+    if (fn === hero + "_stand") sy = 1 + Math.sin(G.t * 2.6) * 0.008;
+    spr(fn, P.x, P.y, P.dir < 0, 1, blink ? 0.45 : 1, 0, sy);
+    if (P.castT > 0.1) { const t = wandTip(); glow(t.x, t.y, 60, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.7); }
+    if (P.elem && !G.ult) glow(P.x, P.y - 100, 150, ELEM[P.elem].rgb, 0.16 + 0.06 * Math.sin(G.t * 5));
+    else if (fn === hero + "_stand" && HD().idle) glow(P.x + P.dir * HD().idle[0], P.y + HD().idle[1], 22, HD().rgb, 0.35 + 0.15 * Math.sin(G.t * 4));
+    if (P.slowT > 0) drawWeb(P.x, P.y - 70, 40, Math.min(1, P.slowT));
+  }
+  function shadowY(o = P) {
+    if (o === P && P.onGround) return P.y;
+    let best = null;
+    if (G.ground.some((s) => o.x > s[0] && o.x < s[1])) best = GY;
+    for (const p of G.plats) if (o.x > p.x0 && o.x < p.x1 && p.y >= o.y - 2 && (best === null || p.y < best)) best = p.y;
+    return best;
+  }
+
+  // ---------------------------------------------------------------- HUD
+  const HEART = '<svg viewBox="0 0 24 24"><path fill="#ff5a7a" stroke="#fff" stroke-width="1.5" d="M12 21s-7.5-4.6-9.5-9.3C1.1 8.3 3.3 4.5 7 4.5c2.1 0 3.6 1.2 5 3 1.4-1.8 2.9-3 5-3 3.7 0 5.9 3.8 4.5 7.2C19.5 16.4 12 21 12 21z"/></svg>';
+  function renderHearts() { $("hearts").innerHTML = Array.from({ length: 5 }, (_, i) => (i < G.hearts ? '<img src="assets/ui_heart.webp" alt="">' : '<img class="lost" src="assets/ui_heart_empty.webp" alt="">')).join(""); }
+  function updateHud() {
+    $("efill").style.width = G.energy + "%"; $("ebar").classList.toggle("full", G.energy >= 100);
+    $("stars").textContent = G.stars;
+  }
+  let bannerTimer = 0;
+  function showBanner(text, small) {
+    const b = $("banner"); b.innerHTML = ""; b.append(text);
+    if (small) { const s = document.createElement("small"); s.textContent = small; b.append(s); }
+    b.classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove("show"), 1900);
+  }
+  function togglePause() {
+    if (G.mode === "play") { G.mode = "pause"; $("pauseScreen").hidden = false; }
+    else if (G.mode === "pause") { G.mode = "play"; $("pauseScreen").hidden = true; }
+  }
+  $("pause").addEventListener("click", togglePause);
+  document.addEventListener("visibilitychange", () => { if (document.hidden && G.mode === "play") togglePause(); });
+  $("resumeBtn").addEventListener("click", togglePause);
+  $("homeBtn").addEventListener("click", () => { $("pauseScreen").hidden = true; toTitle(); });
+  $("againBtn").addEventListener("click", () => { $("winScreen").hidden = true; startGame(0); if (NET.role === "host") sendStart(); });
+
+  function renderLevels() {
+    const box = $("levels"); box.innerHTML = "";
+    LEVELS.forEach((L, i) => {
+      const b = document.createElement("button"); b.className = "lv"; b.disabled = i + 1 > progress;
+      const [a, n] = L.name.split(": "); b.innerHTML = `<b>${a}</b>`; b.append(n);
+      b.addEventListener("click", () => startGame(i));
+      box.append(b);
+    });
+  }
+  function renderHeroes() {
+    const box = $("heroes"); box.innerHTML = "";
+    for (const [k, h] of Object.entries(HEROES)) {
+      const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
+      const f = FR[k + "_stand"], c = document.createElement("canvas"), sc = 1.2; c.width = 130 * sc; c.height = 262 * sc;
+      const k2 = f.s * sc, g = c.getContext("2d");
+      g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
+      b.append(c, h.name);
+      b.addEventListener("click", () => { hero = k; try { localStorage.setItem("dcpt2-hero", k); } catch (e) {} renderHeroes(); });
+      box.append(b);
+    }
+  }
+  function toTitle() {
+    if (NET.role) leaveCoop();
+    G.mode = "title"; renderLevels(); renderHeroes();
+    $("titleScreen").hidden = false; $("hud").hidden = true; $("controls").hidden = true; $("bossbar").hidden = true;
+  }
+  function startGame(i) {
+    initAudio();
+    Object.assign(G, { stars: 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
+    P.elem = null; P.elemT = 0; updateElemHud();
+    buildLevel(i); renderHearts(); updateHud();
+    G.mode = "play"; $("againBtn").hidden = false;
+    $("titleScreen").hidden = true; $("winScreen").hidden = true; $("hud").hidden = false; $("controls").hidden = false; $("bossbar").hidden = true;
+    showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
+  }
+  $("startBtn").addEventListener("click", () => startGame(Math.max(0, progress - 1)));
+
+  // ---------------------------------------------------------------- two-player co-op (claude.ai room)
+  // One iPad hosts: it runs the whole world as in solo play and treats the other girl as a second
+  // target. The guest runs only its own girl, mirrors the host's world from the host's presence,
+  // and reports its spell hits, ultimate and portal entry back as room events.
+  const MKINDS = Object.keys(MON), MST = ["idle", "walk", "prep", "atk", "rest", "web", "fly", "back"];
+  const BST = ["enter", "walk", "prep", "slam", "rest"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
+  const NET = { room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
+    sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false };
+  let Q = null;   // the other girl, as last reported in their presence
+  const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+
+  async function netInit() {
+    let room = null;
+    try { room = window.claude && window.claude.use ? await window.claude.use("room") : null; } catch (e) {}
+    // off claude.ai the two iPads link up directly with a room code instead
+    if (!room) { NET.state = "p2p"; renderCoop(); return; }
+    NET.state = "ok"; attachRoom(room);
+  }
+  function attachRoom(room) {
+    NET.room = room;
+    room.onPeers((ch) => {
+      const me = ch.peers.find((p) => p.sameTab); if (me) NET.me = me.peer;
+      if (NET.partner) { const p = ch.peers.find((p) => p.peer === NET.partner); NET.pp = p ? p.presence : null; }
+      if (NET.co && NET.co.role === "host" && !NET.role) {
+        const j = ch.peers.find((p) => !p.sameTab && p.presence.co && p.presence.co.role === "join" && p.presence.co.host === NET.me);
+        if (j) beginHost(j.peer, j.presence);
+      }
+      renderCoop();
+    }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
+    for (const t of ["start", "hit", "ult", "shoo", "portal", "hurt", "pick", "gain"]) room.on(t, onNet, () => {});
+    renderCoop();
+  }
+
+  // ---- room code play: a stand-in for the claude.ai room over one WebRTC link (PeerJS)
+  const P2P_PREFIX = "dcpt2-room-";
+  function loadPeerJs() {
+    if (window.Peer) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const sc = document.createElement("script"); sc.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
+      sc.onload = res; sc.onerror = () => rej({ type: "network" }); document.head.append(sc);
+    });
+  }
+  async function p2pRoom(code, hosting, onState) {
+    await loadPeerJs();
+    const peer = new window.Peer(hosting ? P2P_PREFIX + code : undefined, { debug: 0 });
+    const peers = new Map(), ph = [], th = {};
+    let mine = Object.freeze({}), conn = null, myId = null, closed = false;
+    const snap = (id, pres) => Object.freeze({ peer: id, by: null, isMe: id === myId, sameTab: id === myId, kind: "viewer", guest: false, presence: pres, updatedAt: Date.now() });
+    const list = () => Object.freeze([...peers.values()]);
+    const fire = (ch) => setTimeout(() => ph.forEach((h) => h({ peers: list(), joined: [], left: [], updated: [], ...ch })), 0);
+    const send = (m) => { if (conn && conn.open) try { conn.send(m); } catch (e) {} };
+    function wire(c) {
+      if (conn && conn !== c) { c.on("open", () => c.close()); return; }   // one partner per room
+      conn = c;
+      c.on("open", () => { send({ k: "pres", presence: mine }); onState("open"); });
+      c.on("data", (m) => {
+        if (!m || typeof m !== "object") return;
+        if (m.k === "pres") {
+          const had = peers.has(c.peer); peers.set(c.peer, snap(c.peer, Object.freeze(m.presence && typeof m.presence === "object" ? m.presence : {})));
+          fire(had ? { updated: [peers.get(c.peer)] } : { joined: [peers.get(c.peer)] });
+        } else if (m.k === "emit" && typeof m.topic === "string")
+          (th[m.topic] || []).forEach((h) => h({ topic: m.topic, data: m.data, peer: c.peer, by: null, isMe: false, sameTab: false, kind: "viewer", guest: false }));
+      });
+      const gone = () => { if (conn !== c) return; conn = null; const pp = peers.get(c.peer); peers.delete(c.peer); if (pp) fire({ left: [pp] }); onState("closed"); };
+      c.on("close", gone); c.on("error", gone);
+    }
+    await new Promise((res, rej) => {
+      peer.on("open", (id) => { myId = id; peers.set(id, snap(id, mine)); res(); });
+      peer.on("error", (e) => { if (!myId) rej(e); else onState("error", e); });
+    });
+    peer.on("disconnected", () => { if (!closed) try { peer.reconnect(); } catch (e) {} });
+    if (hosting) peer.on("connection", wire);
+    else wire(peer.connect(P2P_PREFIX + code, { reliable: true, serialization: "json" }));
+    return {
+      async emit(topic, data) { send({ k: "emit", topic, data }); },
+      on(topic, h) { (th[topic] = th[topic] || []).push(h); return () => {}; },
+      async presence(patch) {
+        const o = { ...mine }; for (const [k, v] of Object.entries(patch)) { if (v === null) delete o[k]; else o[k] = v; }
+        mine = Object.freeze(o); peers.set(myId, snap(myId, mine)); send({ k: "pres", presence: mine }); fire({ updated: [peers.get(myId)] });
+      },
+      peers: list,
+      onPeers(h) { ph.push(h); fire({ joined: list() }); return () => {}; },
+      connected: () => !!(conn && conn.open),
+      destroy() { closed = true; try { peer.destroy(); } catch (e) {} },
+    };
+  }
+  function p2pClose() {
+    if (NET.p2p) { NET.p2p.destroy(); NET.p2p = null; }
+    if (NET.state === "p2p") NET.room = null;
+  }
+  function p2pFail(text) { p2pClose(); NET.co = null; NET.stage = "error"; NET.err = text; renderCoop(); }
+  function p2pState(st, e) {
+    if (NET.role) return;   // in a game, a dropped link is handled by the partner-left timeout
+    if (st === "error") p2pFail(e && e.type === "peer-unavailable" ? "Không tìm thấy phòng có mã này. Kiểm tra lại mã nhé." : "Không kết nối được. Kiểm tra mạng rồi thử lại.");
+    else if (st === "closed" && NET.stage === "joining") p2pFail("Phòng đã đóng.");
+  }
+  async function p2pHost() {
+    NET.stage = "connecting"; renderCoop();
+    for (let i = 0; i < 5; i++) {
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      try {
+        const r = await p2pRoom(code, true, p2pState);
+        if (NET.stage !== "connecting") { r.destroy(); return; }   // cancelled meanwhile
+        NET.p2p = r; NET.code = code; NET.stage = "hosting"; attachRoom(r); setCo({ role: "host", hero }); return;
+      } catch (e) { if (!e || e.type !== "unavailable-id") break; }
+    }
+    p2pFail("Không mở được phòng. Kiểm tra mạng rồi thử lại.");
+  }
+  async function p2pJoin(code) {
+    if (!/^\d{4}$/.test(code)) { NET.stage = "join"; NET.err = "Mã phòng gồm 4 chữ số."; renderCoop(); return; }
+    NET.stage = "connecting"; NET.err = ""; renderCoop();
+    try {
+      const r = await p2pRoom(code, false, (st, e) => {
+        if (st === "open") { NET.stage = "joining"; setCo({ role: "join", host: P2P_PREFIX + code, hero }); }
+        else p2pState(st, e);
+      });
+      if (NET.stage !== "connecting" && NET.stage !== "joining") { r.destroy(); return; }
+      NET.p2p = r; attachRoom(r);
+    } catch (e) { p2pFail("Không kết nối được. Kiểm tra mạng rồi thử lại."); }
+  }
+  function netEmit(topic, data) { if (NET.room && NET.role) NET.room.emit(topic, data).catch(() => {}); }
+  function setCo(co) { NET.co = co; if (NET.room) NET.room.presence({ co }).catch(() => {}); renderCoop(); }
+  function beginHost(peer, pres) {
+    NET.role = "host"; NET.partner = peer; NET.pp = pres; NET.applied = null; Q = null;
+    setCo({ role: "play", with: peer, hero });
+    $("coopScreen").hidden = true;
+    startGame(Math.max(0, progress - 1));
+    sendStart();
+  }
+  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level }); }
+  function leaveCoop() {
+    if (NET.room) NET.room.presence({ co: null, gl: null, sh: null, w: null }).catch(() => {});
+    NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null;
+    if (NET.state === "p2p") { p2pClose(); NET.stage = null; }
+  }
+  function partnerLeft() {
+    const wasGuest = NET.role === "guest";
+    leaveCoop();
+    if (wasGuest && G.mode !== "title") { toTitle(); showBanner("Bạn kia đã rời phòng"); }
+    else showBanner("Bạn kia đã rời phòng", "Bé chơi tiếp một mình");
+  }
+  function onNet(msg) {
+    const d = msg.data && typeof msg.data === "object" ? msg.data : {};
+    if (msg.sameTab) return;
+    if (msg.topic === "start") {
+      const ok = d.to === NET.me && ((NET.co && NET.co.role === "join" && NET.co.host === msg.peer) || (NET.role === "guest" && NET.partner === msg.peer));
+      if (!ok) return;
+      NET.role = "guest"; NET.partner = msg.peer; NET.applied = null; Q = null;
+      const p = NET.room.peers().find((p) => p.peer === msg.peer); NET.pp = p ? p.presence : null;
+      setCo({ role: "play", with: msg.peer, hero });
+      $("coopScreen").hidden = true;
+      startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1));
+      return;
+    }
+    if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
+    if (NET.role === "host") {
+      if (msg.topic === "hit") {
+        const el = ELS[num(d.el)] || null;
+        if (d.boss) { if (G.boss && G.boss.alive) { damageBoss(1, G.boss.x, GY - 220); applyElem(G.boss, el, "q"); } return; }
+        const m = G.mons.find((m) => m.id === d.id && m.alive);
+        if (m) { damageMon(m, 1, Q ? Q.x : m.x, false, "q"); applyElem(m, el, "q"); }
+      } else if (msg.topic === "ult") {
+        ultBlast(num(d.cx), clamp(num(d.hw), 0, 2000)); SFX.boom(); G.shake = 20;
+        if (Q) G.parts.push({ type: "ring", x: Q.x, y: Q.y - 100, r: 40, vr: 2400, life: 0.9, max: 0.9, col: "255,236,170" });
+      } else if (msg.topic === "shoo") shoo(num(d.x));
+      else if (msg.topic === "portal") { if (G.portal && G.portal.open && !P.winT) enterPortal(); }
+    } else if (d.to === NET.me && G.mode === "play") {
+      if (msg.topic === "hurt") { if (d.web) webGirl(); else hurtGirl(num(d.fx)); }
+      else if (msg.topic === "pick") {
+        const x = num(d.x), y = num(d.y);
+        if (DTYPES.includes(d.ty)) pickDrop({ type: d.ty, x, y });
+        else if (["star", "potion", "candy"].includes(d.ty)) pickItem(d.ty, x, y);
+      } else if (msg.topic === "gain") addEnergy(clamp(num(d.n), 0, 30), num(d.x), num(d.y));
+    }
+  }
+  // presence: my girl (both roles) plus the world (host), about 15 times a second
+  function netTick(dt) {
+    if (!NET.room || !NET.role) return;
+    // the partner is gone if they left the room or stopped playing with us
+    const pc = NET.pp && NET.pp.co;
+    const linked = pc && (pc.with === NET.me || (pc.role === "join" && pc.host === NET.me));
+    NET.goneT = linked ? 0 : NET.goneT + dt;
+    if (NET.goneT > 4) return partnerLeft();
+    if (NET.role === "host" && pc && pc.role === "join" && (NET.startT -= dt) <= 0) sendStart();
+    if ((NET.sendT -= dt) > 0) return;
+    NET.sendT = 1 / 15;
+    const patch = { gl: girlState(), sh: G.shots.slice(0, 6).map((s) => [s.x | 0, s.y | 0, ELS.indexOf(s.elem)]) };
+    if (NET.role === "host") patch.w = worldState();
+    NET.room.presence(patch).catch(() => {});
+  }
+  function girlState() {
+    const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0);
+    return [P.x | 0, P.y | 0, P.dir, (G.mode === "play" && girlFrame()) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts];
+  }
+  function worldState() {
+    const B = G.boss;
+    const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0);
+    return {
+      lv: G.level,
+      m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.dir, MST.indexOf(m.st), m.hp,
+        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.guard ? 32 : 0) | (m.summoned ? 64 : 0), Math.round(m.t * 10)]),
+      b: B ? [B.x | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0] : 0,
+      d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.landed ? 1 : 0, Math.round(d.life * 10)]),
+      f: G.foes.map((f) => [f.type === "web" ? 1 : 0, f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
+      v: G.waves.map((w) => [w.x | 0, w.d, Math.round(w.life * 10)]),
+      it: G.items.map((it) => (it.got ? 1 : 0)).join(""),
+      po: G.portal && G.portal.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, won: G.won ? 1 : 0,
+    };
+  }
+  // follow the partner's girl smoothly between presence updates
+  function netFrame(dt) {
+    if (!NET.role) return;
+    const gl = NET.pp && Array.isArray(NET.pp.gl) ? NET.pp.gl : null;
+    if (!gl) return;
+    const x = num(gl[0]), y = num(gl[1]);
+    if (!Q) Q = { x, y, hostInv: 0 };
+    const b = num(gl[4]), k = Math.min(1, dt * 14);
+    Q.x = Math.abs(x - Q.x) > 500 ? x : Q.x + (x - Q.x) * k; Q.y = Math.abs(y - Q.y) > 500 ? y : Q.y + (y - Q.y) * k;
+    Q.dir = gl[2] < 0 ? -1 : 1; Q.hero = gl[7] === "s" ? "s" : "g";
+    Q.fn = typeof gl[3] === "string" && gl[3].startsWith(Q.hero + "_") && FR[gl[3]] ? gl[3] : "";
+    Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16);
+    Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
+    Q.sh = Array.isArray(NET.pp.sh) ? NET.pp.sh.slice(0, 6) : [];
+    Q.hostInv -= dt;
+  }
+
+  // ---- guest: mirror the host's world
+  function applySnapshot() {
+    const w = NET.pp && NET.pp.w;
+    if (!w || typeof w !== "object" || w === NET.applied) return;
+    NET.applied = w;
+    const lv = clamp(Math.floor(num(w.lv)), 0, LEVELS.length - 1);
+    if (lv !== G.level) {
+      if (!NET.lvBusy) {
+        NET.lvBusy = true; P.winT = 1.6; P.vx = 0; SFX.portal();
+        progress = Math.max(progress, lv + 1);
+        try { localStorage.setItem("dcpt2-progress", String(progress)); } catch (e) {}
+        setTimeout(() => fadeTo(() => {
+          const now = NET.pp && NET.pp.w ? clamp(Math.floor(num(NET.pp.w.lv)), 0, LEVELS.length - 1) : lv;
+          buildLevel(now); NET.lvBusy = false; NET.applied = null;
+          showBanner(LEVELS[now].name.split(": ")[1], LEVELS[now].name.split(": ")[0]);
+        }), 900);
+      }
+      return;
+    }
+    // monsters
+    const seen = new Set();
+    for (const a of Array.isArray(w.m) ? w.m : []) {
+      if (!Array.isArray(a)) continue;
+      const id = num(a[0]), kind = MKINDS[num(a[1])], x = num(a[2]), y = num(a[3]), bits = num(a[7]);
+      if (!kind) continue;
+      seen.add(id);
+      let m = G.mons.find((m) => m.id === id);
+      if (!m) {
+        m = makeMon(kind, x, MON[kind].fly ? y : 0, false); m.id = id; m.x = x; m.y = y; m.awake = true; G.mons.push(m);
+        if (bits & 64) burst(x, y, 14, ["#b9a4ff", "#fff"], 220, 0.5);
+      }
+      if (!m.alive) continue;
+      m.tx = x; m.ty = y; m.dir = a[4] < 0 ? -1 : 1; m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]);
+      m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
+      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.guard = !!(bits & 32);
+    }
+    for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
+      m.alive = false; m.die = 0; SFX.pop();
+      const c = monCenter(m); burst(c.x, c.y, 22, ["#fff4c2", "#ffd34d", "#ff9ad5", "#b9a4ff"], 420, 0.8);
+    }
+    // boss
+    if (Array.isArray(w.b) && G.lvl.arena) {
+      const [x, dir, si, hp, t10, bits, dropY, alive] = w.b.map(num);
+      if (!G.boss) {
+        G.boss = { x, tx: x, y: GY, dir: -1, hp, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, alive: true, die: 0, dropY };
+        $("bossbar").hidden = false; SFX.roar(); showBanner("Vua Bí Ngô!", "Nhảy qua sóng xung kích"); G.shake = 18;
+      }
+      const B = G.boss, st = BST[si] || "walk";
+      if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(x + dir * 200, GY, 26); }
+      B.tx = x; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY;
+      if (bits & 1) B.flash = 0.12; B.hurtPose = bits & 2 ? 0.1 : 0;
+      B.slow = bits & 4 ? 1 : 0; B.burn = bits & 8 ? 1 : 0; B.poison = bits & 16 ? 1 : 0;
+      if (!alive && B.alive) { B.alive = false; B.die = 0; SFX.boom(); G.shake = 26; burst(B.x, GY - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4); }
+      updateBossBar();
+    }
+    if (w.al && !G.arenaLock && G.lvl.arena) {
+      G.arenaLock = true;
+      if (P.x < G.lvl.arena + 40) fadeTo(() => { P.x = G.lvl.arena + 250; P.vx = 0; });
+    }
+    // drops, enemy projectiles, shockwaves
+    const drops = [];
+    for (const a of Array.isArray(w.d) ? w.d : []) {
+      if (!Array.isArray(a) || !DTYPES[num(a[1])]) continue;
+      const old = G.drops.find((d) => d.id === a[0]);
+      drops.push({ id: a[0], type: DTYPES[num(a[1])], x: old ? old.x : num(a[2]), y: old ? old.y : num(a[3]), tx: num(a[2]), ty: num(a[3]), landed: !!a[4], life: num(a[5]) / 10, ph: old ? old.ph : Math.random() * 6 });
+    }
+    G.drops = drops;
+    G.foes = (Array.isArray(w.f) ? w.f : []).filter(Array.isArray).map((a) => ({ type: a[0] ? "web" : "fire", x: num(a[1]), y: num(a[2]), vx: num(a[3]), vy: num(a[4]), life: 1 }));
+    G.waves = (Array.isArray(w.v) ? w.v : []).filter(Array.isArray).map((a) => ({ x: num(a[0]), d: a[1] < 0 ? -1 : 1, life: num(a[2]) / 10, sp: 640 }));
+    // items, portal, score
+    if (typeof w.it === "string") G.items.forEach((it, i) => (it.got = w.it[i] === "1"));
+    if (G.portal && w.po && !G.portal.open) { G.portal.open = true; SFX.unlock(); showBanner("Cổng phép đã mở!", "Đi vào cổng để sang màn mới"); }
+    G.stars = num(w.st); G.kills = num(w.k); updateHud();
+    if (w.won && !G.won) winGame();
+  }
+  function guestWorld(dt) {
+    applySnapshot();
+    const k = Math.min(1, dt * 14);
+    for (const m of G.mons) {
+      if (!m.alive) { m.die += dt; continue; }
+      const ox = m.x;
+      m.x = Math.abs(m.tx - m.x) > 600 ? m.tx : m.x + (m.tx - m.x) * k;
+      m.y = Math.abs(m.ty - m.y) > 600 ? m.ty : m.y + (m.ty - m.y) * k;
+      m.dist += Math.abs(m.x - ox); m.t += dt; m.flash -= dt;
+    }
+    G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
+    const B = G.boss;
+    if (B) { B.x += (B.tx - B.x) * k; B.t += dt; B.flash -= dt; if (!B.alive) { B.die += dt; } }
+    for (const d of G.drops) { d.x += (d.tx - d.x) * k; d.y += (d.ty - d.y) * k; d.life -= dt; }
+    for (const f of G.foes) {
+      f.x += f.vx * dt; f.y += f.vy * dt; if (f.type === "web") f.vy += 500 * dt;
+      if (f.type === "fire" && Math.random() < 0.9) G.parts.push({ type: "dot", x: f.x, y: f.y, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
+    }
+    for (const w of G.waves) { w.x += w.d * w.sp * dt; w.life -= dt; if (Math.random() < 0.6) dust(w.x, GY, 1); }
+    updateShots(dt);
+    if (G.portal) {
+      G.portal.t += dt;
+      if (G.portal.open && !NET.portalSent && !P.dead && Math.abs(P.x - G.portal.x) < 70) { NET.portalSent = true; netEmit("portal", {}); }
+    }
+  }
+
+  // ---- drawing the partner
+  function drawPartner() {
+    if (!Q || !NET.role) return;
+    const H = HEROES[Q.hero];
+    for (const sh of Q.sh) drawBolt(num(sh[0]), num(sh[1]), Q.dir * 1500, 0, ELS[num(sh[2])] || null, Q.hero);
+    const L = G.camX - 120, R = G.camX + VW + 120, topY = Q.y - (Q.hero === "s" ? 290 : 245);
+    if (Q.x < L || Q.x > R) {
+      // off screen: an arrow at the edge pointing to her
+      const left = Q.x < L, ex = left ? G.camX + 60 : G.camX + VW - 60, ey = clamp(Q.y - 120, 200, GY - 60);
+      glow(ex, ey, 70, H.rgb, 0.5);
+      ctx.save(); ctx.fillStyle = "#fff"; ctx.beginPath();
+      ctx.moveTo(ex + (left ? -34 : 34), ey); ctx.lineTo(ex + (left ? 6 : -6), ey - 26); ctx.lineTo(ex + (left ? 6 : -6), ey + 26); ctx.closePath(); ctx.fill();
+      ctx.font = "800 28px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.lineWidth = 5; ctx.strokeStyle = "rgba(0,0,0,.6)";
+      ctx.strokeText(H.name, ex + (left ? 30 : -30), ey + 62); ctx.fillText(H.name, ex + (left ? 30 : -30), ey + 62); ctx.restore();
+      return;
+    }
+    if (Q.ultT > 0) { glow(Q.x, Q.y - 100, 260, "255,236,170", 0.55); spr(Q.hero + "_light", Q.x, Q.y, Q.dir < 0); }
+    else if (Q.fn) {
+      const shY = shadowY(Q);
+      if (shY !== null) { ctx.save(); ctx.globalAlpha = 0.25; ctx.fillStyle = "#000"; ctx.beginPath(); const k = clamp(1 - (shY - Q.y) / 500, 0.3, 1); ctx.ellipse(Q.x, shY + 2, 48 * k, 9 * k, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+      const blink = Q.inv && !Q.dead && Math.floor(G.t * 16) % 2 === 0;
+      spr(Q.fn, Q.x, Q.y, Q.dir < 0, 1, blink ? 0.45 : 1);
+      if (Q.cast) glow(Q.x + Q.dir * H.tip[0], Q.y + H.tip[1], 60, Q.elem ? ELEM[Q.elem].rgb : H.rgb, 0.7);
+      if (Q.elem) glow(Q.x, Q.y - 100, 150, ELEM[Q.elem].rgb, 0.16 + 0.06 * Math.sin(G.t * 5));
+      if (Q.slow) drawWeb(Q.x, Q.y - 70, 40, 1);
+    }
+    // name tag and hearts
+    ctx.save(); ctx.font = "800 30px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.lineWidth = 5; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.fillStyle = "#fff";
+    ctx.strokeText(H.name, Q.x, topY); ctx.fillText(H.name, Q.x, topY);
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = i < Q.hearts ? "#ff5a7a" : "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.arc(Q.x - 40 + i * 20, topY + 18, 7, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // ---- lobby
+  function renderCoop() {
+    if ($("coopScreen").hidden) return;
+    const msg = $("coopMsg"), box = $("coopBtns"); box.innerHTML = "";
+    const btn = (txt, fn, ghost) => { const b = document.createElement("button"); b.className = "btn" + (ghost ? " ghost" : ""); b.textContent = txt; b.addEventListener("click", fn); box.append(b); };
+    if (NET.state === "wait") { msg.textContent = "Đang kết nối…"; return; }
+    if (NET.state === "p2p") return renderP2p(msg, box, btn);
+    if (NET.state === "none") { msg.textContent = "Chơi 2 người chỉ chạy khi mở game trên trang claude.ai. Hãy mở cùng đường link này trên cả hai iPad."; return; }
+    if (NET.co && NET.co.role === "host") { msg.textContent = "Đã mở phòng. Trên iPad kia, bấm “Chơi 2 người” rồi bấm “Vào chơi cùng”."; btn("Huỷ phòng", () => setCo(null), true); return; }
+    if (NET.co && NET.co.role === "join") { msg.textContent = "Đang vào phòng…"; btn("Huỷ", () => setCo(null), true); return; }
+    const others = NET.room.peers().filter((p) => !p.sameTab);
+    const hosts = others.filter((p) => p.presence.co && p.presence.co.role === "host");
+    msg.textContent = hosts.length ? "Có bạn đang mở phòng. Bấm để vào chơi cùng."
+      : others.length ? "iPad kia đã mở game. Một bé bấm “Mở phòng”, bé còn lại bấm “Vào chơi cùng”."
+      : "Chưa thấy iPad nào khác. Hãy mở cùng đường link này trên iPad thứ hai.";
+    for (const h of hosts) {
+      const hk = h.presence.co.hero === "s" ? "s" : "g";
+      btn("Vào chơi cùng " + HEROES[hk].name, () => setCo({ role: "join", host: h.peer, hero }));
+    }
+    btn("Mở phòng", () => setCo({ role: "host", hero }), hosts.length > 0);
+  }
+  function renderP2p(msg, box, btn) {
+    const cancel = () => { p2pClose(); NET.co = null; NET.stage = null; NET.err = ""; renderCoop(); };
+    if (NET.stage === "connecting" || NET.stage === "joining") { msg.textContent = "Đang kết nối…"; btn("Huỷ", cancel, true); return; }
+    if (NET.stage === "hosting") {
+      msg.innerHTML = ""; msg.append("Mã phòng của bé:");
+      const c = document.createElement("span"); c.className = "roomcode"; c.textContent = NET.code; msg.append(c);
+      msg.append("Trên iPad kia, bấm “Chơi 2 người” → “Vào phòng” rồi nhập mã này.");
+      btn("Huỷ phòng", cancel, true); return;
+    }
+    if (NET.stage === "join") {
+      msg.textContent = NET.err || "Nhập mã phòng 4 chữ số đang hiện trên iPad kia:";
+      const inp = document.createElement("input"); inp.className = "codein"; inp.inputMode = "numeric"; inp.maxLength = 4; inp.autocomplete = "off"; inp.placeholder = "• • • •";
+      inp.addEventListener("input", () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 4); if (inp.value.length === 4) p2pJoin(inp.value); });
+      box.append(inp); btn("Vào", () => p2pJoin(inp.value)); btn("Quay lại", cancel, true);
+      setTimeout(() => inp.focus(), 50); return;
+    }
+    msg.textContent = NET.stage === "error" ? NET.err : "Hai iPad cần có mạng, tốt nhất cùng một wifi. Một bé bấm “Mở phòng”, bé kia bấm “Vào phòng” rồi nhập mã.";
+    btn("Mở phòng", p2pHost); btn("Vào phòng", () => { NET.stage = "join"; NET.err = ""; renderCoop(); }, true);
+  }
+  $("coopBtn").addEventListener("click", () => { initAudio(); $("titleScreen").hidden = true; $("coopScreen").hidden = false; renderCoop(); });
+  $("coopBack").addEventListener("click", () => {
+    if (NET.co && !NET.role) setCo(null);
+    if (NET.state === "p2p" && !NET.role) { p2pClose(); NET.stage = null; NET.err = ""; } $("coopScreen").hidden = true; $("titleScreen").hidden = false; });
+
+  // ---------------------------------------------------------------- loop
+  let last = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    if (!ready) return;
+    try {
+      if (G.mode === "play") update(dt);
+      else if (G.mode === "title" && G.lvl) { G.t += dt; G.camX = (Math.sin(G.t * 0.05) * 0.5 + 0.5) * 2400; updateParts(dt); }
+      else if (G.mode === "win") { G.t += dt; updateParts(dt); if (Math.random() < 0.3) burst(G.camX + rnd(0, VW), rnd(200, 600), 12, ["#ffd34d", "#ff9ad5", "#b9a4ff", "#7cf2c6"], 300, 1); }
+      render();
+      if (music && AC) music.tick();
+      netTick(dt);
+    } catch (err) { console.error(err); }
+  }
+  requestAnimationFrame(loop);
+
+  async function boot() {
+    try { await loadAssets(); }
+    catch (e) { $("loading").textContent = "Không tải được hình ảnh. Hãy tải lại trang."; return; }
+    buildLevel(0); G.mode = "title"; ready = true;
+    renderLevels(); renderHeroes();
+    $("loading").hidden = true; $("startBtn").hidden = false; $("coopBtn").hidden = false;
+    $("startBtn").textContent = progress > 1 ? `Chơi tiếp màn ${progress}` : "Bắt đầu";
+  }
+  // test hook for automated checks
+  window.__dcpt = { G, P, IN, joy, startGame, buildLevel, LEVELS, FR, keys, NET, getQ: () => Q, setHero: (k) => { hero = k; renderHeroes(); } };
+  boot();
+  netInit();
+})();
+</script>
+</body></html>
