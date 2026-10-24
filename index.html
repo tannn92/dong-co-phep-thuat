@@ -109,6 +109,8 @@
   .levels { display: flex; gap: .6em; flex-wrap: wrap; justify-content: center; }
   .lv { border: 0; border-radius: 16px; padding: .5em .9em; font-family: var(--display); font-weight: 800; font-size: .95em; color: var(--cream); background: rgba(255,255,255,.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); touch-action: manipulation; }
   .lv:disabled { opacity: .35; }
+  .lv[aria-pressed="true"] { background: rgba(255,211,77,.24); box-shadow: inset 0 0 0 3px var(--gold), 0 0 16px rgba(255,211,77,.45); }
+  .pick { font-family: var(--display); font-weight: 800; font-size: .95em; color: var(--muted); margin-top: .2em; }
   .lv b { display: block; font-size: .7em; color: var(--muted); font-family: var(--body); }
   .btn { border: 0; border-radius: 999px; padding: .7em 2.2em; font-family: var(--display); font-weight: 800; font-size: 1.35em; color: #3b2400; background: linear-gradient(180deg, #ffe9a6, var(--gold) 55%, var(--gold-deep)); box-shadow: 0 6px 0 #9a5410, 0 12px 26px rgba(0,0,0,.45); touch-action: manipulation; }
   .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #9a5410, 0 6px 16px rgba(0,0,0,.45); }
@@ -160,10 +162,11 @@
     <h1>Đồng Cỏ <span>Phép Thuật</span></h1>
     <p>Yêu quái chiếm bốn vùng đất. Chọn Mochi hoặc chị Matcha, đi theo đường đá qua đồng cỏ, rừng ma, nghĩa địa và lâu đài để đánh bại <b>Vua Bí Ngô</b>.</p>
     <div class="heroes" id="heroes"></div>
+    <div class="pick">Chọn màn chơi</div>
     <div class="levels" id="levels"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
-    <div class="row"><button class="btn" id="startBtn" hidden>Bắt đầu</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
+    <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
   </div>
 </div>
 
@@ -179,7 +182,7 @@
 <div class="screen" id="pauseScreen" hidden>
   <div class="card">
     <h1>Tạm <span>dừng</span></h1>
-    <div class="row"><button class="btn" id="resumeBtn">Chơi tiếp</button><button class="btn ghost" id="homeBtn">Về màn đầu</button></div>
+    <div class="row"><button class="btn" id="resumeBtn">Chơi tiếp</button><button class="btn ghost" id="homeBtn">Về trang chính</button></div>
   </div>
 </div>
 
@@ -504,9 +507,7 @@
   const IN = { ultPressed: false };
   let progress = 1;
   try { progress = Math.max(1, Math.min(4, +localStorage.getItem("dcpt3-progress") || 1)); } catch (e) {}
-  // rescued pets, kept per sister
-  function loadPets() { try { P.pets = (localStorage.getItem("dcpt3-pets-" + hero) || "").split(",").filter((k) => PETS[k] && PETS[k].owner === hero); } catch (e) { P.pets = []; } }
-  loadPets();
+  function loadPets() { P.pets = []; }   // each game sets her pets in startGame
 
   // ---------------------------------------------------------------- map generation
   // A winding path: Catmull-Rom spline through 10-14 control points zig-zagging across the world, resampled every STEP units.
@@ -1496,7 +1497,6 @@
   function rescuePet(kind) {
     if (!P.pets.includes(kind)) {
       P.pets.push(kind);
-      try { localStorage.setItem("dcpt3-pets-" + hero, P.pets.join(",")); } catch (e) {}
       makePetEnts();
     }
     showBanner(HD().name + " đã cứu " + PETS[kind].name + "!", PETS[kind].tip);
@@ -2472,12 +2472,16 @@
   $("homeBtn").addEventListener("click", () => { $("pauseScreen").hidden = true; toTitle(); });
   $("againBtn").addEventListener("click", () => { $("winScreen").hidden = true; startGame(0); if (NET.role === "host") sendStart(); });
 
+  // the home screen: pick a level (any one reached so far, Màn 1 = from the start), then play alone or together.
+  // In two-player the room's host picks the level.
+  let selLv = Math.max(0, progress - 1);
   function renderLevels() {
     const box = $("levels"); box.innerHTML = "";
+    selLv = clamp(selLv, 0, progress - 1);
     LEVELS.forEach((L, i) => {
-      const b = document.createElement("button"); b.className = "lv"; b.disabled = i + 1 > progress;
-      const [a, n] = L.name.split(": "); b.innerHTML = `<b>${a}</b>`; b.append(n);
-      b.addEventListener("click", () => (OUTFITS_ON ? openWardrobe(() => startGame(i)) : startGame(i)));
+      const b = document.createElement("button"); b.className = "lv"; b.disabled = i + 1 > progress; b.setAttribute("aria-pressed", i === selLv);
+      const [a, n] = L.name.split(": "); b.innerHTML = `<b>${a}${i + 1 > progress ? " · chưa mở" : ""}</b>`; b.append(n);
+      b.addEventListener("click", () => { selLv = i; renderLevels(); });
       box.append(b);
     });
   }
@@ -2577,9 +2581,9 @@
   $("wardBack").addEventListener("click", () => { $("wardScreen").hidden = true; $("titleScreen").hidden = false; });
   function toTitle() {
     if (NET.role) leaveCoop();
+    if (G.mode !== "title" && G.lvl) selLv = G.level;   // back home: the level she was on is picked
     G.mode = "title"; renderLevels(); renderHeroes();
     $("titleScreen").hidden = false; $("hud").hidden = true; $("controls").hidden = true; $("bossbar").hidden = true; $("winScreen").hidden = true;
-    $("startBtn").textContent = progress > 1 ? `Chơi tiếp màn ${progress}` : "Bắt đầu";
   }
   // starting straight at a later level gives the girl a head start in experience
   function startGame(i) {
@@ -2587,13 +2591,15 @@
     initAudio();
     Object.assign(G, { stars: 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
+    // her pet: rescued on the way from Màn 1, already with her when she starts further on
+    P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero) : [];
     buildLevel(i); renderHearts(); updateHud(); questTxt = null; updateQuest();
     G.mode = "play"; $("againBtn").hidden = false;
     for (const id of ["titleScreen", "winScreen", "pauseScreen", "wardScreen", "bossbar"]) $(id).hidden = true;
     $("hud").hidden = false; $("controls").hidden = false;
     showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
   }
-  $("startBtn").addEventListener("click", () => openWardrobe(() => startGame(Math.max(0, progress - 1))));
+  $("startBtn").addEventListener("click", () => (OUTFITS_ON ? openWardrobe(() => startGame(selLv)) : startGame(selLv)));
 
   // ---------------------------------------------------------------- two-player co-op (claude.ai room, or a PeerJS room code)
   // One iPad hosts: it runs the whole world (monsters, drops, gems, chests, boss) and treats the other girl as a second
@@ -2740,7 +2746,7 @@
     NET.role = "host"; NET.partner = peer; NET.pp = pres; NET.applied = null; Q = null; NET.quietT = 0;
     setCo({ role: "play", with: peer, hero });
     $("coopScreen").hidden = true;
-    startGame(Math.max(0, progress - 1));
+    startGame(selLv);
     sendStart();
   }
   function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level }); }
@@ -3035,6 +3041,7 @@
       msg.innerHTML = ""; msg.append("Mã phòng của bé:");
       const c = document.createElement("span"); c.className = "roomcode"; c.textContent = NET.code; msg.append(c);
       msg.append("Trên iPad kia, bấm “Chơi 2 người” → “Vào phòng” rồi nhập mã này.");
+      const lv = document.createElement("small"); lv.className = "pick"; lv.style.display = "block"; lv.textContent = "Hai bé sẽ chơi " + LEVELS[selLv].name; msg.append(lv);
       btn("Huỷ phòng", cancel, true); return;
     }
     if (NET.stage === "join") {
@@ -3088,7 +3095,6 @@
     buildLevel(0); G.mode = "title"; ready = true;
     renderLevels(); renderHeroes(); updateXpHud();
     $("loading").hidden = true; $("startBtn").hidden = false; $("coopBtn").hidden = false;
-    $("startBtn").textContent = progress > 1 ? `Chơi tiếp màn ${progress}` : "Bắt đầu";
   }
   // test hooks for automated checks. __dcpt3.autopilot = true makes this girl walk the path on her own.
   const API = window.__dcpt3 = {
