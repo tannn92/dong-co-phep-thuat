@@ -312,7 +312,7 @@
     try {
       AC = new (window.AudioContext || window.webkitAudioContext)();
       master = AC.createGain(); master.gain.value = muted ? 0 : 0.9; master.connect(AC.destination);
-      startMusic();
+      loadSamples();
     } catch (e) { AC = null; }
   }
   const NB = {};
@@ -367,6 +367,42 @@
     level() { [659, 880, 1108, 1318, 1760].forEach((f, i) => tone("triangle", f, f, 0.3, 0.07, i * 0.07)); },
     chest() { noise(0.15, 0.12, 900, 0.8); [1046, 1318, 1568, 2093].forEach((f, i) => tone("triangle", f, f, 0.3, 0.06, 0.08 + i * 0.07)); },
   });
+  // recorded sounds (CC0, assets/sfx; see art/sfx/CREDITS.txt) replace the synth ones once loaded.
+  // vol: loudness per sound; rate: random pitch spread so repeats do not sound identical
+  const SAMPLE = {}, SVOL = { zap: [0.16, 0.12], hit: [0.35, 0.15], pop: [0.45, 0.12], hurt: [0.55, 0.05], bite: [0.5, 0.1], scratch: [0.5, 0.15],
+    gem: [0.22, 0.12], star: [0.35, 0.08], heal: [0.45, 0], candy: [0.45, 0], ready: [0.5, 0], level: [0.6, 0], chest: [0.6, 0], unlock: [0.55, 0],
+    win: [0.7, 0], portal: [0.6, 0], charge: [0.6, 0], boom: [0.8, 0], slam: [0.7, 0.05], bell: [0.4, 0], meow: [0.7, 0.05] };
+  let musicSrc = null, musicGain = null;
+  async function loadSamples() {
+    let meta;
+    try { meta = await (await fetch("assets/sfx/sfx.json")).json(); } catch (e) { startMusic(); return; }
+    const get = async (fn) => AC.decodeAudioData(await (await fetch("assets/sfx/" + fn)).arrayBuffer());
+    // music first (it starts as soon as it is ready), then the effects
+    get(meta._music).then((buf) => {
+      musicGain = AC.createGain(); musicGain.gain.value = 0.32; musicGain.connect(master);
+      musicSrc = AC.createBufferSource(); musicSrc.buffer = buf; musicSrc.loop = true; musicSrc.connect(musicGain); musicSrc.start();
+      music = { tick() { musicSrc.playbackRate.value = G.boss && G.boss.alive ? 1.08 : 1; } };
+    }).catch(() => startMusic());
+    for (const [name, files] of Object.entries(meta)) {
+      if (name[0] === "_") continue;
+      Promise.all(files.map(get)).then((bufs) => (SAMPLE[name] = bufs)).catch(() => {});
+    }
+  }
+  // play a recorded sound; false when it is not loaded (the caller then falls back to the synth)
+  function sample(name, volK = 1) {
+    const bufs = SAMPLE[name]; if (!AC || !bufs) return false;
+    const [v, spread] = SVOL[name] || [0.5, 0];
+    const src = AC.createBufferSource(); src.buffer = bufs[Math.floor(Math.random() * bufs.length)];
+    src.playbackRate.value = 1 + (Math.random() * 2 - 1) * spread;
+    const g = AC.createGain(); g.gain.value = v * volK; src.connect(g); g.connect(master); src.start();
+    return true;
+  }
+  for (const n of Object.keys(SVOL)) {
+    const synth = SFX[n];
+    SFX[n] = () => { if (!sample(n) && synth) synth(); };
+  }
+  // the ultimate: the spell chime over the synth's deep boom
+  { const synthBoom = SFX.boom; SFX.boom = () => { tone("sine", 110, 28, 1.4, 0.5); noise(1.2, 0.35, 600, 0.4, 0, "lowpass"); if (!sample("boom")) synthBoom(); sample("bell", 0.8); }; }
   function startMusic() {
     const MAJ = [587.3, 659.3, 740, 880, 987.8, 1174.7], MIN = [587.3, 698.5, 784, 880, 1046.5, 1174.7];
     let next = AC.currentTime + 0.2, step = 0;
@@ -1532,6 +1568,7 @@
     SFX.unlock(); burst(c.x, c.y - 80, 30, ["#fff4c2", "#ffd34d", PETS[c.kind].col], 420, 0.8);
   }
   function rescuePet(kind) {
+    if (kind === "cat") SFX.meow();
     if (!P.pets.includes(kind)) {
       P.pets.push(kind);
       makePetEnts();
@@ -1609,7 +1646,7 @@
   }
   function petHitFx(kind, x, y, rot) {
     if (PETS[kind].bite) { G.parts.push({ type: "bite", x, y: y - 60, vx: 0, vy: 0, life: 0.32, max: 0.32 }); SFX.bite(); }
-    else { G.parts.push({ type: "claw", x, y: y - 70, vx: 0, vy: 0, rot, life: 0.32, max: 0.32 }); play("hit"); }
+    else { G.parts.push({ type: "claw", x, y: y - 70, vx: 0, vy: 0, rot, life: 0.32, max: 0.32 }); SFX.scratch(); }
     G.shake = Math.max(G.shake, 3);
   }
   // the partner's pets go where their page says (pouncing included); older pages without positions just follow her
@@ -3196,6 +3233,7 @@
     getQ: () => Q,
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadPets(); renderHeroes(); },
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
+    audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc }),
     heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet,
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     killAll: () => { for (const m of G.mons) if (m.alive) killMon(m, true, "p"); },
