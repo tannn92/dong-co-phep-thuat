@@ -1988,7 +1988,7 @@
       const k = clamp((t - say) / 0.25, 0, 1);
       const words = ["Cảm ơn nhé!", "Cảm ơn!", "Cảm ơn các bạn!", "Hai bạn giỏi quá!", "Cảm ơn HUNTR/X!"][b.i];
       ctx.save(); ctx.globalAlpha = k;
-      ctx.font = "800 34px Grandstander, system-ui"; const w = ctx.measureText(words).width + 36, y = b.y - 320 - (b.i % 2) * 55;
+      ctx.font = "800 34px Grandstander, system-ui"; const w = ((ctx.measureText(words) || {}).width || words.length * 18) + 36, y = b.y - 320 - (b.i % 2) * 55;
       ctx.fillStyle = "#fff"; rrect(ctx, b.x - w / 2, y - 44, w, 60, 26); ctx.fill();
       ctx.beginPath(); ctx.moveTo(b.x - 14, y + 14); ctx.lineTo(b.x + 14, y + 14); ctx.lineTo(b.x, y + 40); ctx.fill();
       ctx.fillStyle = "#8a2b6a"; ctx.textAlign = "center"; ctx.fillText(words, b.x, y - 2); ctx.restore();
