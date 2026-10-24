@@ -173,7 +173,7 @@
 <div class="screen" id="titleScreen">
   <div class="card">
     <h1>Đồng Cỏ <span>Phép Thuật</span></h1>
-    <p>Yêu quái chiếm bốn vùng đất. Chọn Mochi hoặc chị Matcha, đi theo đường đá qua đồng cỏ, rừng ma, nghĩa địa và lâu đài để đánh bại <b>Vua Bí Ngô</b>.</p>
+    <p>Yêu quái chiếm năm vùng đất. Chọn Mochi hoặc chị Matcha, đi qua đồng cỏ, rừng ma, nghĩa địa, lâu đài và sân khấu cuối cùng để đánh bại <b>Gwi Ma</b>.</p>
     <div class="heroes" id="heroes"></div>
     <div class="pick">Chọn màn chơi</div>
     <div class="levels" id="levels"></div>
@@ -213,7 +213,7 @@
 <div class="screen" id="winScreen" hidden>
   <div class="card">
     <h1>Bé đã <span>chiến thắng!</span></h1>
-    <p>Vua Bí Ngô đã bị đánh bại. Đồng Cỏ Phép Thuật lại bình yên.</p>
+    <p>Gwi Ma đã bị đánh bại. Saja Boys được giải cứu, Đồng Cỏ Phép Thuật lại bình yên.</p>
     <p id="winStats"></p>
     <button class="btn" id="againBtn">Chơi lại</button>
   </div>
@@ -436,22 +436,22 @@
   // spawn: monsters per second at start / after the 5-minute ramp. camps: monster camps waiting beside the path.
   // gr: ground palette. deco: [sprite, weight] scattered beside the path. pets: caged friends to rescue along the path (PETS[k].at).
   const LEVELS = [
-    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
+    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", arena: true, boss: { art: "mboss_d0", name: "Bù Nhìn Khổng Lồ", hp: 30, tip: "Cẩn thận cây cào đập đất!", summon: "bat" }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
       kinds: [["zombie", 3, 0], ["bat", 2, 0], ["skeleton", 2, 0.15], ["ghost", 2, 0.35]],
       deco: [["tree", 3], ["bush", 4], ["mushrooms", 1], ["pumpkin2", 1], ["pumpkin3", 1]],
       gr: { base: "#679c4a", patch: ["#84b75c", "#558a3e", "#76a94f"], blade: ["#93c96a", "#4f8a3a", "#a6d77a"], dot: ["#ffd3f0", "#fff3b0", "#ffffff", "#ff9ec7", "#c9b6ff"], nDot: 70,
         stone: ["#e3d4b4", "#d8c7a3", "#cdb995"], gap: "#9c8a6c", edge: "#6f5d44" } },
-    { name: "Màn 2: Rừng Ma", seed: 2207, path: "loop", quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
+    { name: "Màn 2: Rừng Ma", seed: 2207, path: "loop", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa gọi đàn nhện con!", summon: "spider" }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
       kinds: [["spider", 3, 0], ["ghost", 2, 0], ["bat", 2, 0.1], ["mummy", 2, 0.3]],
       deco: [["tree", 4], ["mushrooms", 4], ["bush", 2], ["pumpkin3", 1]],
       gr: { base: "#3f5340", patch: ["#536b4a", "#2f3f34", "#4d4466", "#45405c"], blade: ["#5f7d55", "#2c3a2e", "#6b5f86"], dot: ["#b9a4ff", "#7cf2c6", "#e0b8ff"], nDot: 45,
         stone: ["#a3a69a", "#959a8c", "#8a9180"], gap: "#5a5e55", edge: "#2a302c" } },
-    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", quota: 160, spawn: [0.8, 1.8], camps: 11, pets: ["mira"],
+    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", arena: true, boss: { art: "mboss_d2", name: "Hiệp Sĩ Xương", hp: 50, tip: "Thanh kiếm đập tạo sóng xung kích!", summon: "skeleton" }, quota: 160, spawn: [0.8, 1.8], camps: 11, pets: ["mira"],
       kinds: [["skeleton", 3, 0], ["bat", 2, 0], ["mummy", 2, 0.1], ["witch", 1, 0.25], ["vampire", 1, 0.45]],
       deco: [["grave1", 3], ["grave2", 3], ["tree", 1], ["pumpkin3", 1], ["pumpkin1", 1]],
       gr: { base: "#4f4a5a", patch: ["#5d5768", "#423d4c", "#5a5a4a", "#5b4a5e"], blade: ["#6a6577", "#3d3846", "#6e6a52"], dot: ["#d8d0e8", "#ff9ab8"], nDot: 30,
         stone: ["#bdb5bf", "#aea5b2", "#a39aa8"], gap: "#6e6578", edge: "#35303d" } },
-    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true, pets: ["rumi"],
+    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true, boss: { art: "boss", name: "Vua Bí Ngô", hp: 70, tip: "Tránh xa vòng sóng xung kích", summon: "bat" }, pets: ["rumi"],
       kinds: [["skeleton", 2, 0], ["bat", 2, 0], ["mummy", 2, 0.05], ["witch", 2, 0.15], ["vampire", 2, 0.3]],
       deco: [["pumpkin1", 3], ["pumpkin2", 3], ["pumpkin3", 2], ["grave2", 1], ["bush", 1]],
       gr: { base: "#5a5660", patch: ["#66616d", "#4b4852", "#55604f"], blade: ["#6d6977", "#46424d"], dot: ["#f6c453"], nDot: 12, tiles: true,
@@ -485,15 +485,15 @@
     ghost:    { hp: 2, en: 7,  spd: 95,  reach: 380, prep: 0.5, atk: 0.55, cd: 1.3, fly: true, hgt: 110 },
     bat:      { hp: 1, en: 5,  spd: 150, reach: 460, prep: 0.35, atk: 0.6, cd: 1.5, fly: true, hgt: 170 },
     // the Saja Boys as demons (level 5): saja = fighting style, see updateSaja. heavy: barely knocked back
-    saja_mystery: { hp: 22, en: 20, spd: 150, prep: 0.5, atk: 0.4, cd: 2.6, saja: "phase", heavy: true, name: "Mystery" },
-    saja_abby:    { hp: 26, en: 20, spd: 120, prep: 0.7, atk: 0.45, cd: 3.0, saja: "slam", heavy: true, name: "Abby" },
-    saja_jinu:    { hp: 30, en: 20, spd: 140, prep: 0.55, atk: 0.4, cd: 2.4, saja: "blink", heavy: true, name: "Jinu" },
-    saja_baby:    { hp: 18, en: 20, spd: 190, prep: 0.35, atk: 0.35, cd: 2.4, saja: "dash", heavy: true, name: "Baby" },
-    saja_romance: { hp: 22, en: 20, spd: 140, prep: 0.6, atk: 0.4, cd: 3.0, saja: "hearts", heavy: true, name: "Romance" },
+    saja_mystery: { hp: 88, en: 20, spd: 150, prep: 0.5, atk: 0.4, cd: 2.6, saja: "phase", heavy: true, name: "Mystery" },
+    saja_abby:    { hp: 104, en: 20, spd: 120, prep: 0.7, atk: 0.45, cd: 3.0, saja: "slam", heavy: true, name: "Abby" },
+    saja_jinu:    { hp: 120, en: 20, spd: 140, prep: 0.55, atk: 0.4, cd: 2.4, saja: "blink", heavy: true, name: "Jinu" },
+    saja_baby:    { hp: 72, en: 20, spd: 190, prep: 0.35, atk: 0.35, cd: 2.4, saja: "dash", heavy: true, name: "Baby" },
+    saja_romance: { hp: 88, en: 20, spd: 140, prep: 0.6, atk: 0.4, cd: 3.0, saja: "hearts", heavy: true, name: "Romance" },
     // Gwi Ma: the flame-toad demon king, shielded until the five are down
     // Gwi Ma's summoned demons (level 5): plain fighters, swept away by an ultimate
     saja_minion:  { hp: 7, en: 8, spd: 125, prep: 0.5, atk: 0.35, cd: 1.6, saja: "claw" },
-    gwima:        { hp: 118, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
+    gwima:        { hp: 420, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
   };
   const SAJA = ["saja_mystery", "saja_abby", "saja_jinu", "saja_baby", "saja_romance"];
   // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows. While one is held the auto-attack also fires faster.
@@ -524,8 +524,9 @@
       tip: "Rumi lao kiếm chém xuyên qua hàng quái" },
   };
   const isAlly = (k) => PETS[k] && PETS[k].owner === "any";
-  const allyDmg = (lv) => 4 + Math.floor(lv * 1.1);
-  const petDmg = (lv) => 3 + Math.floor(lv * 0.8);
+  const allyDmg = (lv) => Math.round((4 + Math.floor(lv * 1.1)) * levelDmg());
+  const levelDmg = () => 1 + 0.6 * Math.min(G.level || 0, 4);
+  const petDmg = (lv) => Math.round((3 + Math.floor(lv * 0.8)) * levelDmg());
   let hero = "g";
   try { if (localStorage.getItem("dcpt3-hero") === "s") hero = "s"; } catch (e) {}
   const HD = () => HEROES[hero];
@@ -822,7 +823,7 @@
     if (NET.role === "guest") { P.x += 110; }
     NET.portalSent = false;
     makePetEnts();
-    G.cine = null;
+    G.cine = null; $("bossbar").hidden = true; $("sbars").hidden = true;
     if (L.stage) startStage();
   }
   function respawnHero() {
@@ -1094,7 +1095,7 @@
   // keeps a girl inside the world, out of a sealed arena, and inside the arena during the boss fight
   function fence(o) {
     const A = G.arena;
-    if (A && G.lvl && G.lvl.stage && G.cine) { inStage(o, 60, true); return; }
+    if (A && G.lvl && G.lvl.stage && G.cine) { inStage(o, 60); return; }
     if (A) {
       const dx = o.x - A.x, dy = o.y - A.y, d = Math.hypot(dx, dy) || 1;
       if (G.arenaLock && d > A.r - 60) { o.x = A.x + dx / d * (A.r - 60); o.y = A.y + dy / d * (A.r - 60); }
@@ -1112,7 +1113,8 @@
     const H = HEROES[hk];
     return {
       cd: Math.max(H.minCd, H.cd * Math.pow(0.93, lv - 1)) * (elem ? 0.8 : 1),
-      dmg: H.dmg + (hk === "s" ? Math.floor(lv / 3) : Math.floor(lv / 6)),
+      // later levels' monsters are much tougher, so every level also multiplies the girls' damage
+      dmg: Math.round((H.dmg + (hk === "s" ? Math.floor(lv / 3) : Math.floor(lv / 6))) * levelDmg()),
       range: H.range + Math.min(12, lv - 1) * 30,
       n: hk === "s" ? 1 + (lv >= 10) : Math.min(9, 2 + Math.floor(lv / 2.6)),   // Mochi starts with two hearts
       bounce: H.bounce + (hk === "s" ? Math.floor(lv / 3) : 0),
@@ -1123,7 +1125,7 @@
   }
   // up to n nearest monsters (and the boss) within range r
   // a Saja demon waiting backstage for its turn: not a target, bolts fly past it
-  const offStage = (m) => m.c.saja && m.shield;
+  const offStage = (m) => (m.c.saja || m.c.gwima) && m.shield;
   function nearestFoes(x, y, r, n) {
     const out = [], ds = [], rr = r * r;
     const add = (o, d) => {
@@ -1184,7 +1186,8 @@
         if (s.life <= 0) break;
         if (!m.alive || offStage(m) || (s.hit && s.hit.has(m.id))) continue;
         const rr = s.r + m.r; if (d2(s.x, s.y, m.x, m.y) > rr * rr) continue;
-        hitMon(m, s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
+        // Matcha's serpent bites bosses harder (its bounce does little against a lone big target)
+        hitMon(m, s.hk === "s" && m.c.heavy ? Math.round(s.dmg * 1.6) : s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
         if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
       }
       const B = G.boss;
@@ -1341,8 +1344,6 @@
   // kb: knock-back push (from the shooter's level). A light hit only nudges; it never stops a monster's lunge or resets its attack.
   function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
-    // alone at last (Jinu down), Gwi Ma is weaker: double damage
-    if (m.c.gwima && G.cine && !G.mons.some((o) => o.alive && o.c.name)) dmg *= 2;
     if (m.shield) { m.flash = 0.06; if (!dot && Math.random() < 0.3) burst(fx, fy - 120, 4, ["#ff6ec7", "#fff"], 160, 0.3); return; }
     m.hp -= dmg; m.flash = 0.12;
     if (m.hp <= 0) return killMon(m, true, by);
@@ -1664,7 +1665,7 @@
         const T = p.tgt, B = G.boss, dead = !T || (T === B ? !B || !B.alive : !T.alive);
         if (p.st === "pounce" && (dead || d2(p.x, p.y, owner.x, owner.y) > 900 * 900)) { p.st = "follow"; p.cd = 0.4; }
         else if (p.st === "atk") {
-          const t = p.at < 0 ? PET_ATK : p.at;
+          const t = p.at < 0 ? PET_ATK : p.at, big = T === B || !!(T && T.c && T.c.heavy);
           if (!dead) { const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1; p.ux = dx / d; p.uy = dy / d; }
           if (t < PET_LEAP && !dead) {
             // leap: close the gap to the monster
@@ -1674,8 +1675,12 @@
             // the flurry: clinging on, a hit at evenly spaced moments
             if (!dead) { p.x = T.x - p.ux * 55; p.y = T.y - p.uy * 40; }
             const hitN = Math.min(PET_HITS, Math.floor((t - PET_LEAP) / ((PET_COMBO - PET_LEAP) / PET_HITS)) + 1);
-            while ((p.hits || 0) < hitN) { p.hits = (p.hits || 0) + 1; if (!dead) petStrike(p, T, PET_HITS); }
+            while ((p.hits || 0) < hitN && !(big && p.tot >= 10)) { p.hits = (p.hits || 0) + 1; p.tot = (p.tot || 0) + 1; if (!dead) petStrike(p, T, PET_HITS, big); }
+          } else if (!p.flip0 && !dead && (big ? p.tot < 10 : p.tot < 60) && d2(p.x, p.y, owner.x, owner.y) < 1100 * 1100) {
+            // keep at it: an ordinary monster until it falls, a boss for ten blows
+            p.at = PET_LEAP; p.hits = 0; continue;
           } else {
+            p.flip0 = true;
             // back-flip: spring back toward the girl
             const k = (t - PET_COMBO) / (PET_ATK - PET_COMBO);
             if (!p.bx0) { p.bx0 = p.x; p.by0 = p.y; }
@@ -1687,7 +1692,7 @@
           const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1, reach = T === B ? 260 : T.r + 230;   // leaps the last stretch
           setFace(p, dx, dy);
           if (d > reach) { const sp = Math.min(d - reach + 1, 950 * dt); p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; p.moving = true; continue; }
-          p.moving = false; p.st = "atk"; p.at = 0; p.hits = 0; p.ax0 = p.x; p.ay0 = p.y; p.bx0 = 0;
+          p.moving = false; p.st = "atk"; p.at = 0; p.hits = 0; p.tot = 0; p.flip0 = false; p.ax0 = p.x; p.ay0 = p.y; p.bx0 = 0;
           if (NET.role && NET.fq.length < 10) NET.fq.push(["a", p.i, p.face + (p.flip ? 8 : 0)]);
           continue;
         }
@@ -1747,13 +1752,13 @@
     if (NET.role && NET.fq.length < 10) NET.fq.push(["h", p.i, cx | 0, cy | 0, Math.round(rot * 100)]);
   }
   // the hit itself: Cafe's claws hurt more; Coca's bite also knocks the monster back and slows it
-  function petStrike(p, T, parts = 1) {
+  function petStrike(p, T, parts = 1, big) {
     const D = PETS[p.kind], B = G.boss, dx = T.x - p.x, dy = T.y - p.y, rot = Math.atan2(dy, dx) + rnd(-0.6, 0.6);
     const cx = p.x + dx * 0.7 + rnd(-30, 30), cy = p.y + dy * 0.7 + rnd(-40, 20);
     if (T === B) hitBoss(D.bite ? "ice" : null, T.x, T.y);
     else {
       if (D.bite && NET.role !== "guest" && T.st === "prep") T.st = "walk";   // a bite breaks a wind-up
-      hitMon(T, Math.max(1, Math.round((D.bite ? petDmg(P.lv) * 0.7 : petDmg(P.lv)) * 1.6 / parts)), D.bite ? "ice" : null, p.x, p.y, D.bite ? (260 + 10 * P.lv) / parts : 40);
+      hitMon(T, Math.max(1, Math.round((D.bite ? petDmg(P.lv) * 0.7 : petDmg(P.lv)) * 1.6 / parts)), D.bite ? "ice" : null, p.x, p.y, big ? 500 : D.bite ? (260 + 10 * P.lv) / parts : 40);
     }
     petHitFx(p.kind, cx, cy, rot);
     if (NET.role && NET.fq.length < 10) NET.fq.push(["h", p.i, cx | 0, cy | 0, Math.round(rot * 100)]);
@@ -1791,29 +1796,40 @@
   // the curse lifts from each in turn (OUT_LIFT + 0.45 s each), each boy says thank you (OUT_THANKS), then everyone cheers
   const OUT_BOOM = 4.2, OUT_DEMON = 4.9, OUT_LIFT = 6.6, OUT_THANKS = 9.4, OUT_CHEER = 12.6, OUT_END = 17;
   const CPH = ["intro", "fight", "outro"], BOYX = [-560, -280, 0, 280, 560];
-  const WAVES = [["saja_mystery", "saja_romance"], ["saja_abby", "saja_baby"], ["saja_jinu"]];
-  const WAVE_MSG = [["Mystery và Romance ra trận!", "Hai quỷ đầu tiên"], ["Abby và Baby ra trận!", "Thêm hai quỷ nữa"], ["Jinu và Gwi Ma!", "Trận cuối cùng, cố lên!"]];
-  const SR = { x0: -1750, x1: 1750, y0: -1250, y1: 1150 };   // the walkable stage area, relative to the arena centre
+  // turns: two, two, Jinu (Gwi Ma throws fire from his throne), then Gwi Ma himself
+  const WAVES = [["saja_mystery", "saja_romance"], ["saja_abby", "saja_baby"], ["saja_jinu"], ["gwima"]];
+  const SR = { x0: -1750, x1: 1750, y0: -1190, y1: 1150 };   // the walkable stage area, relative to the arena centre
+  // Gwi Ma's throne: a raised dais behind the main stage, cut off by a laser fence; the demons wait beside him
+  const DAIS = { x0: -1200, x1: 1200, y0: -1720, y1: -1290 };
+  const THRONE_X = { saja_mystery: -1030, saja_abby: -740, saja_jinu: -460, saja_baby: 740, saja_romance: 1030 }, THRONE_Y = -1380;
+  const LAND = { saja_mystery: [-480, -640], saja_romance: [480, -640], saja_abby: [-480, -640], saja_baby: [480, -640], saja_jinu: [0, -640], gwima: [0, -560] };
+  const INTRO = {
+    saja_mystery: ["Mystery — Bóng Ma Bí Ẩn", "Phóng cầu linh hồn rồi biến mất"],
+    saja_romance: ["Romance — Quỷ Quyến Rũ", "Thả tim làm các bé chậm lại"],
+    saja_abby: ["Abby — Lực Sĩ Bóng Đêm", "Đấm xuống sàn tạo sóng chấn động"],
+    saja_baby: ["Baby — Tia Chớp", "Lao vụt tới ba lần liên tiếp"],
+    saja_jinu: ["Jinu — Thủ Lĩnh Kiếm Bóng", "Biến vào bóng tối, chém sau lưng"],
+    gwima: ["GWI MA — VUA QUỶ", "Hắn tự mình xuống trận!"],
+  };
+  const INTRO_EACH = 3.4, INTRO_JUMP = 1.3;
   const SAJA_RANGE = { blink: 900, slam: 260, phase: 900, hearts: 820, dash: 700, claw: 170 };
-  // backstage: two roped-off wings beside the main stage where the demons wait their turn (the girls cannot go in)
-  const BACKSTAGE = [{ x0: -1730, x1: -1060, y0: -1240, y1: -790 }, { x0: 1060, x1: 1730, y0: -1240, y1: -790 }];
-  const BACK_HOME = { saja_abby: [-1530, -930], saja_baby: [-1260, -930], saja_jinu: [1400, -930] };
-  const BOY_Y = -880, GWIMA_Y = -1010;
-  function inStage(o, pad, keepOut) {
+  const BOY_Y = -880, GWIMA_Y = -1420;
+  function inStage(o, pad) {
     const A = G.arena; o.x = clamp(o.x, A.x + SR.x0 + pad, A.x + SR.x1 - pad); o.y = clamp(o.y, A.y + SR.y0 + pad, A.y + SR.y1 - pad);
-    if (keepOut) for (const b of BACKSTAGE) {
-      const lx = o.x - A.x, ly = o.y - A.y;
-      if (lx > b.x0 - pad && lx < b.x1 + pad && ly > b.y0 && ly < b.y1 + pad) {
-        // out the nearest open side: the front, or the side next to the main stage
-        const dFront = b.y1 + pad - ly, dSide = b.x0 < 0 ? b.x1 + pad - lx : lx - (b.x0 - pad);
-        if (dFront < dSide) o.y = A.y + b.y1 + pad; else o.x = A.x + (b.x0 < 0 ? b.x1 + pad : b.x0 - pad);
-      }
-    }
+  }
+  // a leap from one spot to another (the dais to the floor): m.jz is the height above the ground
+  function startJump(m, x1, y1, d) { m.jump = { t: 0, d, x0: m.x, y0: m.y, x1, y1, h: 520 + Math.abs(y1 - m.y) * 0.25 }; }
+  function stepJump(m, dt) {
+    const J = m.jump; if (!J) return false;
+    J.t += dt; const k = clamp(J.t / J.d, 0, 1);
+    m.x = J.x0 + (J.x1 - J.x0) * k; m.y = J.y0 + (J.y1 - J.y0) * k; m.jz = Math.sin(k * Math.PI) * J.h;
+    if (k >= 1) { m.jump = null; m.jz = 0; G.shake = Math.max(G.shake, m.c.gwima ? 30 : 14); SFX.slam(); dust(m.x, m.y, 14); burst(m.x, m.y - 40, 24, ["#c08bff", "#fff", "#3a0d4f"], 420, 0.6); if (m.c.gwima) G.rings.push({ x: m.x, y: m.y, r: 120, sp: 650, life: 1.2, delay: 0 }); }
+    return true;
   }
   function startStage() {
     const A = G.arena; A.open = true; G.arenaLock = false;
     // nothing standing on the floor
-    for (const [k, a] of G.decoGrid) G.decoGrid.set(k, a.filter((d) => d.x < A.x + SR.x0 - 120 || d.x > A.x + SR.x1 + 120 || d.y < A.y + SR.y0 - 200 || d.y > A.y + SR.y1 + 150));
+    for (const [k, a] of G.decoGrid) G.decoGrid.set(k, a.filter((d) => d.x < A.x + SR.x0 - 120 || d.x > A.x + SR.x1 + 120 || d.y < A.y + DAIS.y0 - 900 || d.y > A.y + SR.y1 + 150));
     G.chests = G.chests.filter((c) => c.x < A.x + SR.x0 || c.x > A.x + SR.x1 || c.y < A.y + SR.y0 || c.y > A.y + SR.y1);
     P.x = A.x + (NET.role === "guest" ? 130 : -130); P.y = A.y - 420; P.vx = P.vy = 0; P.face = 4; P.flip = false; P.prog = G.path.n - 1;
     for (const p of PETE) { p.x = P.x + rnd(-200, 200); p.y = P.y + rnd(60, 160); }
@@ -1835,17 +1851,36 @@
   const gwimaMon = () => G.mons.find((m) => m.c.gwima);
   // which wave a demon belongs to
   const waveOf = (k) => WAVES.findIndex((w) => w.includes(k));
+  // a new turn: first a short film introducing each fighter on the dais, then they leap down onto the floor
   function startWave(n) {
     const c = G.cine; c.wave = n;
-    for (const m of G.mons) if (m.alive && m.c.saja && waveOf(m.kind) === n) { m.wait = false; m.shield = false; m.cd = 1 + Math.random(); }
-    if (n === 2) { const g = gwimaMon(); if (g) { g.shield = false; g.cd = 2; } }
+    const list = G.mons.filter((m) => m.alive && waveOf(m.kind) === n);
+    c.show = { ids: list.map((m) => m.id), t: 0 }; c.lock = true;
+    for (const m of G.mons) if (m.alive && m.kind === "saja_minion") killMon(m, false);   // the floor is cleared for the entrance
+  }
+  function updateShow(dt) {
+    const c = G.cine, S = c.show; if (!S) return;
+    S.t += dt;
+    const list = S.ids.map((id) => G.mons.find((m) => m.id === id)).filter(Boolean), n = list.length;
+    const i = Math.min(n - 1, Math.floor(S.t / INTRO_EACH)), cur = list[i];
+    if (cur && S.shown !== i && S.t < n * INTRO_EACH) { S.shown = i; const t = INTRO[cur.kind]; showBanner(t[0], t[1]); cur.cheerT = 1.2; SFX.roar(); if (NET.role) netEmit("say", { to: NET.partner, a: t[0], b: t[1] }); }
+    if (cur) c.focus = [cur.x, cur.y - 260];
+    if (S.t >= n * INTRO_EACH && !S.jumped) {
+      S.jumped = true;
+      for (const m of list) { const L = LAND[m.kind]; startJump(m, G.arena.x + L[0], G.arena.y + L[1], INTRO_JUMP); }
+    }
+    if (S.t >= n * INTRO_EACH + INTRO_JUMP + 0.4) {
+      for (const m of list) { m.wait = false; m.shield = false; m.cd = 1 + Math.random(); }
+      c.show = null; c.focus = null; c.lock = false;
+      showBanner(c.wave === 3 ? "Đánh bại Gwi Ma!" : "Chiến đấu!", c.wave === 2 ? "Gwi Ma phun lửa hỗ trợ từ ngai cao" : "");
+    }
   }
   function updateCine(dt) {
     const c = G.cine; if (!c) return;
     const A = G.arena, host = NET.role !== "guest";
     c.t += dt;
     if (c.shown !== c.ph) { c.shown = c.ph; onCinePhase(c.ph); }
-    if (c.ph === "fight" && c.shownWave !== c.wave && c.wave >= 0) { c.shownWave = c.wave; showBanner(...WAVE_MSG[c.wave]); SFX.roar(); }
+    if (c.ph === "fight" && host) updateShow(dt);
     if (c.ph === "intro") {
       if (c.t > 2.5 && !c.laugh) { c.laugh = true; SFX.roar(); G.shake = 10; }
       if (c.t > 4.8 && !c.spellMsg) { c.spellMsg = true; showBanner("Gwi Ma niệm phép!", "Ôi không…"); SFX.charge(); }
@@ -1856,12 +1891,12 @@
       if (c.t > 7.3 && !c.boom) { c.boom = true; SFX.boom(); G.shake = 22; for (const x of BOYX) burst(A.x + x, A.y + BOY_Y - 100, 30, ["#3a0d4f", "#c08bff", "#ff3d7f", "#000"], 420, 1); }
       if (host && c.t > 7.3 && !c.spawned) {
         c.spawned = true;
-        // the demons line up on the main stage; each waits (shielded) for its turn
-        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y + BOY_Y); m.face = 0; m.wait = true; m.shield = true; const h = BACK_HOME[k] || [BOYX[i], BOY_Y]; m.home = [A.x + h[0], A.y + h[1]]; });
+        // the demons leap up onto the dais beside Gwi Ma, and wait (shielded) for their turn
+        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y + BOY_Y); m.face = 0; m.wait = true; m.shield = true; m.home = [A.x + THRONE_X[k], A.y + THRONE_Y]; startJump(m, m.home[0], m.home[1], 1.1 + i * 0.12); });
       }
-      if (host && c.t > 9.6) { c.ph = "fight"; c.t = 0; c.lock = false; startWave(0); }
+      if (host && c.t > 9.8) { c.ph = "fight"; c.t = 0; c.lock = false; startWave(0); }
     } else if (c.ph === "fight") {
-      if (host) {
+      if (host && !c.show) {
         // presents falling onto the stage now and then
         if ((c.dropT = (c.dropT ?? 4) - dt) <= 0) {
           c.dropT = rnd(4, 7);
@@ -1872,16 +1907,16 @@
         if ((c.shoutT = (c.shoutT ?? 9) - dt) <= 0) {
           c.shoutT = rnd(13, 17); gwimaShout();
           if (NET.role) netEmit("shout", { to: NET.partner });
-          const alone = c.wave === 2 && !stageMons().length, n = Math.max(0, Math.min(alone ? 2 : c.wave === 2 ? 4 : 3, (alone ? 3 : 6) - G.mons.filter((m) => m.alive && m.kind === "saja_minion").length));
+          const alone = c.wave === 3, n = Math.max(0, Math.min(alone ? 2 : c.wave === 2 ? 4 : 3, (alone ? 3 : 6) - G.mons.filter((m) => m.alive && m.kind === "saja_minion").length));
           for (let i = 0; i < n; i++) setTimeout(() => {
-            if (!G.cine || G.cine.ph !== "fight") return;
+            if (!G.cine || G.cine.ph !== "fight" || G.cine.show) return;
             const side = i % 2 ? 1 : -1, m = spawnMon("saja_minion", A.x + side * rnd(300, 950), A.y - 820);
             m.summoned = true; m.face = 0; burst(m.x, m.y - 150, 26, ["#5b2bd6", "#c08bff", "#3a0d4f"], 360, 0.8);
           }, 600 + i * 250);
         }
-        const left = stageMons().filter((m) => waveOf(m.kind) === c.wave).length, g = gwimaMon();
-        if (c.wave < 2 && !left) startWave(c.wave + 1);
-        else if (c.wave === 2 && !left && (!g || !g.alive)) { c.ph = "outro"; c.t = 0; c.lock = true; for (const m of G.mons) if (m.alive) killMon(m, false); }
+        const left = G.mons.filter((m) => m.alive && waveOf(m.kind) === c.wave).length;
+        if (c.wave < 3 && !left) startWave(c.wave + 1);
+        else if (c.wave === 3 && !left) { c.ph = "outro"; c.t = 0; c.lock = true; for (const m of G.mons) if (m.alive) killMon(m, false); }
       }
       const g = gwimaMon(); if (g) { c.gx = g.x; c.gy = g.y; }
     } else if (c.ph === "outro") {
@@ -2018,16 +2053,11 @@
     // the silver stage: main stage, runway, catwalk
     const sil = ctx.createLinearGradient(0, Y(-1180), 0, Y(-40)); sil.addColorStop(0, "#c9c4d8"); sil.addColorStop(1, "#8f89a6");
     box(-1000, -1180, 1000, -760, sil, "#efeaff"); box(-120, -770, 120, -220, sil, "#efeaff"); box(-1350, -230, 1350, -60, sil, "#efeaff");
-    // backstage wings, roped off
-    for (const b of BACKSTAGE) {
-      box(b.x0, b.y0, b.x1, b.y1, "rgba(90,20,40,.75)", "rgba(255,90,120,.6)");
-      ctx.strokeStyle = "#d9b36a"; ctx.lineWidth = 6;
-      for (let x = b.x0 + 40; x <= b.x1 - 30; x += 110) {
-        ctx.beginPath(); ctx.moveTo(X(x), Y(b.y1 + 4)); ctx.lineTo(X(x), Y(b.y1 - 46)); ctx.stroke();
-        if (x + 110 <= b.x1 - 30) { ctx.strokeStyle = "#b3122f"; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(X(x), Y(b.y1 - 40)); ctx.quadraticCurveTo(X(x + 55), Y(b.y1 - 10), X(x + 110), Y(b.y1 - 40)); ctx.stroke(); ctx.strokeStyle = "#d9b36a"; ctx.lineWidth = 6; }
-      }
-      ctx.font = "800 46px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,200,210,.5)"; ctx.fillText("HẬU TRƯỜNG", X((b.x0 + b.x1) / 2), Y(b.y0 + 70));
-    }
+    // Gwi Ma's dais: raised, dark crimson with a gold rim, steps of light down its front, a laser fence below
+    const dz = ctx.createLinearGradient(0, Y(DAIS.y0), 0, Y(DAIS.y1)); dz.addColorStop(0, "#2a0a1c"); dz.addColorStop(1, "#5a1236");
+    box(DAIS.x0, DAIS.y0, DAIS.x1, DAIS.y1, dz, "#d9b36a");
+    box(DAIS.x0 + 40, DAIS.y1 - 40, DAIS.x1 - 40, DAIS.y1, "#3a0d22");
+    ctx.font = "800 52px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,190,210,.45)"; ctx.fillText("NGAI VUA QUỶ", X(0), Y(DAIS.y0 + 70));
     // fan zone labels
     ctx.font = "800 60px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.35)";
     ctx.fillText("FANZONE A", X(-700), Y(-470)); ctx.fillText("FANZONE B", X(700), Y(-470)); ctx.fillText("STAGE", X(0), Y(-960));
@@ -2035,12 +2065,14 @@
     // neon edges along the stage
     ctx.strokeStyle = `rgba(255,110,199,${0.5 + 0.25 * Math.sin(t * 3)})`; ctx.lineWidth = 10;
     ctx.strokeRect(X(-1000), Y(-1180), 2000, 420); ctx.strokeRect(X(-1350), Y(-230), 2700, 170);
+    // the laser fence between the dais and the stage
+    for (let k = 0; k < 3; k++) { ctx.strokeStyle = `rgba(255,60,110,${0.45 + 0.3 * Math.sin(t * 8 + k)})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(X(DAIS.x0), Y(-1268 + k * 22)); ctx.lineTo(X(DAIS.x1), Y(-1268 + k * 22)); ctx.stroke(); }
     ctx.restore();
     // the LED wall behind the main stage and the side screens
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (let k = -9; k <= 9; k++) {
       const x = X(k * 110), h = 220 + 160 * Math.abs(Math.sin(t * 2.2 + k * 0.6));
-      ctx.fillStyle = `rgba(${k % 2 ? "255,110,199" : "124,242,255"},0.3)`; ctx.fillRect(x - 46, Y(-1190) - h, 92, h);
+      ctx.fillStyle = `rgba(${k % 2 ? "255,110,199" : "124,242,255"},0.3)`; ctx.fillRect(x - 46, Y(DAIS.y0 - 10) - h, 92, h);
     }
     for (const sx of [-1450, 1450]) { ctx.fillStyle = `rgba(160,120,255,${0.25 + 0.1 * Math.sin(t * 4 + sx)})`; ctx.fillRect(X(sx) - 110, Y(-1240), 220, 300); }
     ctx.restore();
@@ -2050,9 +2082,10 @@
   function updateStageMon(m, dt) {
     if (m.c.gwima) return updateGwima(m, dt);
     const c = m.c, A = G.arena, ox = m.x, oy = m.y;
+    if (stepJump(m, dt)) { m.st = "walk"; return; }
+    // waiting for its turn on the dais (the intro film shows its wind-up pose)
+    if (m.wait) { m.cheerT = (m.cheerT || 0) - dt; m.st = m.cheerT > 0 ? "prep" : "walk"; m.face = 0; m.flip = false; return; }
     if (G.cine && G.cine.lock) { m.st = "walk"; return; }
-    // waiting for its turn on the main stage
-    if (m.wait) { if (m.home) { m.x += (m.home[0] - m.x) * Math.min(1, dt * 3); m.y += (m.home[1] - m.y) * Math.min(1, dt * 3); } m.st = "walk"; m.face = 0; m.flip = false; return; }
     const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
     if (m.st === "rest") { if (m.t > 0.5) { m.st = "walk"; m.t = 0; } }
     if (m.st === "walk" || m.st === "rest") {
@@ -2116,9 +2149,16 @@
   }
   // ---- Gwi Ma
   function updateGwima(m, dt) {
-    if (m.shield || (G.cine && G.cine.lock)) { m.st = "walk"; return; }
-    // alone at last, he comes forward onto the main stage
-    if (!G.mons.some((o) => o.alive && o.c.name)) m.y += (G.arena.y - 820 - m.y) * Math.min(1, dt * 0.8);
+    if (stepJump(m, dt)) return;
+    if (G.cine && G.cine.lock) { m.st = "walk"; return; }
+    // on his throne during Jinu's turn: only fireballs
+    if (m.shield) {
+      if (!G.cine || G.cine.wave !== 2) { m.st = "walk"; return; }
+      if (m.st === "walk" || m.st === "rest") { if ((m.cd -= 0) <= 0) { m.st = "prep"; m.t = 0; m.cyc = 0; } }
+      else if (m.st === "prep" && m.t > m.c.prep) { m.st = "atk"; m.t = 0; m.cyc = 1; const T = targetFor(m.x, m.y), a0 = Math.atan2(T.y - m.y, T.x - m.x); for (let i = -2; i <= 2; i++) { const a = a0 + i * 0.13; G.foes.push({ type: "fire", x: m.x + Math.cos(a) * 120, y: m.y + 40, vx: Math.cos(a) * 600, vy: Math.sin(a) * 600, life: 3 }); } play("fire"); }
+      else if (m.st === "atk" && m.t > m.c.atk) { m.st = "rest"; m.t = 0; m.cd = 3.2; }
+      return;
+    }
     const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
     if (m.st === "walk" || m.st === "rest") { if (m.cd <= 0) { m.st = "prep"; m.t = 0; m.cyc = (m.cyc || 0) + 1; } }
     else if (m.st === "prep") {
@@ -2146,9 +2186,9 @@
   }
   function drawGwima(m, f) {
     if (!m.alive) return;   // the ending film draws his end (drawGwimaGone)
-    const bob = Math.sin(G.t * 1.6) * 14, a = m.alive ? 1 : clamp(1 - m.die / 0.6, 0, 1);
+    const bob = Math.sin(G.t * 1.6) * 14 - (m.jz || 0), a = m.alive ? 1 : clamp(1 - m.die / 0.6, 0, 1);
     glow(m.x, m.y - 300, 520, "255,60,140", 0.35 + 0.1 * Math.sin(G.t * 3));
-    shadow(m.x, m.y, 260, 50, 0.35 * a);
+    shadow(m.x, m.y, 240, 46, 0.35 * a);
     spr(f, m.x, m.y + bob, false, 1, a);
     if (m.flash > 0) sprFlash(f, m.x, m.y + bob, false, 1, 0.5);
     if ((m.shoutT = (m.shoutT || 0) - 1 / 60) > 0) { label("GRÀOOO!", m.x, m.y - 760 + Math.sin(G.t * 30) * 8, 110, "#ff3d7f"); glow(m.x, m.y - 420, 600, "255,40,90", 0.4 * Math.min(1, m.shoutT)); }
@@ -2184,11 +2224,12 @@
     if (d2(P.x, P.y, A.x, A.y) > (A.r - 80) ** 2) fadeTo(() => { const [nx, ny] = norm(P.x - A.x, P.y - A.y); P.x = A.x + nx * (A.r - 260); P.y = A.y + ny * (A.r - 260); });
     // he lands on the far side from where the girl came in
     const [nx, ny] = norm(A.x - P.x, A.y - P.y);
-    $("bossName").textContent = "Vua Bí Ngô";
-    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp: 70, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
+    const BD = G.lvl.boss;
+    $("bossName").textContent = BD.name;
+    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp: BD.hp, max: BD.hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
     for (const m of G.mons) if (m.alive) killMon(m, false);
     $("bossbar").hidden = false; updateBossBar();
-    SFX.roar(); showBanner("Vua Bí Ngô!", "Tránh xa vòng sóng xung kích");
+    SFX.roar(); showBanner(BD.name + "!", BD.tip);
     G.shake = 18;
   }
   function updateBossBar() { if (G.boss) $("bfill").style.width = (100 * Math.max(0, G.boss.hp) / G.boss.max) + "%"; }
@@ -2238,7 +2279,7 @@
   function summonBats(B) {
     const A = G.arena;
     for (let i = 0; i < 3; i++) {
-      const a = Math.random() * TAU, m = spawnMon("bat", A.x + Math.cos(a) * (A.r - 120), A.y + Math.sin(a) * (A.r - 120));
+      const a = Math.random() * TAU, m = spawnMon((G.lvl.boss && G.lvl.boss.summon) || "bat", A.x + Math.cos(a) * (A.r - 120), A.y + Math.sin(a) * (A.r - 120));
       m.summoned = true; burst(m.x, m.y - m.hgt, 14, ["#b9a4ff", "#fff"], 220, 0.5);
     }
   }
@@ -2300,7 +2341,8 @@
     const all = mult > 1;
     for (const m of G.mons) {
       if (!m.alive || offStage(m) || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
-      if (m.c.heavy) damageMon(m, Math.ceil(m.max * 0.1 * mult), m.x, m.y, true, "p");
+      // a combo takes a fifth of a demon's health, Gwi Ma needs about five combos
+      if (m.c.heavy) damageMon(m, Math.ceil(m.max * (m.c.gwima ? (all ? 0.15 : 0.035) : (all ? 0.2 : 0.06))), m.x, m.y, true, "p");
       else killMon(m, false);
     }
     G.foes = G.foes.filter((f) => !(Math.abs(f.x - cx) < hw && Math.abs(f.y - cy) < hh));
@@ -2394,7 +2436,7 @@
     if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
     updateShots(dt);
     // camera: follow the girl, a little ahead of where she walks (in a story scene: the stage)
-    const ce = G.cine, cc = ce && ce.lock && G.arena ? [G.arena.x, G.arena.y - (ce.ph !== "outro" ? 880 : ce.t < OUT_BOOM + 0.4 ? -(ce.gy || G.arena.y + GWIMA_Y) + G.arena.y + 380 : 640)] : null;
+    const ce = G.cine, cc = ce && ce.lock && G.arena ? (ce.focus ? ce.focus : [G.arena.x, G.arena.y - (ce.ph === "intro" ? 1180 : ce.t < OUT_BOOM + 0.4 ? -(ce.gy || G.arena.y + GWIMA_Y) + G.arena.y + 380 : 640)]) : null;
     const tx = clamp((cc ? cc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((cc ? cc[1] : P.y - 70 + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
     updateCine(dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
@@ -2648,6 +2690,7 @@
     const f = tierFrame(fn), fly = m.c.fly;
     let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : 1);
     if (m.c.gwima) return drawGwima(m, f);
+    if (m.jz) y -= m.jz;
     if (m.c.saja === "phase" && m.alive) a = m.st === "atk" ? Math.max(0.12, 1 - m.t / m.c.atk) : m.st === "rest" && m.t < 0.4 ? 0.2 + m.t * 2 : 1;
     if (fly) y += Math.sin(G.t * 3 + m.ph) * 10 - (m.st === "prep" ? 30 * Math.min(1, m.t / m.c.prep) : 0);
     if (!m.alive) { const t = m.die / 0.6; a = 1 - t; mul *= 1 - 0.4 * t; rot = (flip ? 1 : -1) * t * 0.8; y -= t * 40; }
@@ -2672,13 +2715,15 @@
     }
   }
   function drawBoss() {
-    const B = G.boss;
-    let name = "boss_stand";
-    if (!B.alive) name = B.die < 0.4 ? "boss_hurt" : "boss_dead";
-    else if (B.st === "prep") name = "boss_prep";
-    else if (B.st === "slam") name = B.t < 0.7 ? "boss_slam" : "boss_stand";
-    else if (B.hurtPose > 0) name = "boss_hurt";
-    const f = FR[name], flip = B.dir < 0;
+    const B = G.boss, art = (G.lvl.boss && G.lvl.boss.art) || "boss";
+    let pose = "stand";
+    if (!B.alive) pose = B.die < 0.4 ? "hurt" : "dead";
+    else if (B.st === "prep") pose = "prep";
+    else if (B.st === "slam") pose = B.t < 0.7 ? "slam" : "stand";
+    else if (B.hurtPose > 0) pose = "hurt";
+    // the Pumpkin King's frames are named by pose; the mini bosses' come from one sheet, one row each
+    const name = art === "boss" ? "boss_" + pose : `${art}_w${["stand", "prep", "slam", "hurt", "dead"].indexOf(pose)}`;
+    const f = FR[name], flip = B.dir < 0; if (!f) return;
     let y = B.y + (B.dropY || 0), sy = 1;
     if (B.alive && B.st === "walk") y -= Math.abs(Math.sin(B.t * 6)) * 10;
     if (B.alive && B.st !== "enter") sy = 1 + Math.sin(G.t * 2) * 0.012;
@@ -3146,7 +3191,7 @@
     // edge markers
     if (G.mode === "play") {
       const goal = G.portal || G.arena;
-      if (goal && goal.open && !G.boss) edgeMarker(goal.x, goal.y - 100, "192,139,255", G.portal ? "Cổng phép" : "Đấu trường", L, R, T, B);
+      if (goal && goal.open && !G.boss && !G.lvl.stage) edgeMarker(goal.x, goal.y - 100, "192,139,255", G.portal ? "Cổng phép" : "Đấu trường", L, R, T, B);
       if (Q && NET.role) edgeMarker(Q.x, Q.y - 100, HEROES[Q.hero].rgb, HEROES[Q.hero].name, L, R, T, B);
     }
     // vignette and fade (screen space)
@@ -3209,7 +3254,7 @@
     let html = "", open = false;
     if (G.boss || (G.lvl && G.lvl.stage)) html = "";
     else if (goal && !goal.open) html = `${G.portal ? "Mở cổng phép" : "Mở đấu trường"}: hạ thêm <b>${quotaLeft()}</b> quái`;
-    else if (goal) { open = true; html = G.portal ? "Cổng phép đã mở! Đi theo mũi tên" : "Vào đấu trường gặp Vua Bí Ngô!"; }
+    else if (goal) { open = true; html = G.portal ? "Cổng phép đã mở! Đi theo mũi tên" : "Vào đấu trường gặp " + ((G.lvl.boss && G.lvl.boss.name) || "trùm") + "!"; }
     if (html === questTxt) return;
     questTxt = html; el.hidden = !html; el.innerHTML = html; el.classList.toggle("open", open);
   }
@@ -3388,7 +3433,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout", "say"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -3557,7 +3602,7 @@
           const el = ELS[num(h[1])] || null, id = num(h[0]);
           if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); } continue; }
           const m = G.mons.find((m) => m.id === id && m.alive);
-          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 14), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 250)); applyElem(m, el, "q"); }
+          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 250)); applyElem(m, el, "q"); }
         }
       } else if (msg.topic === "ult") {
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); G.shake = 20;
@@ -3574,6 +3619,7 @@
       else if (msg.topic === "xp") { gainXp(clamp(Math.floor(num(d.n)), 0, 200)); play("gem"); }
       else if (msg.topic === "combo") comboUlt(false);
       else if (msg.topic === "shout") gwimaShout();
+      else if (msg.topic === "say" && typeof d.a === "string") { showBanner(d.a.slice(0, 60), typeof d.b === "string" ? d.b.slice(0, 80) : ""); SFX.roar(); }
       else if (msg.topic === "pet" && PETS[d.k] && (PETS[d.k].owner === hero || isAlly(d.k))) rescuePet(d.k);
     }
   }
@@ -3613,12 +3659,12 @@
     return {
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
-        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max]),
+        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max, m.jz | 0]),
       b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0] : 0,
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
-      cn: G.cine ? [CPH.indexOf(G.cine.ph), Math.round(G.cine.t * 10), G.cine.spawned ? 1 : 0, G.cine.wave] : 0,
+      cn: G.cine ? [CPH.indexOf(G.cine.ph), Math.round(G.cine.t * 10), G.cine.spawned ? 1 : 0, G.cine.wave, G.cine.lock ? 1 : 0, G.cine.focus ? G.cine.focus[0] | 0 : 0, G.cine.focus ? G.cine.focus[1] | 0 : 0] : 0,
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
@@ -3687,7 +3733,7 @@
       m.tt = now; m.tx = x; m.ty = y; m.face = clamp(fc & 7, 0, 4); m.flip = fc >= 8;
       m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]); m.max = num(a[9]) || m.max;
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
-      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.shield = !!(bits & 256);
+      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.shield = !!(bits & 256); m.jz = num(a[10]);
     }
     for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
       m.alive = false; m.die = 0;
@@ -3700,7 +3746,8 @@
       const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy] = w.b.map(num);
       if (!G.boss) {
         G.boss = { x, y, tx: x, ty: y, dir: -1, hp, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, alive: true, die: 0, dropY };
-        $("bossbar").hidden = false; SFX.roar(); showBanner("Vua Bí Ngô!", "Tránh xa vòng sóng xung kích"); G.shake = 18;
+        const BD = G.lvl.boss || { name: "Trùm", tip: "" };
+        $("bossName").textContent = BD.name; $("bossbar").hidden = false; SFX.roar(); showBanner(BD.name + "!", BD.tip); G.shake = 18;
       }
       const B = G.boss, st = BST[si] || "walk";
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
@@ -3738,7 +3785,8 @@
       if (!G.cine) G.cine = { ph: "intro", t: 0, lock: true, shown: null, wave: -1, shownWave: -1 };
       const ph = CPH[num(w.cn[0])] || "intro", t = num(w.cn[1]) / 10;
       if (ph !== G.cine.ph || Math.abs(t - G.cine.t) > 0.5) { G.cine.ph = ph; G.cine.t = t; }
-      G.cine.lock = ph === "intro" || ph === "outro"; G.cine.spawned = !!w.cn[2]; G.cine.wave = clamp(Math.floor(num(w.cn[3])), -1, 2);
+      G.cine.lock = !!w.cn[4]; G.cine.spawned = !!w.cn[2]; G.cine.wave = clamp(Math.floor(num(w.cn[3])), -1, 3);
+      G.cine.focus = w.cn[5] || w.cn[6] ? [num(w.cn[5]), num(w.cn[6])] : null;
     }
     G.rings = (Array.isArray(w.v) ? w.v : []).filter(Array.isArray).map((a) => ({ x: num(a[0]), y: num(a[1]), r: num(a[2]), life: num(a[3]) / 10, delay: num(a[4]) / 10, sp: 470 }));
     // items, chests, cages, gate, score
