@@ -2009,7 +2009,8 @@
   // ---------------------------------------------------------------- frames for the 8-direction art (with side-view fallback)
   // o: { hk, skin, face, flip, moving, dist, castT, hurtT, dead, winT } -> [frame name, mirror]
   const DIR_CYCLE = 240;   // world units walked per 8-direction walk cycle
-  const SIDE_CYCLE = 300;  // ... and per side-view walk cycle (two steps)
+  const SIDE_CYCLE = 260;  // ... and per side-view walk cycle (two steps)
+  const SIDE_STEPS = [1, 0, 3, 0];
   function heroFrame(o) {
     const sk = o.skin, base = o.hk;
     if (o.winT) return [fr(sk + "_win", base + "_win"), o.flip];
@@ -2017,7 +2018,10 @@
     if (o.hurtT > 0) return [fr(`${sk}_d${o.face}_hurt`, `${base}_d${o.face}_hurt`, sk + "_hurt", base + "_hurt"), o.flip];
     // walking left, right or diagonally: the original side-view walk cycle (six real steps, legs clearly alternating),
     // mirrored by facing; the 8-direction sheets' legs barely move
-    if (o.moving && o.face >= 1 && o.face <= 3 && FR[base + "_walk4"]) { const n = FR[base + "_walk5"] ? 6 : 5; return [base + "_walk" + (Math.floor(o.dist / SIDE_CYCLE * n) % n), o.flip]; }
+    // (the side sheet has one feet-together pose and several strides: step, pass, step, pass, so the legs read as alternating)
+    if (o.moving && o.face >= 1 && o.face <= 3 && FR[base + "_walk4"]) return [base + "_walk" + SIDE_STEPS[Math.floor(o.dist / SIDE_CYCLE * 4) % 4], o.flip];
+    // standing still sideways (not casting): the original standing pose, same proportions as the side walk
+    if (!o.moving && !(o.castT > 0) && o.face >= 1 && o.face <= 3 && FR[base + "_stand"]) return [base + "_stand", o.flip];
     // 8-direction art first: the outfit's own; an outfit without it (and once loaded) uses its own side view below
     const own = sk === base || !SKIN[sk] || SKIN[sk].then;
     for (const p of own ? [base] : [sk]) {
@@ -2130,14 +2134,16 @@
     const ph = walk / DIR_CYCLE * TAU, up = Math.abs(Math.sin(ph)), i = Math.floor(walk / DIR_CYCLE * 2);
     if (o.stepI !== undefined && o.stepI >= 0 && i !== o.stepI) dust(o.x, o.y, 2);
     o.stepI = i;
-    return [0, 0, 1];   // the walk art carries its own step and bob: no extra hop
+    // side walk: the body rises a little as the feet pass under it
+    const f = Array.isArray(o.fn) ? o.fn[0] : o.fn || "", pass = /_walk0$/.test(f) ? 1 : 0;
+    return [pass * 4, 0, 1];
   }
   function dust(x, y, n) {
     for (let k = 0; k < n; k++) G.parts.push({ type: "dust", x: x + rnd(-24, 24), y: y + rnd(-4, 6), vx: rnd(-50, 50), vy: rnd(-30, -5), life: 0.42, max: 0.42, r: rnd(10, 16) });
   }
   // the side-view poses (hurt, resting, win, ultimate) are slimmer than the chibi 8-direction art: scaled up so
   // she looks the same size (ratio of body areas, measured from the atlas)
-  const SIDE_K = { g: 1.15, s: 1.05 };
+  const SIDE_K = { g: 1.12, s: 1.0 };
   const sideK = (hk, fn) => (/_d\d_/.test(fn) ? 1 : SIDE_K[hk] || 1);
   function drawHeroSprite(hk, fn, x, y, z, flip, alpha, ultT, step) {
     const M = CHAR_M * sideK(hk, typeof fn === "string" ? fn : "");
