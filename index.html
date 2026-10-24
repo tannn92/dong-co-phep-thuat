@@ -1042,8 +1042,17 @@
     }
     play("zap");
   }
+  // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
+  // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
+  const WAND = { g: [[42, 30], [55, 21], [63, 19], [64, 10], [45, 10]], s: [[64, 18], [74, 7], [83, 7], [75, 9], [40, 0]] };
+  function wandTip(hk, face, flip) { const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip ? -1 : 1), w[1]]; }
   function fireBolt(a, S) {
-    const x = P.x + Math.cos(a) * 46, y = P.y + Math.sin(a) * 30;
+    // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
+    const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
+    const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
+    const [wx, wy] = ahead && dirN(`${hero}_cast_d${P.face}_w`) ? wandTip(hero, P.face, P.flip) : [Math.cos(a) * 46, Math.sin(a) * 30];
+    const x = P.x + wx, y = P.y + wy;
+    if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
     G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
     netShot(x, y, a, S.sc);
   }
@@ -1707,7 +1716,7 @@
     for (const p of G.parts) {
       p.life -= dt;
       if (p.type === "ring") { p.r += p.vr * dt; continue; }
-      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt;
       if (p.g) p.vy += p.g * dt;
       if (p.type === "dust") { p.vx *= 0.92; p.vy *= 0.92; p.r += 20 * dt; }
     }
@@ -1926,6 +1935,9 @@
     for (const p of own ? [base] : [sk]) {
       const pre = `${p}_d${o.face}_`, n = dirN(pre);
       if (!n) continue;
+      // casting: the same walk with her wand arm pointing ahead (standing: one frame of it)
+      const cpre = `${p}_cast_d${o.face}_w`, cn = o.castT > 0 ? dirN(cpre) : 0;
+      if (cn) return [cpre + (o.moving ? Math.floor(o.dist / DIR_CYCLE * cn) % cn : 1 % cn), o.flip];
       if (o.moving) return [pre + (Math.floor(o.dist / DIR_CYCLE * n) % n), o.flip];
       return [FR[pre + "s"] ? pre + "s" : pre + "0", o.flip];
     }
@@ -2062,7 +2074,7 @@
       groundCircle(hero === "s" ? "fx_circle_s" : "fx_circle_g", P.x, P.y, 0.45 + 0.25 * k, 0.5 + 0.4 * k, G.t);
     }
     drawHeroSprite(hero, G.ult ? fr(mySkin() + "_jump", hero + "_jump") : fn, P.x, P.y, P.z, flip, blink ? 0.45 : 1, G.ult ? G.ult.t : 0, stepPose(P, P.moving && !G.ult ? P.dist : -1));
-    if (P.castT > 0.15 && !G.ult) glow(P.x + (flip ? -40 : 40), P.y - 130, 50, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55);
+    if (P.castT > 0.15 && !G.ult) { const [wx, wy] = wandTip(hero, P.face, flip); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
     if (P.slowT > 0) drawWeb(P.x, P.y - 70, 40, Math.min(1, P.slowT));
   }
   function drawPartner() {
