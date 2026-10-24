@@ -433,10 +433,10 @@
     poison: { name: "Phép Độc", tip: "Quái mất máu dần", rgb: "130,235,70", cols: ["#7be04a", "#c8ff8a", "#3f9e2a"], dot: 6.0, tick: 1.0 },
   };
   const ELEM_TIME = 20;
-  // playable heroes. Auto-attack: cd (s between volleys), dmg per bolt, range, bolt speed, pierce (monsters passed through), hit radius
+  // playable heroes. Auto-attack: cd (s between volleys), dmg per bolt, range, bolt speed, bounce (hops on to further monsters), hit radius
   const HEROES = {
-    g: { name: "Mochi", rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, pierce: 0, r: 30 },
-    s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, pierce: 3, r: 42 },
+    g: { name: "Mochi", rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, bounce: 0, r: 30 },
+    s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, bounce: 2, r: 42 },
   };
   // TODO(pets): placeholder friends until their art and details arrive. Pets follow the hero and now and then shoot a small bolt.
   const PETS = {
@@ -448,8 +448,10 @@
   const HD = () => HEROES[hero];
   // outfits: every sister can wear any of them; each is its own small atlas (assets/skins/<hero><id>.*), loaded on demand
   let OUTFITS = [];                       // [{ id, name, heroes: "gs" }], from assets/skins/index.json
+  // switched off for now: both girls play in their own costume and the wardrobe is skipped
+  const OUTFITS_ON = false;
   const outfit = { g: "", s: "" };        // chosen outfit id per sister ("" = her own costume)
-  try { for (const k of "gs") outfit[k] = localStorage.getItem("dcpt3-outfit-" + k) || ""; } catch (e) {}
+  if (OUTFITS_ON) try { for (const k of "gs") outfit[k] = localStorage.getItem("dcpt3-outfit-" + k) || ""; } catch (e) {}
   const SKIN = {};                        // loaded outfit atlases: sid -> { tip, rcTip, rcN } or a pending promise
   const skinOf = (h, o) => (o && OUTFITS.some((x) => x.id === o && x.heroes.includes(h)) ? h + o : h);
   const mySkin = () => skinOf(hero, outfit[hero]);
@@ -889,9 +891,7 @@
       c.botT = (c.botT || 0) + 1 / 60; if (c.botT > 4) { c.botSkip = true; continue; }
       tx = c.x; ty = c.y; break;
     }
-    const cp = campOf(P);
-    if (cp) { const a = G.t * 0.5; tx = cp.x + Math.cos(a) * CAMP_R * 0.45; ty = cp.y + Math.sin(a) * CAMP_R * 0.45; }
-    else if (goal && !goal.open && d2(P.x, P.y, goal.x, goal.y) < (pr + 400) ** 2) {
+    if (goal && !goal.open && d2(P.x, P.y, goal.x, goal.y) < (pr + 400) ** 2) {
       // the gate is still sealed: patrol around it
       const a = G.t * 0.35; tx = goal.x + Math.cos(a) * pr; ty = goal.y + Math.sin(a) * pr;
     }
@@ -978,8 +978,6 @@
   }
   // keeps a girl inside the world, out of a sealed arena, and inside the arena during the boss fight
   function fence(o) {
-    const cp = campOf(o);
-    if (cp) { const dx = o.x - cp.x, dy = o.y - cp.y, d = Math.hypot(dx, dy) || 1; if (d > CAMP_R - 50) { o.x = cp.x + dx / d * (CAMP_R - 50); o.y = cp.y + dy / d * (CAMP_R - 50); } }
     const A = G.arena;
     if (A) {
       const dx = o.x - A.x, dy = o.y - A.y, d = Math.hypot(dx, dy) || 1;
@@ -989,18 +987,22 @@
     o.x = clamp(o.x, 80, WORLD - 80); o.y = clamp(o.y, 80, WORLD - 80);
   }
 
-  // ---- auto attack: Mochi fires fast little heart bolts at one target each; Matcha's slower serpent bolt pierces several
+  // ---- auto attack: Mochi fires a fan of little heart bolts that grows with her level;
+  // Matcha's slower serpent bolt bounces from monster to monster, and grows bigger and stronger with her level
+  const BOUNCE_R = 520;
   const MAX_LV = 20;
   const xpNeed = (lv) => Math.round(15 + 12 * Math.pow(lv - 1, 1.4));
   function heroStats(hk, lv, elem) {
     const H = HEROES[hk];
     return {
       cd: Math.max(H.minCd, H.cd * Math.pow(0.93, lv - 1)) * (elem ? 0.8 : 1),
-      dmg: H.dmg + (hk === "s" ? Math.floor(lv / 3) : Math.floor(lv / 5)),
+      dmg: H.dmg + (hk === "s" ? Math.floor(lv / 3) : Math.floor(lv / 6)),
       range: H.range + Math.min(12, lv - 1) * 30,
-      n: 1 + (lv >= 3) + (lv >= 5) + (lv >= 7),
-      pierce: H.pierce + (hk === "s" ? Math.floor(lv / 2) : 0),
-      speed: H.bolt, r: H.r,
+      n: hk === "s" ? 1 + (lv >= 10) : Math.min(9, 1 + Math.floor(lv / 2.4)),
+      bounce: H.bounce + (hk === "s" ? Math.floor(lv / 3) : 0),
+      speed: H.bolt, r: H.r + (hk === "s" ? (lv - 1) * 2.5 : 0),
+      sc: hk === "s" ? 1 + (lv - 1) * 0.045 : 1,
+      kb: 40 + 9 * (lv - 1),   // knock-back push: gentle at first, stronger as she grows
     };
   }
   // up to n nearest monsters (and the boss) within range r
@@ -1031,8 +1033,11 @@
   }
   function fireBolt(a, S) {
     const x = P.x + Math.cos(a) * 46, y = P.y + Math.sin(a) * 30;
-    G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, pierce: S.pierce, hit: S.pierce ? new Set() : null, elem: P.elem, hk: hero });
-    if (NET.role && NET.sq.length < 40) NET.sq.push([x | 0, y | 0, Math.round(a * 100), ELS.indexOf(P.elem)]);
+    G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
+    netShot(x, y, a, S.sc);
+  }
+  function netShot(x, y, a, sc) {
+    if (NET.role && NET.sq.length < 40) NET.sq.push([x | 0, y | 0, Math.round(a * 100), ELS.indexOf(P.elem), Math.round(sc * 100)]);
   }
   // this girl's own bolts (on a guest they hit the mirrored monsters and are reported to the host)
   function updateShots(dt) {
@@ -1046,8 +1051,8 @@
         if (s.life <= 0) break;
         if (!m.alive || (s.hit && s.hit.has(m.id))) continue;
         const rr = s.r + m.r; if (d2(s.x, s.y, m.x, m.y) > rr * rr) continue;
-        hitMon(m, s.dmg, s.elem, s.x, s.y); hitFx(s.x, s.y - BOLT_Z, s.hk);
-        if (s.pierce > 0) { s.hit.add(m.id); s.pierce--; } else s.life = 0;
+        hitMon(m, s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
+        if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
       }
       const B = G.boss;
       if (B && B.alive && s.life > 0 && B.st !== "enter" && d2(s.x, s.y, B.x, B.y) < (s.r + 120) ** 2) {
@@ -1056,9 +1061,21 @@
     }
     G.shots = G.shots.filter((s) => s.life > 0);
   }
-  function hitMon(m, dmg, el, fx, fy) {
-    if (NET.role === "guest") { NET.hq.push([m.id, ELS.indexOf(el), dmg]); m.flash = 0.12; play("hit"); return; }
-    damageMon(m, dmg, fx, fy, false, "p"); applyElem(m, el, "p");
+  // a bouncing bolt hops on to the nearest monster it has not hit yet
+  function bounceShot(s, from) {
+    s.hit.add(from.id);
+    let best = null, bd = BOUNCE_R * BOUNCE_R;
+    for (const m of G.mons) { if (!m.alive || s.hit.has(m.id) || m === from) continue; const d = d2(from.x, from.y, m.x, m.y); if (d < bd) { bd = d; best = m; } }
+    if (!best) { s.life = 0; return; }
+    s.bounce--;
+    const a = Math.atan2(best.y - from.y, best.x - from.x), sp = Math.hypot(s.vx, s.vy);
+    s.x = from.x; s.y = from.y; s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; s.life = Math.sqrt(bd) / sp + 0.25;
+    burst(from.x, from.y - BOLT_Z, 8, HEROES[s.hk].cols, 260, 0.35);
+    netShot(s.x, s.y, a, s.sc);
+  }
+  function hitMon(m, dmg, el, fx, fy, kb) {
+    if (NET.role === "guest") { NET.hq.push([m.id, ELS.indexOf(el), dmg, Math.round(kb || 0)]); m.flash = 0.12; play("hit"); return; }
+    damageMon(m, dmg, fx, fy, false, "p", kb); applyElem(m, el, "p");
   }
   function hitBoss(el, x, y) {
     if (NET.role === "guest") { NET.hq.push([-1, ELS.indexOf(el), 1]); G.boss.flash = 0.12; play("hit"); return; }
@@ -1073,10 +1090,11 @@
   }
   function levelUp() {
     const lv = P.lv, s = hero === "s";
+    const a = heroStats(hero, lv - 1, null), b = heroStats(hero, lv, null);
     let msg = lv % 2 ? "Bắn xa hơn" : "Bắn nhanh hơn";
-    if (lv === 3 || lv === 5 || lv === 7) msg = "Thêm một tia phép!";
-    else if (s ? lv % 3 === 0 : lv % 4 === 0) msg = "Phép mạnh hơn";
-    else if (s && lv % 2 === 0) msg = "Tia rắn xuyên qua thêm quái";
+    if (b.n > a.n) msg = s ? "Thêm một con rắn phép!" : "Thêm một tia trái tim!";
+    else if (b.bounce > a.bounce) msg = "Rắn nảy qua thêm quái";
+    else if (b.dmg > a.dmg) msg = s ? "Rắn to và mạnh hơn" : "Trái tim mạnh hơn";
     showBanner("Lên cấp " + lv + "!", msg); SFX.level();
     burst(P.x, P.y - 110, 36, ["#7cf2c6", "#fff4c2", "#ffd34d", ...HD().cols], 460, 0.9);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 30, vr: 900, life: 0.7, max: 0.7, col: "124,242,198" });
@@ -1186,15 +1204,16 @@
       }
     }
   }
-  function damageMon(m, dmg, fx, fy, dot, by) {
+  // kb: knock-back push (from the shooter's level). A light hit only nudges; it never stops a monster's lunge or resets its attack.
+  function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
     m.hp -= dmg; m.flash = 0.12;
     if (m.hp <= 0) return killMon(m, true, by);
     if (dot) return;
     play("hit");
-    if (m.st !== "atk" || m.kind === "bat" || m.kind === "ghost") {
-      m.hurt = 0.22; m.st = m.c.fly ? "fly" : "rest"; m.t = 0; m.cd = Math.max(m.cd, 0.4);
-      const [nx, ny] = norm(m.x - fx, m.y - fy); m.vx = nx * 300; m.vy = ny * 300;
+    if (m.st !== "atk" && m.st !== "prep") {
+      m.hurt = 0.1 + Math.min(0.12, kb / 2000); if (m.elite) kb *= 0.4;
+      const [nx, ny] = norm(m.x - fx, m.y - fy); m.vx = nx * kb * 2.5; m.vy = ny * kb * 2.5;
     }
   }
   function killMon(m, give, by) {
@@ -1235,7 +1254,7 @@
     const m = makeMon(kind, x, y, elite); pushOut(m, m.r); G.mons.push(m); return m;
   }
   // monster camps on the path: spawned while a girl is still a screen away, they wait for her.
-  // st: 0 not yet there, 1 waiting, 2 fighting (a ring of light holds the girl in until the camp is cleared), 3 cleared
+  // st: 0 not yet there, 1 waiting, 2 awake and fighting, 3 cleared (or given up on)
   const CAMP_R = 540, CAMP_MAX_T = 45;
   function updateCamps(gs, dt) {
     for (const cp of G.camps) {
@@ -1253,7 +1272,7 @@
       if (cp.st === 1) {
         let go = false;
         for (const g of gs) if (d2(g.x, g.y, cp.x, cp.y) < (CAMP_R - 60) ** 2) go = true;
-        if (go || cp.hit) { cp.st = 2; cp.t = 0; showBanner("Ổ quái!", "Hạ hết quái để đi tiếp nhé"); SFX.roar(); }
+        if (go || cp.hit) { cp.st = 2; cp.t = 0; showBanner("Ổ quái!", "Bé hạ hết chúng nhé"); SFX.roar(); }
       }
       // stragglers stuck somewhere far off are brought back near the girl
       if (cp.st === 2 && cp.t > 12 && Math.floor(cp.t) !== Math.floor(cp.t - dt)) {
@@ -1263,20 +1282,16 @@
         }
       }
       if (cp.st === 2 && ((cp.t += dt) > CAMP_MAX_T || cp.left <= 0)) {
-        cp.st = 3; SFX.unlock();
+        cp.st = 3;
         for (const m of G.mons) if (m.camp === cp) m.wait = false;
-        showBanner("Phá xong ổ quái!", G.camps.every((c) => c.st === 3) ? "Đi tới cổng phép nào" : "Đi tiếp theo mũi tên");
-        let gx = cp.x, gy = cp.y; for (const g of gs) if (d2(g.x, g.y, cp.x, cp.y) < CAMP_R * CAMP_R) { gx = g.x; gy = g.y; }
+        if (cp.left > 0) continue;   // gave up on the last few: they just roam like any other monster
+        SFX.unlock(); showBanner("Phá xong ổ quái!", "Đi tiếp theo mũi tên");
+        let gx = cp.x, gy = cp.y; for (const g of gs) if (d2(g.x, g.y, cp.x, cp.y) < 1200 * 1200) { gx = g.x; gy = g.y; }
         burst(gx, gy - 120, 40, ["#ffd34d", "#fff4c2", "#b9a4ff", "#7cf2c6"], 520, 1);
         for (let i = 0; i < 8; i++) spawnGem(gx + rnd(-160, 160), gy + rnd(-110, 110), 2 + G.level * 2);
         spawnDrop(gx + rnd(-80, 80), gy + rnd(-60, 60));
       }
     }
-  }
-  // the camp ring this girl is held in, if any
-  function campOf(o) {
-    for (const cp of G.camps) if (cp.st === 2 && d2(o.x, o.y, cp.x, cp.y) < (CAMP_R + 60) ** 2) return cp;
-    return null;
   }
   // a girl standing by the sealed gate: monsters pour out of it so she does not have to go looking
   function nearGate(gs) {
@@ -1495,7 +1510,7 @@
       if (!T) { p.cd = 0.3; continue; }
       p.cd = D.cd;
       const a = Math.atan2(T.y - p.y, T.x - p.x);
-      G.shots.push({ x: p.x, y: p.y + 40, vx: Math.cos(a) * 1100, vy: Math.sin(a) * 1100, life: D.range / 1100 + 0.1, r: 24, dmg: D.dmg, pierce: 0, hit: null, elem: null, hk: hero, pet: p.kind });
+      G.shots.push({ x: p.x, y: p.y + 40, vx: Math.cos(a) * 1100, vy: Math.sin(a) * 1100, life: D.range / 1100 + 0.1, r: 24, dmg: D.dmg, bounce: 0, hit: null, elem: null, hk: hero, pet: p.kind });
     }
   }
 
@@ -1670,7 +1685,7 @@
     if (Q && NET.role) { if (QPETE.map((p) => p.kind).join() !== Q.pets.join()) QPETE = Q.pets.map((k, i) => ({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i })); followPets(QPETE, Q, dt, false); }
     for (const sh of G.pshots) {
       sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
-      if (!sh.pierce) for (const m of G.mons) if (m.alive && d2(sh.x, sh.y, m.x, m.y) < (m.r + 30) ** 2) { sh.life = 0; break; }
+      for (const m of G.mons) if (m.alive && d2(sh.x, sh.y, m.x, m.y) < (m.r + 30) ** 2) { sh.life = 0; break; }
     }
     G.pshots = G.pshots.filter((sh) => sh.life > 0);
     if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
@@ -2061,23 +2076,6 @@
     if (d.lamp) glow(d.x + (d.flip ? -1 : 1) * 48 * d.m, d.y - 160 * d.m, 130, "255,200,110", 0.42 * (0.9 + 0.1 * Math.sin(G.t * 6 + d.x)));
   }
   // ground layer: things lying flat or hovering low, drawn under everyone
-  function drawCamps(L, R, T, B) {
-    for (const cp of G.camps) {
-      if (cp.st === 0 || cp.st === 3 || cp.x < L - CAMP_R || cp.x > R + CAMP_R || cp.y < T - CAMP_R || cp.y > B + CAMP_R) continue;
-      ctx.save(); ctx.translate(cp.x, cp.y); ctx.scale(1, 0.75); ctx.globalCompositeOperation = "lighter";
-      if (cp.st === 1) {
-        // a faint warning circle while the camp sleeps
-        ctx.setLineDash([46, 34]); ctx.lineDashOffset = -G.t * 40;
-        ctx.strokeStyle = `rgba(255,120,150,${0.22 + 0.08 * Math.sin(G.t * 3)})`; ctx.lineWidth = 14;
-        ctx.beginPath(); ctx.arc(0, 0, CAMP_R, 0, TAU); ctx.stroke();
-      } else {
-        ctx.strokeStyle = `rgba(255,110,170,${0.5 + 0.2 * Math.sin(G.t * 4)})`; ctx.lineWidth = 26; ctx.beginPath(); ctx.arc(0, 0, CAMP_R, 0, TAU); ctx.stroke();
-        ctx.strokeStyle = "rgba(255,255,255,.4)"; ctx.lineWidth = 6; ctx.stroke();
-      }
-      ctx.restore();
-      if (cp.st === 2) label(`Còn ${Math.max(0, cp.left)} quái`, cp.x, cp.y - CAMP_R * 0.75 - 24, 44);
-    }
-  }
   function drawArena() {
     const A = G.arena; if (!A) return;
     fx("fx_circle_g", A.x, A.y, 1.6, G.boss ? 0.18 : 0.1, G.t * 0.05);
@@ -2210,11 +2208,11 @@
   }
   function drawWeb(x, y, r, a) { spr("web", x, y, false, r / 52, a, Math.sin(G.t * 3 + x) * 0.15); }
   // a spell in flight: the bolt's head sits on the hit point, its trail behind
-  function drawBolt(x, y, vx, vy, elem, hk) {
+  function drawBolt(x, y, vx, vy, elem, hk, sc = 1) {
     const n = hk === "s" ? "fx_bolt_s" : "fx_bolt_g", sp = Math.hypot(vx, vy) || 1;
     if (elem) glow(x, y, 95, ELEM[elem].rgb, 0.55 + 0.1 * Math.sin(G.t * 20));
-    glow(x, y, 60, HEROES[hk].rgb, 0.45);
-    fxDir(n, x - vx / sp * 50, y - vy / sp * 50, vx, vy, hk === "g" ? 0.75 : 0.95, 1);
+    glow(x, y, 60 * sc, HEROES[hk].rgb, 0.45);
+    fxDir(n, x - vx / sp * 50 * sc, y - vy / sp * 50 * sc, vx, vy, (hk === "g" ? 0.75 : 0.95) * sc, 1);
   }
   // which effect sprite a coloured spark is drawn with
   const DOT_SPR = {};
@@ -2263,7 +2261,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawCamps(L, R, T, B); drawRings();
+    drawArena(); drawRings();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 0);
@@ -2306,9 +2304,9 @@
     }
     for (const s of G.shots) {
       if (s.pet) { const D = PETS[s.pet]; glow(s.x, s.y - 60, 46, D.rgb, 0.75); fx("fx_twinkle", s.x, s.y - 60, 0.45, 1, G.t * 8); }
-      else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk);
+      else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk, s.sc);
     }
-    for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk);
+    for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc);
     drawParts(L, R, T, B);
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 1);
     if (Q && NET.role && Q.ultT > 0) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 1);
@@ -2380,9 +2378,7 @@
   function updateQuest() {
     const el = $("quest"), goal = G.portal || G.arena;
     let html = "", open = false;
-    const cp = campOf(P);
     if (G.boss) html = "";
-    else if (cp) html = `Ổ quái: hạ thêm <b>${Math.max(0, cp.left)}</b> quái`;
     else if (goal && !goal.open) html = `${G.portal ? "Mở cổng phép" : "Mở đấu trường"}: hạ thêm <b>${quotaLeft()}</b> quái`;
     else if (goal) { open = true; html = G.portal ? "Cổng phép đã mở! Đi theo mũi tên" : "Vào đấu trường gặp Vua Bí Ngô!"; }
     if (html === questTxt) return;
@@ -2409,7 +2405,7 @@
     LEVELS.forEach((L, i) => {
       const b = document.createElement("button"); b.className = "lv"; b.disabled = i + 1 > progress;
       const [a, n] = L.name.split(": "); b.innerHTML = `<b>${a}</b>`; b.append(n);
-      b.addEventListener("click", () => openWardrobe(() => startGame(i)));
+      b.addEventListener("click", () => (OUTFITS_ON ? openWardrobe(() => startGame(i)) : startGame(i)));
       box.append(b);
     });
   }
@@ -2687,7 +2683,7 @@
       for (const b of Array.isArray(d.s) ? d.s.slice(0, 40) : []) {
         if (!Array.isArray(b) || !Q || G.pshots.length >= 40) break;
         const a = num(b[2]) / 100;
-        G.pshots.push({ x: num(b[0]), y: num(b[1]), vx: Math.cos(a) * H.bolt, vy: Math.sin(a) * H.bolt, life: (H.range + 200) / H.bolt, elem: ELS[num(b[3])] || null, hk: k, pierce: k === "s" });
+        G.pshots.push({ x: num(b[0]), y: num(b[1]), vx: Math.cos(a) * H.bolt, vy: Math.sin(a) * H.bolt, life: (H.range + 200) / H.bolt, elem: ELS[num(b[3])] || null, hk: k, sc: clamp(num(b[4]) / 100 || 1, 0.5, 3) });
       }
       return;
     }
@@ -2698,7 +2694,7 @@
           const el = ELS[num(h[1])] || null, id = num(h[0]);
           if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); } continue; }
           const m = G.mons.find((m) => m.id === id && m.alive);
-          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 12), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q"); applyElem(m, el, "q"); }
+          if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 14), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 250)); applyElem(m, el, "q"); }
         }
       } else if (msg.topic === "ult") {
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400)); SFX.boom(); G.shake = 20;
