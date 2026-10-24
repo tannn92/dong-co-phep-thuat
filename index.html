@@ -1108,7 +1108,7 @@
   }
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
-  const WAND = { g: [[109, -13], [117, -21], [118, -21], [118, -23], [100, -49]], s: [[109, -44], [126, -45], [128, -50], [117, -55], [102, -93]] };
+  const WAND = { g: [[78, -32], [111, -40], [112, -38], [103, -42], [79, -60]], s: [[85, -51], [140, -49], [155, -50], [120, -60], [40, 0]] };
   function wandTip(hk, face, flip) { const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip ? -1 : 1), w[1]]; }
   function fireBolt(a, S) {
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
@@ -2125,14 +2125,14 @@
     const ph = walk / DIR_CYCLE * TAU, up = Math.abs(Math.sin(ph)), i = Math.floor(walk / DIR_CYCLE * 2);
     if (o.stepI !== undefined && o.stepI >= 0 && i !== o.stepI) dust(o.x, o.y, 2);
     o.stepI = i;
-    return [up * 13, Math.sin(ph) * 0.045, 1 + 0.035 * up - 0.035 * (1 - up)];
+    return [up * 6, Math.sin(ph) * 0.02, 1 + 0.015 * up - 0.015 * (1 - up)];   // gentle: short child steps
   }
   function dust(x, y, n) {
     for (let k = 0; k < n; k++) G.parts.push({ type: "dust", x: x + rnd(-24, 24), y: y + rnd(-4, 6), vx: rnd(-50, 50), vy: rnd(-30, -5), life: 0.42, max: 0.42, r: rnd(10, 16) });
   }
   // the side-view poses (hurt, resting, win, ultimate) are slimmer than the chibi 8-direction art: scaled up so
   // she looks the same size (ratio of body areas, measured from the atlas)
-  const SIDE_K = { g: 1.36, s: 1.17 };
+  const SIDE_K = { g: 1.15, s: 1.05 };
   const sideK = (hk, fn) => (/_d\d_/.test(fn) ? 1 : SIDE_K[hk] || 1);
   function drawHeroSprite(hk, fn, x, y, z, flip, alpha, ultT, step) {
     const M = CHAR_M * sideK(hk, typeof fn === "string" ? fn : "");
