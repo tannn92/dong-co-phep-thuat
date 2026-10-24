@@ -335,6 +335,7 @@
   const SFX = {
     zap() { tone("sawtooth", 2000, 420, 0.16, 0.06); tone("sine", 2800, 1200, 0.1, 0.06); },
     hit() { tone("triangle", 700, 380, 0.09, 0.12); noise(0.06, 0.08, 2500, 1); },
+    bark() { [0, 0.13].forEach((w) => { tone("square", 620, 310, 0.09, 0.07, w); noise(0.07, 0.07, 900, 1.5, w); }); },
     pop() { tone("sine", 180, 50, 0.3, 0.3); noise(0.22, 0.2, 1800, 0.6); [2349, 2960, 3520].forEach((f, i) => tone("sine", f, f, 0.22, 0.04, 0.04 + i * 0.05)); },
     hurt() { tone("square", 240, 90, 0.28, 0.1); noise(0.18, 0.1, 400, 1); },
     jump() { tone("sine", 380, 760, 0.14, 0.08); },
@@ -381,19 +382,19 @@
   // kinds: [monster, weight, from] — `from` is the share of the level's ramp (0..1) before it starts to appear.
   // quota: monsters to defeat before the portal (or, in level 4, the arena) opens; the camps along the path give most of them.
   // spawn: monsters per second at start / after the 5-minute ramp. camps: monster camps waiting beside the path.
-  // gr: ground palette. deco: [sprite, weight] scattered beside the path. pet: a caged friend to rescue mid-path.
+  // gr: ground palette. deco: [sprite, weight] scattered beside the path. pets: caged friends to rescue along the path (PETS[k].at).
   const LEVELS = [
-    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, quota: 120, spawn: [0.7, 1.6], camps: 9,
+    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
       kinds: [["zombie", 3, 0], ["bat", 2, 0], ["skeleton", 2, 0.15], ["ghost", 2, 0.35]],
       deco: [["tree", 3], ["bush", 4], ["mushrooms", 1], ["pumpkin2", 1], ["pumpkin3", 1]],
       gr: { base: "#679c4a", patch: ["#84b75c", "#558a3e", "#76a94f"], blade: ["#93c96a", "#4f8a3a", "#a6d77a"], dot: ["#ffd3f0", "#fff3b0", "#ffffff", "#ff9ec7", "#c9b6ff"], nDot: 70,
         stone: ["#e3d4b4", "#d8c7a3", "#cdb995"], gap: "#9c8a6c", edge: "#6f5d44" } },
-    { name: "Màn 2: Rừng Ma", seed: 2207, quota: 140, spawn: [0.8, 1.7], camps: 10, pet: "cat",
+    { name: "Màn 2: Rừng Ma", seed: 2207, quota: 140, spawn: [0.8, 1.7], camps: 10,
       kinds: [["spider", 3, 0], ["ghost", 2, 0], ["bat", 2, 0.1], ["mummy", 2, 0.3]],
       deco: [["tree", 4], ["mushrooms", 4], ["bush", 2], ["pumpkin3", 1]],
       gr: { base: "#3f5340", patch: ["#536b4a", "#2f3f34", "#4d4466", "#45405c"], blade: ["#5f7d55", "#2c3a2e", "#6b5f86"], dot: ["#b9a4ff", "#7cf2c6", "#e0b8ff"], nDot: 45,
         stone: ["#a3a69a", "#959a8c", "#8a9180"], gap: "#5a5e55", edge: "#2a302c" } },
-    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, quota: 160, spawn: [0.8, 1.8], camps: 11, pet: "dog",
+    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, quota: 160, spawn: [0.8, 1.8], camps: 11,
       kinds: [["skeleton", 3, 0], ["bat", 2, 0], ["mummy", 2, 0.1], ["witch", 1, 0.25], ["vampire", 1, 0.45]],
       deco: [["grave1", 3], ["grave2", 3], ["tree", 1], ["pumpkin3", 1], ["pumpkin1", 1]],
       gr: { base: "#4f4a5a", patch: ["#5d5768", "#423d4c", "#5a5a4a", "#5b4a5e"], blade: ["#6a6577", "#3d3846", "#6e6a52"], dot: ["#d8d0e8", "#ff9ab8"], nDot: 30,
@@ -438,11 +439,14 @@
     g: { name: "Mochi", rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, bounce: 0, r: 30 },
     s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, bounce: 2, r: 42 },
   };
-  // TODO(pets): placeholder friends until their art and details arrive. Pets follow the hero and now and then shoot a small bolt.
+  // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
+  // The cat (Matcha's Scottish Fold) pounces on a monster near her girl and scratches it.
+  // The poodle (Mochi's) barks when monsters come close: they are pushed back and slowed. at: where its cage sits along the path.
   const PETS = {
-    cat: { name: "Mèo", rgb: "255,190,120", col: "#ffcf8a", cd: 1.5, dmg: 1, range: 620 },
-    dog: { name: "Cún", rgb: "150,200,255", col: "#a8d4ff", cd: 1.8, dmg: 2, range: 620 },
+    cat: { name: "Mèo Tai Cụp", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 1.1, range: 560, tip: "Bạn ấy sẽ đi theo và cào quái giúp Matcha" },
+    dog: { name: "Cún Poodle", owner: "g", at: 0.38, rgb: "200,130,90", col: "#c98a5e", cd: 3.2, range: 380, bark: true, tip: "Bạn ấy sủa đẩy lùi quái và làm chúng chậm lại" },
   };
+  const petDmg = (lv) => 3 + Math.floor(lv * 0.8);
   let hero = "g";
   try { if (localStorage.getItem("dcpt3-hero") === "s") hero = "s"; } catch (e) {}
   const HD = () => HEROES[hero];
@@ -500,7 +504,9 @@
   const IN = { ultPressed: false };
   let progress = 1;
   try { progress = Math.max(1, Math.min(4, +localStorage.getItem("dcpt3-progress") || 1)); } catch (e) {}
-  try { P.pets = (localStorage.getItem("dcpt3-pets") || "").split(",").filter((k) => PETS[k]); } catch (e) {}
+  // rescued pets, kept per sister
+  function loadPets() { try { P.pets = (localStorage.getItem("dcpt3-pets-" + hero) || "").split(",").filter((k) => PETS[k] && PETS[k].owner === hero); } catch (e) { P.pets = []; } }
+  loadPets();
 
   // ---------------------------------------------------------------- map generation
   // A winding path: Catmull-Rom spline through 10-14 control points zig-zagging across the world, resampled every STEP units.
@@ -614,7 +620,7 @@
     const offAt = (s, side, off) => { const i = clamp(Math.round(s / STEP), 0, endI), [dx, dy] = pathDir(i); return [path.x[i] - dy * side * off, path.y[i] + dx * side * off]; };
     G.chests = [];
     for (const f of [0.14, 0.3, 0.46, 0.62, 0.78, 0.92]) {
-      if (L.pet && Math.abs(f - 0.5) < 0.06) continue;
+      if ((L.pets || []).some((k) => Math.abs(f - PETS[k].at) < 0.06)) continue;
       const [x, y] = offAt(f * path.len, R() < 0.5 ? -1 : 1, PATH_W * 0.28 + R() * 30);
       G.chests.push({ x, y, open: false, t: 0 });
     }
@@ -633,7 +639,11 @@
     // the gate wants about as many monsters as the camps hold, so walking the path is enough
     G.quota = Math.round(G.camps.reduce((a, c) => a + c.n, 0) * 0.9);
     G.cages = [];
-    if (L.pet) { const [x, y] = offAt(0.5 * path.len, R() < 0.5 ? -1 : 1, PATH_W / 2 + 70); G.cages.push({ kind: L.pet, x, y, open: false, t: 0 }); }
+    // a cage only when its sister plays (in co-op always, so both pages build the same level)
+    for (const k of L.pets || []) {
+      const [x, y] = offAt(PETS[k].at * path.len, R() < 0.5 ? -1 : 1, PATH_W / 2 + 70), own = PETS[k].owner === hero;
+      if (NET.role || (own && !P.pets.includes(k))) G.cages.push({ kind: k, x, y, open: false, t: 0 });
+    }
     G.items = [];
     for (let s = 500; s < path.len - 300; s += 380 + R() * 160) {
       const side = R() < 0.5 ? -0.25 : 0.25, candy = R() < 0.18;
@@ -1454,7 +1464,9 @@
       const T = nearestGirl(c.x, c.y, 140);
       if (!T) continue;
       c.open = true; openCageFx(c);
-      if (T === P) rescuePet(c.kind); else netEmit("pet", { to: NET.partner, k: c.kind });
+      // the pet goes to the sister it belongs to, whoever opened the cage
+      const owner = PETS[c.kind].owner, mine = hero === owner && (T === P || !Q || Q.hero !== owner);
+      if (mine) rescuePet(c.kind); else if (Q && Q.hero === owner) netEmit("pet", { to: NET.partner, k: c.kind });
     }
     for (const it of G.items) {
       if (it.got) continue;
@@ -1484,17 +1496,34 @@
   function rescuePet(kind) {
     if (!P.pets.includes(kind)) {
       P.pets.push(kind);
-      try { localStorage.setItem("dcpt3-pets", P.pets.join(",")); } catch (e) {}
+      try { localStorage.setItem("dcpt3-pets-" + hero, P.pets.join(",")); } catch (e) {}
       makePetEnts();
     }
-    showBanner("Bé đã cứu bạn " + PETS[kind].name + "!", "Bạn ấy sẽ đi theo và bắn giúp bé");
+    showBanner(HD().name + " đã cứu " + PETS[kind].name + "!", PETS[kind].tip);
   }
 
-  // ---------------------------------------------------------------- pets (TODO: real art and abilities)
+  // ---------------------------------------------------------------- pets
+  // st: "follow" trails the girl; "pounce" runs at a monster near her and scratches it, then follows again
   let PETE = [], QPETE = [];
-  function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i })); }
-  function followPets(list, owner, dt, shoot) {
+  function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow" })); }
+  function followPets(list, owner, dt, act) {
     for (const p of list) {
+      p.scr = (p.scr || 0) - dt;
+      if (act && p.st === "pounce") {
+        const T = p.tgt, B = G.boss, dead = !T || (T === B ? !B || !B.alive : !T.alive);
+        if (dead || d2(p.x, p.y, owner.x, owner.y) > 900 * 900) { p.st = "follow"; p.cd = 0.4; }
+        else {
+          const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1, reach = T === B ? 150 : T.r + 40;
+          if (d > reach) { const sp = Math.min(d - reach + 1, 950 * dt); p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; setFace(p, dx, dy); p.moving = true; continue; }
+          // scratch!
+          setFace(p, dx, dy); p.moving = false; p.scr = 0.3; p.st = "follow"; p.cd = PETS[p.kind].cd;
+          const dmg = petDmg(P.lv);
+          if (T === B) hitBoss(null, T.x, T.y); else hitMon(T, dmg, null, p.x, p.y, 90);
+          G.parts.push({ type: "claw", x: (p.x + T.x) / 2, y: (p.y + T.y) / 2 - 70, vx: 0, vy: 0, rot: Math.atan2(dy, dx), life: 0.3, max: 0.3 });
+          play("hit");
+          continue;
+        }
+      }
       // trail behind the girl, one on each side
       const side = p.i % 2 ? 1 : -1, back = 120 + Math.floor(p.i / 2) * 60;
       const fx = owner.flip ? 1 : -1, tx = owner.x + fx * back * 0.8 + side * 30, ty = owner.y + side * 70;
@@ -1503,15 +1532,24 @@
       const sp = Math.min(d * 3.2, 560) * dt;
       if (d > 4) { p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; if (sp > 1) setFace(p, dx, dy); }
       p.moving = sp > 40 * dt;
-      if (!shoot) continue;
-      const D = PETS[p.kind];
-      if ((p.cd -= dt) > 0) continue;
-      const T = nearestFoes(p.x, p.y, D.range, 1)[0];
+      if (!act || (p.cd -= dt) > 0) continue;
+      if (PETS[p.kind].bark) { bark(p, owner); continue; }
+      const T = nearestFoes(owner.x, owner.y, PETS[p.kind].range, 1)[0];
       if (!T) { p.cd = 0.3; continue; }
-      p.cd = D.cd;
-      const a = Math.atan2(T.y - p.y, T.x - p.x);
-      G.shots.push({ x: p.x, y: p.y + 40, vx: Math.cos(a) * 1100, vy: Math.sin(a) * 1100, life: D.range / 1100 + 0.1, r: 24, dmg: D.dmg, bounce: 0, hit: null, elem: null, hk: hero, pet: p.kind });
+      p.st = "pounce"; p.tgt = T;
     }
+  }
+
+  // the poodle's bark: when monsters come close to her girl, a ring of sound pushes them back and slows them
+  function bark(p, owner) {
+    const D = PETS[p.kind], rr = D.range * D.range, near = G.mons.filter((m) => m.alive && (d2(m.x, m.y, p.x, p.y) < rr || d2(m.x, m.y, owner.x, owner.y) < rr * 0.6));
+    if (!near.length) { p.cd = 0.3; return; }
+    p.cd = D.cd; p.scr = 0.3;
+    const kb = 260 + 10 * P.lv;
+    for (const m of near) { if (NET.role !== "guest" && m.st === "prep") m.st = "walk"; hitMon(m, 1, "ice", p.x, p.y, kb); }   // a bark also breaks a wind-up
+    G.parts.push({ type: "ring", x: p.x, y: p.y - 50, r: 40, vr: 1300, life: 0.35, max: 0.35, col: "255,230,190" });
+    G.parts.push({ type: "text", x: p.x, y: p.y - 140, vx: 0, vy: -110, life: 0.8, max: 0.8, txt: "Gâu!" });
+    SFX.bark();
   }
 
   // ---------------------------------------------------------------- boss (level 4)
@@ -2022,9 +2060,14 @@
     ctx.restore();
   }
   function drawPet(p) {
-    const D = PETS[p.kind], pre = `pet_${p.kind}_d${p.face}_`, n = dirN(pre);
-    if (n) { shadow(p.x, p.y, 34, 10); spr(pre + (p.moving ? Math.floor(p.dist / 120 * n) % n : 0), p.x, p.y, p.flip, CHAR_M); return; }
-    // TODO(pets): placeholder until the pet art arrives — a glowing bubble with a paw print
+    const D = PETS[p.kind], pre = `pet_${p.kind}_d${p.face}_w`, n = dirN(pre);
+    if (n) {
+      const ph = p.dist / 150 * TAU, hop = p.moving ? Math.abs(Math.sin(ph)) * 6 : 0, lunge = p.scr > 0 ? Math.sin(p.scr / 0.3 * Math.PI) * 14 : 0;
+      shadow(p.x, p.y, 44, 12);
+      spr(pre + (p.moving ? Math.floor(p.dist / 150 * n) % n : 0), p.x, p.y - hop - lunge, p.flip, CHAR_M * (p.sc || 1));
+      return;
+    }
+    // no art for this pet yet: a glowing bubble with a paw print
     const bob = Math.abs(Math.sin(G.t * 6 + p.i * 1.7)) * (p.moving ? 16 : 5), y = p.y - 48 - bob;
     shadow(p.x, p.y, 30, 9, 0.25);
     glow(p.x, y, 80, D.rgb, 0.55);
@@ -2045,7 +2088,7 @@
     shadow(c.x, c.y, 70, 16);
     if (!c.open) {
       glow(c.x, c.y - 100, 160, D.rgb, 0.35 + 0.12 * Math.sin(G.t * 3));
-      drawPet({ kind: c.kind, x: c.x, y: c.y - 30, face: 0, flip: false, moving: false, i: 0, dist: 0 });
+      drawPet({ kind: c.kind, x: c.x, y: c.y - 22, face: 0, flip: false, moving: false, i: 0, dist: 0, sc: 0.72 });
       spr(PROPS.cage, c.x, c.y);
       label("Cứu bạn " + D.name + "!", c.x, c.y - 230, 36);
     } else spr(PROPS.cageOpen, c.x, c.y, false, 1, 0.85);
@@ -2233,6 +2276,16 @@
       else if (p.type === "dust") { ctx.globalAlpha = 1; spr("fx_smoke", p.x, p.y, p.x % 2 > 1, p.r / 34, a * 0.55); }
       else if (p.type === "fx") { ctx.globalAlpha = 1; fx(p.name, p.x, p.y, p.sc * (1 + (1 - a) * (p.grow || 0.6)), a, p.rot || 0, !!p.flip); }
       else if (p.type === "ring") { ctx.globalAlpha = a; ctx.strokeStyle = `rgba(${p.col},1)`; ctx.lineWidth = 26 * a + 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke(); }
+      else if (p.type === "claw") {
+        // three quick scratch marks
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + Math.PI / 2); ctx.globalAlpha = a; ctx.lineCap = "round";
+        const k = 1 - a * 0.6;
+        for (let j = -1; j <= 1; j++) {
+          ctx.strokeStyle = "rgba(255,170,90,.9)"; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(j * 26 - 30 * k, -46 * k); ctx.quadraticCurveTo(j * 26 + 12, 0, j * 26 - 30 * k, 46 * k); ctx.stroke();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.stroke();
+        }
+        ctx.restore();
+      }
       else if (p.type === "text") {
         ctx.globalAlpha = a; ctx.font = "800 44px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.lineWidth = 7; ctx.strokeStyle = "rgba(40,20,0,.7)"; ctx.fillStyle = "#ffd34d";
         ctx.strokeText(p.txt, p.x, p.y); ctx.fillText(p.txt, p.x, p.y);
@@ -2417,7 +2470,7 @@
       const k2 = f.s * sc, g = c.getContext("2d");
       g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
       b.append(c, h.name);
-      b.addEventListener("click", () => { hero = k; try { localStorage.setItem("dcpt3-hero", k); } catch (e) {} renderHeroes(); });
+      b.addEventListener("click", () => { hero = k; try { localStorage.setItem("dcpt3-hero", k); } catch (e) {} loadPets(); renderHeroes(); });
       box.append(b);
     }
   }
@@ -2728,7 +2781,7 @@
         else if (["star", "candy"].includes(d.ty)) pickItem(d.ty, x, y);
       } else if (msg.topic === "gain") addEnergy(clamp(num(d.n), 0, 30), num(d.x), num(d.y));
       else if (msg.topic === "xp") { gainXp(clamp(Math.floor(num(d.n)), 0, 200)); play("gem"); }
-      else if (msg.topic === "pet" && PETS[d.k]) rescuePet(d.k);
+      else if (msg.topic === "pet" && PETS[d.k] && PETS[d.k].owner === hero) rescuePet(d.k);
     }
   }
   // presence: my girl (both roles) plus the world (host), about 20 times a second
@@ -2797,7 +2850,7 @@
     Q.fn = fn.startsWith(Q.skin + "_") && FR[fn] ? fn : fn.includes("_") && FR[base] ? base : FR[Q.hero + "_stand"] ? Q.hero + "_stand" : "";
     Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16); Q.flip = !!(b & 32);
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
-    Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];
+    Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];   // their pets (shown following them)
     Q.lv = clamp(Math.floor(num(gl[13])) || 1, 1, MAX_LV);
     Q.hostInv -= dt;
   }
@@ -3014,7 +3067,7 @@
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
     autopilot: false,
     getQ: () => Q,
-    setHero: (k) => { hero = k === "s" ? "s" : "g"; renderHeroes(); },
+    setHero: (k) => { hero = k === "s" ? "s" : "g"; loadPets(); renderHeroes(); },
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet,
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
