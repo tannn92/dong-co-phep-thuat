@@ -59,6 +59,12 @@
   .iconbtn svg { width: 1.05em; height: 1.05em; }
   #bossbar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 9 * var(--u)); width: min(46vw, 60 * var(--u)); display: grid; gap: .25em; text-align: center; font-family: var(--display); font-weight: 800; font-size: calc(2.4 * var(--u)); text-shadow: 0 2px 6px #000; pointer-events: none; }
   #bossbar .bar { height: .9em; }
+  /* the finale: one bar per demon fighting */
+  #sbars { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 3 * var(--u)); display: flex; gap: calc(2 * var(--u)); pointer-events: none; }
+  #sbars[hidden] { display: none; }
+  .sbar { width: min(26vw, 30 * var(--u)); display: grid; gap: .2em; text-align: center; font-family: var(--display); font-weight: 800; font-size: calc(2.1 * var(--u)); color: #ffd6f2; text-shadow: 0 2px 6px #000; }
+  .sbar .bar { height: .8em; }
+  .sbar .fill { background: linear-gradient(90deg, #5a1d8f, #c060ff 60%, #ff8ad8); box-shadow: 0 0 12px rgba(200,100,255,.7); }
   #bossbar .fill { background: linear-gradient(90deg, #a3122b, #ff6a3d 70%, #ffc06a); box-shadow: 0 0 14px rgba(255,90,60,.7); }
 
   .xp { width: 10em; display: grid; gap: .2em; }
@@ -153,6 +159,7 @@
     <canvas id="mini" width="200" height="200" aria-label="Bản đồ nhỏ"></canvas>
   </div>
 </div>
+<div id="sbars" hidden></div>
 <div id="bossbar" hidden><div id="bossName">Vua Bí Ngô</div><div class="bar"><div class="fill" id="bfill"></div></div></div>
 
 <div id="controls" hidden>
@@ -484,7 +491,7 @@
     saja_baby:    { hp: 22, en: 20, spd: 190, prep: 0.35, atk: 0.35, cd: 2.4, saja: "dash", heavy: true, name: "Baby" },
     saja_romance: { hp: 26, en: 20, spd: 140, prep: 0.6, atk: 0.4, cd: 3.0, saja: "hearts", heavy: true, name: "Romance" },
     // Gwi Ma: the flame-toad demon king, shielded until the five are down
-    gwima:        { hp: 120, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
+    gwima:        { hp: 135, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
   };
   const SAJA = ["saja_mystery", "saja_abby", "saja_jinu", "saja_baby", "saja_romance"];
   // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows. While one is held the auto-attack also fires faster.
@@ -1085,6 +1092,7 @@
   // keeps a girl inside the world, out of a sealed arena, and inside the arena during the boss fight
   function fence(o) {
     const A = G.arena;
+    if (A && G.lvl && G.lvl.stage && G.cine) { inStage(o, 60); return; }
     if (A) {
       const dx = o.x - A.x, dy = o.y - A.y, d = Math.hypot(dx, dy) || 1;
       if (G.arenaLock && d > A.r - 60) { o.x = A.x + dx / d * (A.r - 60); o.y = A.y + dy / d * (A.r - 60); }
@@ -1767,18 +1775,30 @@
   }
 
   // ---------------------------------------------------------------- the finale (level 5): the concert stage
-  // A short film first (the girls cannot move): the five Saja Boys tied up on the stage, Gwi Ma laughing behind them,
-  // his spell turns them into demons. Then the fight: the five demons, each with its own move; Gwi Ma is shielded
-  // until they are all down. When he falls, the boys are themselves again and everyone cheers.
-  // G.cine: { ph: intro | fight | gwima | outro, t, lock (no control), spawned }
-  const CPH = ["intro", "fight", "gwima", "outro"], BOYX = [-440, -220, 0, 220, 440];
+  // A short film first (the girls cannot move): the five Saja Boys tied up on the main stage, Gwi Ma laughing behind
+  // them, his spell turns them into demons. Then they fight in turns, 2 + 2 + 1: Mystery and Romance, then Abby and Baby,
+  // last Jinu with Gwi Ma throwing fire from behind the stage. When both fall, the boys are themselves again.
+  // G.cine: { ph: intro | fight | outro, t, lock (no control), wave (0..2), spawned }
+  // The stage is laid out like the "Tinh Hà Say Hi" concert: a main stage at the top in front of an LED wall, a runway
+  // down to a long catwalk, the two fan zones either side of the runway, the general floor below. All of it is walkable.
+  const CPH = ["intro", "fight", "outro"], BOYX = [-560, -280, 0, 280, 560];
+  const WAVES = [["saja_mystery", "saja_romance"], ["saja_abby", "saja_baby"], ["saja_jinu"]];
+  const WAVE_MSG = [["Mystery và Romance ra trận!", "Hai quỷ đầu tiên"], ["Abby và Baby ra trận!", "Thêm hai quỷ nữa"], ["Jinu và Gwi Ma!", "Trận cuối cùng, cố lên!"]];
+  const SR = { x0: -1750, x1: 1750, y0: -1250, y1: 1150 };   // the walkable stage area, relative to the arena centre
   const SAJA_RANGE = { blink: 900, slam: 260, phase: 900, hearts: 820, dash: 700 };
+  const BOY_Y = -880, GWIMA_Y = -1010;
+  function inStage(o, pad) {
+    const A = G.arena; o.x = clamp(o.x, A.x + SR.x0 + pad, A.x + SR.x1 - pad); o.y = clamp(o.y, A.y + SR.y0 + pad, A.y + SR.y1 - pad);
+  }
   function startStage() {
-    const A = G.arena; A.open = true; G.arenaLock = true;
-    P.x = A.x + (NET.role === "guest" ? 130 : -130); P.y = A.y + 330; P.vx = P.vy = 0; P.face = 4; P.flip = false; P.prog = G.path.n - 1;
-    for (const p of PETE) { p.x = P.x + rnd(-160, 160); p.y = P.y + rnd(40, 120); }
-    G.cine = { ph: "intro", t: 0, lock: true, spawned: false, shown: null };
-    if (NET.role !== "guest") { const g = spawnMon("gwima", A.x, A.y - 270); g.shield = true; }
+    const A = G.arena; A.open = true; G.arenaLock = false;
+    // nothing standing on the floor
+    for (const [k, a] of G.decoGrid) G.decoGrid.set(k, a.filter((d) => d.x < A.x + SR.x0 - 120 || d.x > A.x + SR.x1 + 120 || d.y < A.y + SR.y0 - 200 || d.y > A.y + SR.y1 + 150));
+    G.chests = G.chests.filter((c) => c.x < A.x + SR.x0 || c.x > A.x + SR.x1 || c.y < A.y + SR.y0 || c.y > A.y + SR.y1);
+    P.x = A.x + (NET.role === "guest" ? 130 : -130); P.y = A.y - 420; P.vx = P.vy = 0; P.face = 4; P.flip = false; P.prog = G.path.n - 1;
+    for (const p of PETE) { p.x = P.x + rnd(-200, 200); p.y = P.y + rnd(60, 160); }
+    G.cine = { ph: "intro", t: 0, lock: true, wave: -1, spawned: false, shown: null, shownWave: -1 };
+    if (NET.role !== "guest") { const g = spawnMon("gwima", A.x, A.y + GWIMA_Y); g.shield = true; }
   }
   function openFinalPortal() {
     const A = G.arena; if (!A || G.portal) return;
@@ -1788,49 +1808,72 @@
   }
   const stageMons = () => G.mons.filter((m) => m.alive && m.c.saja);
   const gwimaMon = () => G.mons.find((m) => m.c.gwima);
+  // which wave a demon belongs to
+  const waveOf = (k) => WAVES.findIndex((w) => w.includes(k));
+  function startWave(n) {
+    const c = G.cine; c.wave = n;
+    for (const m of G.mons) if (m.alive && m.c.saja && waveOf(m.kind) === n) { m.wait = false; m.shield = false; m.cd = 1 + Math.random(); }
+    if (n === 2) { const g = gwimaMon(); if (g) { g.shield = false; g.cd = 2; } }
+  }
   function updateCine(dt) {
     const c = G.cine; if (!c) return;
     const A = G.arena, host = NET.role !== "guest";
     c.t += dt;
     if (c.shown !== c.ph) { c.shown = c.ph; onCinePhase(c.ph); }
+    if (c.ph === "fight" && c.shownWave !== c.wave && c.wave >= 0) { c.shownWave = c.wave; showBanner(...WAVE_MSG[c.wave]); SFX.roar(); }
     if (c.ph === "intro") {
       if (c.t > 2.5 && !c.laugh) { c.laugh = true; SFX.roar(); G.shake = 10; }
       if (c.t > 4.8 && !c.spellMsg) { c.spellMsg = true; showBanner("Gwi Ma niệm phép!", "Ôi không…"); SFX.charge(); }
       if (c.t > 4.8 && c.t < 7.3 && G.parts.length < 420) for (let i = 0; i < 3; i++) {
-        const k = Math.floor(Math.random() * 5), x0 = A.x + rnd(-60, 60), y0 = A.y - 560, x1 = A.x + BOYX[k], y1 = A.y - 200;
+        const k = Math.floor(Math.random() * 5), x0 = A.x + rnd(-60, 60), y0 = A.y + GWIMA_Y - 300, x1 = A.x + BOYX[k], y1 = A.y + BOY_Y - 140;
         G.parts.push({ type: "dot", x: x0, y: y0, vx: (x1 - x0) * 1.4, vy: (y1 - y0) * 1.4, life: 0.7, max: 0.7, r: rnd(6, 11), col: Math.random() < 0.5 ? "#ff3d7f" : "#c08bff" });
       }
-      if (c.t > 7.3 && !c.boom) { c.boom = true; SFX.boom(); G.shake = 22; for (const x of BOYX) burst(A.x + x, A.y - 160, 30, ["#3a0d4f", "#c08bff", "#ff3d7f", "#000"], 420, 1); }
+      if (c.t > 7.3 && !c.boom) { c.boom = true; SFX.boom(); G.shake = 22; for (const x of BOYX) burst(A.x + x, A.y + BOY_Y - 100, 30, ["#3a0d4f", "#c08bff", "#ff3d7f", "#000"], 420, 1); }
       if (host && c.t > 7.3 && !c.spawned) {
         c.spawned = true;
-        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y - 60); m.face = 0; m.cd = 1.2 + i * 0.35; });
+        // the demons line up on the main stage; each waits (shielded) for its turn
+        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y + BOY_Y); m.face = 0; m.wait = true; m.shield = true; m.home = [m.x, m.y]; });
       }
-      if (host && c.t > 9.6) { c.ph = "fight"; c.t = 0; c.lock = false; }
+      if (host && c.t > 9.6) { c.ph = "fight"; c.t = 0; c.lock = false; startWave(0); }
     } else if (c.ph === "fight") {
-      if (host && c.spawned && !stageMons().length) { c.ph = "gwima"; c.t = 0; const g = gwimaMon(); if (g) { g.shield = false; g.cd = 1.5; } }
-    } else if (c.ph === "gwima") {
-      const g = gwimaMon();
-      if (g) { c.gx = g.x; c.gy = g.y; $("bfill").style.width = (100 * Math.max(0, g.hp) / g.max) + "%"; }
-      if (host && (!g || !g.alive)) { c.ph = "outro"; c.t = 0; c.lock = true; for (const m of G.mons) if (m.alive) killMon(m, false); }
+      if (host) {
+        const left = stageMons().filter((m) => waveOf(m.kind) === c.wave).length, g = gwimaMon();
+        if (c.wave < 2 && !left) startWave(c.wave + 1);
+        else if (c.wave === 2 && !left && (!g || !g.alive)) { c.ph = "outro"; c.t = 0; c.lock = true; for (const m of G.mons) if (m.alive) killMon(m, false); }
+      }
+      const g = gwimaMon(); if (g) { c.gx = g.x; c.gy = g.y; }
     } else if (c.ph === "outro") {
-      if (c.t < 7 && Math.random() < dt * 4) burst(A.x + rnd(-700, 700), A.y + rnd(-700, 200), 22, ["#ffd34d", "#ff6ec7", "#7cf2ff", "#b9a4ff", "#fff"], 420, 1);
+      if (c.t < 7 && Math.random() < dt * 4) burst(A.x + rnd(-900, 900), A.y + rnd(-900, 100), 22, ["#ffd34d", "#ff6ec7", "#7cf2ff", "#b9a4ff", "#fff"], 420, 1);
       if (c.t > 1.2 && !c.thanks) { c.thanks = true; showBanner("Cảm ơn các bạn nhỏ!", "Saja Boys đã trở lại là chính mình"); SFX.win(); }
       if (host && c.t > 9 && !G.won) winGame();
     }
+    if (G.frame % 5 === 0) renderStageBars();
+  }
+  // a health bar for each demon (and Gwi Ma) that is fighting right now
+  function renderStageBars() {
+    const box = $("sbars"), c = G.cine;
+    const list = c && c.ph === "fight" ? G.mons.filter((m) => m.alive && (m.c.saja || m.c.gwima) && !m.wait && !m.shield) : [];
+    const key = list.map((m) => m.id).join();
+    if (box.dataset.key !== key) {
+      box.dataset.key = key; box.innerHTML = "";
+      box.fills = list.map((m) => {
+        const d = document.createElement("div"), n = document.createElement("div"), bar = document.createElement("div"), f = document.createElement("div");
+        d.className = "sbar"; bar.className = "bar"; f.className = "fill"; n.textContent = m.c.gwima ? "Gwi Ma" : m.c.name;
+        bar.append(f); d.append(n, bar); box.append(d); return f;
+      });
+    }
+    list.forEach((m, i) => { const f = box.fills && box.fills[i]; if (f) f.style.width = (100 * Math.max(0, m.hp) / m.max) + "%"; });
+    box.hidden = !list.length;
   }
   function onCinePhase(ph) {
     const A = G.arena;
     if (ph === "intro") showBanner("Gwi Ma đã bắt Saja Boys!", "Cả nhóm hãy xem kìa…");
-    else if (ph === "fight") { showBanner("5 quỷ Saja tấn công!", "Hạ hết chúng để phá khiên của Gwi Ma"); SFX.roar(); }
-    else if (ph === "gwima") {
-      showBanner("Khiên của Gwi Ma đã vỡ!", "Đánh bại Gwi Ma nào!"); SFX.unlock();
-      $("bossbar").hidden = false; $("bossName").textContent = "Gwi Ma";
-    } else if (ph === "outro") {
-      $("bossbar").hidden = true; showBanner("Gwi Ma đã bị đánh bại!", "");
-      P.winT = 99; P.vx = P.vy = 0; P.x = A.x + (NET.role === "guest" ? 120 : -120); P.y = A.y + 250; P.face = 4;
+    else if (ph === "outro") {
+      showBanner("Gwi Ma đã bị đánh bại!", "");
+      P.winT = 99; P.vx = P.vy = 0; P.x = A.x + (NET.role === "guest" ? 120 : -120); P.y = A.y - 520; P.face = 4;
       // everyone in a row in front of the boys
-      PETE.forEach((p, i) => { const k = i + 1, side = k % 2 ? 1 : -1; p.x = P.x + side * (150 + Math.floor((k - 1) / 2) * 150); p.y = A.y + 230 + (k % 3) * 20; p.face = 0; p.flip = false; p.at = -1; p.st = "follow"; });
-      const c = G.cine; burst(c.gx || A.x, (c.gy || A.y - 270) - 250, 80, ["#ff3d7f", "#ff6ec7", "#fff", "#ffd34d"], 800, 1.5);
+      PETE.forEach((p, i) => { const k = i + 1, side = k % 2 ? 1 : -1; p.x = P.x + side * (150 + Math.floor((k - 1) / 2) * 150); p.y = A.y - 520 + 30 + (k % 3) * 20; p.face = 0; p.flip = false; p.at = -1; p.st = "follow"; });
+      const c = G.cine; burst(c.gx || A.x, (c.gy || A.y + GWIMA_Y) - 250, 80, ["#ff3d7f", "#ff6ec7", "#fff", "#ffd34d"], 800, 1.5);
     }
   }
   // the five boys during the film: tied up before the spell, free and cheering at the end
@@ -1838,7 +1881,7 @@
     const c = G.cine, A = G.arena; if (!c || !A) return [];
     const tied = c.ph === "intro" && c.t < 7.4, happy = c.ph === "outro" && c.t > 0.5;
     if (!tied && !happy) return [];
-    if (!c.boys || c.boys.happy !== happy) { c.boys = BOYX.map((x, i) => ({ x: A.x + x, y: A.y + (happy ? -20 : -60), i, happy })); c.boys.happy = happy; }
+    if (!c.boys || c.boys.happy !== happy) { c.boys = BOYX.map((x, i) => ({ x: A.x + x, y: A.y + (happy ? -760 : BOY_Y), i, happy })); c.boys.happy = happy; }
     return c.boys;
   }
   function drawCineBoy(b) {
@@ -1860,38 +1903,49 @@
     const f = c.ph === "intro" ? clamp(1 - Math.abs(c.t - 7.35) / 0.5, 0, 1) : c.ph === "outro" ? clamp(1 - c.t / 0.8, 0, 1) : 0;
     if (f > 0) { ctx.save(); ctx.globalAlpha = f * 0.85; ctx.fillStyle = "#fff"; ctx.fillRect(L - 50, T - 50, VW + 100, VH + 100); ctx.restore(); }
   }
-  // the stage itself: a dark round floor with neon rims, a light wall at the back, sweeping spotlights
+  // the concert floor: LED wall, main stage, runway, catwalk, fan zones, general floor
   function drawStage() {
     if (!G.lvl || !G.lvl.stage || !G.arena) return;
-    const A = G.arena, t = G.t;
+    const A = G.arena, t = G.t, X = (v) => A.x + v, Y = (v) => A.y + v;
+    const box = (x0, y0, x1, y1, fill, edge) => { ctx.fillStyle = fill; ctx.fillRect(X(x0), Y(y0), x1 - x0, y1 - y0); if (edge) { ctx.strokeStyle = edge; ctx.lineWidth = 8; ctx.strokeRect(X(x0), Y(y0), x1 - x0, y1 - y0); } };
     ctx.save();
-    const g = ctx.createRadialGradient(A.x, A.y, 60, A.x, A.y, A.r + 60);
-    g.addColorStop(0, "#3a2560"); g.addColorStop(0.75, "#22163d"); g.addColorStop(1, "#120a22");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(A.x, A.y, A.r + 60, 0, TAU); ctx.fill();
+    // the floor
+    box(SR.x0, SR.y0, SR.x1, SR.y1, "#1b1230");
+    ctx.strokeStyle = "rgba(160,120,255,.08)"; ctx.lineWidth = 3;
+    for (let x = SR.x0; x <= SR.x1; x += 140) { ctx.beginPath(); ctx.moveTo(X(x), Y(SR.y0)); ctx.lineTo(X(x), Y(SR.y1)); ctx.stroke(); }
+    for (let y = SR.y0; y <= SR.y1; y += 140) { ctx.beginPath(); ctx.moveTo(X(SR.x0), Y(y)); ctx.lineTo(X(SR.x1), Y(y)); ctx.stroke(); }
+    // general floor zones (GA), the fan zones, the VIP strip at the back
+    box(-1700, -40, -900, 700, "rgba(120,80,220,.22)", "rgba(150,110,255,.35)"); box(900, -40, 1700, 700, "rgba(120,80,220,.22)", "rgba(150,110,255,.35)");
+    box(-860, 120, 860, 520, "rgba(200,90,255,.16)", "rgba(220,120,255,.35)");
+    box(-1250, -720, -160, -240, "rgba(230,150,255,.22)", "rgba(240,170,255,.5)"); box(160, -720, 1250, -240, "rgba(230,150,255,.22)", "rgba(240,170,255,.5)");
+    // the silver stage: main stage, runway, catwalk
+    const sil = ctx.createLinearGradient(0, Y(-1180), 0, Y(-40)); sil.addColorStop(0, "#c9c4d8"); sil.addColorStop(1, "#8f89a6");
+    box(-1000, -1180, 1000, -760, sil, "#efeaff"); box(-120, -770, 120, -220, sil, "#efeaff"); box(-1350, -230, 1350, -60, sil, "#efeaff");
+    // fan zone labels
+    ctx.font = "800 60px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.35)";
+    ctx.fillText("FANZONE A", X(-700), Y(-470)); ctx.fillText("FANZONE B", X(700), Y(-470)); ctx.fillText("STAGE", X(0), Y(-960));
     ctx.globalCompositeOperation = "lighter";
-    for (const [r, col, w] of [[A.r + 40, "255,110,199", 18], [A.r - 10, "124,242,255", 8], [A.r * 0.55, "190,120,255", 6]]) {
-      ctx.strokeStyle = `rgba(${col},${0.45 + 0.25 * Math.sin(t * 3 + r)})`; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(A.x, A.y, r, 0, TAU); ctx.stroke();
-    }
-    // floor light stripes from the centre
-    for (let k = 0; k < 12; k++) {
-      const a = k / 12 * TAU + t * 0.15; ctx.strokeStyle = `rgba(255,${120 + 60 * Math.sin(t * 2 + k)},220,0.12)`; ctx.lineWidth = 26;
-      ctx.beginPath(); ctx.moveTo(A.x + Math.cos(a) * 140, A.y + Math.sin(a) * 140); ctx.lineTo(A.x + Math.cos(a) * (A.r - 40), A.y + Math.sin(a) * (A.r - 40)); ctx.stroke();
-    }
+    // neon edges along the stage
+    ctx.strokeStyle = `rgba(255,110,199,${0.5 + 0.25 * Math.sin(t * 3)})`; ctx.lineWidth = 10;
+    ctx.strokeRect(X(-1000), Y(-1180), 2000, 420); ctx.strokeRect(X(-1350), Y(-230), 2700, 170);
     ctx.restore();
-    // the light wall behind the stage
+    // the LED wall behind the main stage and the side screens
     ctx.save(); ctx.globalCompositeOperation = "lighter";
-    for (let k = -6; k <= 6; k++) {
-      const x = A.x + k * 130, h = 180 + 120 * Math.abs(Math.sin(t * 2.2 + k * 0.7));
-      ctx.fillStyle = `rgba(${k % 2 ? "255,110,199" : "124,242,255"},0.35)`; ctx.fillRect(x - 40, A.y - A.r - 60 - h, 80, h);
+    for (let k = -9; k <= 9; k++) {
+      const x = X(k * 110), h = 220 + 160 * Math.abs(Math.sin(t * 2.2 + k * 0.6));
+      ctx.fillStyle = `rgba(${k % 2 ? "255,110,199" : "124,242,255"},0.3)`; ctx.fillRect(x - 46, Y(-1190) - h, 92, h);
     }
+    for (const sx of [-1450, 1450]) { ctx.fillStyle = `rgba(160,120,255,${0.25 + 0.1 * Math.sin(t * 4 + sx)})`; ctx.fillRect(X(sx) - 110, Y(-1240), 220, 300); }
     ctx.restore();
-    for (let k = 0; k < 4; k++) glow(A.x + Math.sin(t * 0.7 + k * 1.7) * A.r * 0.7, A.y + Math.cos(t * 0.9 + k * 2.3) * A.r * 0.5, 260, k % 2 ? "255,120,210" : "120,230,255", 0.22);
+    for (let k = 0; k < 5; k++) glow(X(Math.sin(t * 0.6 + k * 1.7) * 1400), Y(-300 + Math.cos(t * 0.8 + k * 2.3) * 700), 300, k % 2 ? "255,120,210" : "120,230,255", 0.2);
   }
   // ---- the five demons
   function updateStageMon(m, dt) {
     if (m.c.gwima) return updateGwima(m, dt);
     const c = m.c, A = G.arena, ox = m.x, oy = m.y;
     if (G.cine && G.cine.lock) { m.st = "walk"; return; }
+    // waiting for its turn on the main stage
+    if (m.wait) { if (m.home) { m.x += (m.home[0] - m.x) * Math.min(1, dt * 3); m.y += (m.home[1] - m.y) * Math.min(1, dt * 3); } m.st = "walk"; m.face = 0; m.flip = false; return; }
     const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
     if (m.st === "rest") { if (m.t > 0.5) { m.st = "walk"; m.t = 0; } }
     if (m.st === "walk" || m.st === "rest") {
@@ -1910,16 +1964,14 @@
       }
       if (m.t > c.atk) {
         if (c.saja === "phase") {   // vanish and reappear somewhere else on the stage
-          const a = Math.random() * TAU, r = rnd(200, A.r - 200); m.x = A.x + Math.cos(a) * r; m.y = A.y + Math.sin(a) * r;
+          m.x = A.x + rnd(SR.x0 + 300, SR.x1 - 300); m.y = A.y + rnd(-700, SR.y1 - 250);
           burst(m.x, m.y - 140, 18, ["#c08bff", "#fff"], 260, 0.5);
         }
         if (--m.combo > 0) { m.st = "prep"; m.t = 0; m.quick = true; }
         else { m.st = "rest"; m.t = 0; m.quick = false; m.cd = c.cd * rnd(0.85, 1.2); }
       }
     }
-    // stay on the stage
-    const ex = m.x - A.x, ey = m.y - A.y, ed = Math.hypot(ex, ey);
-    if (ed > A.r - 80) { m.x = A.x + ex / ed * (A.r - 80); m.y = A.y + ey / ed * (A.r - 80); }
+    inStage(m, 80);   // stay in the hall
     m.dist += Math.hypot(m.x - ox, m.y - oy);
     if (dt > 0) { m.evx = (m.x - ox) / dt; m.evy = (m.y - oy) / dt; }
   }
@@ -1995,7 +2047,7 @@
   function drawGwimaGone() {
     const c = G.cine; if (!c || c.ph !== "outro" || c.t > 2.5) return;
     const k = c.t / 2.5, fn = k < 0.5 ? "gwima_d1_w2" : "gwima_d1_w3";
-    if (FR[fn]) spr(fn, c.gx || G.arena.x, c.gy || G.arena.y - 270, false, 1 - 0.4 * k, 1 - k);
+    if (FR[fn]) spr(fn, c.gx || G.arena.x, c.gy || G.arena.y + GWIMA_Y, false, 1 - 0.4 * k, 1 - k);
   }
 
   // ---------------------------------------------------------------- boss (level 4)
@@ -2111,10 +2163,48 @@
     }
     if (U.t > 2.6) { G.ult = null; P.z = 0; }
   }
-  function ultBlast(cx, cy, hw, hh) {
-    for (const m of G.mons) if (m.alive && Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh) killMon(m, false);
+  // src: "p" (this page's girl) or "q" (the partner). Both girls' ultimates within 2 s: the HUNTR/X combo, five times as strong
+  function ultBlast(cx, cy, hw, hh, src = "p") {
+    let mult = 1;
+    const L = G.ultLast;
+    if (L && L.src !== src && G.t - L.t <= 2) { mult = 5; G.ultLast = null; comboUlt(true); } else G.ultLast = { src, t: G.t };
+    // the stage demons and Gwi Ma lose a tenth of their health (half on a combo) instead of dying at once
+    const all = mult > 1;
+    for (const m of G.mons) {
+      if (!m.alive || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
+      if (m.c.heavy) damageMon(m, Math.ceil(m.max * 0.1 * mult), m.x, m.y, true, "p");
+      else killMon(m, false);
+    }
     G.foes = G.foes.filter((f) => !(Math.abs(f.x - cx) < hw && Math.abs(f.y - cy) < hh));
-    const B = G.boss; if (B && B.alive && Math.abs(B.x - cx) < hw + 100 && Math.abs(B.y - cy) < hh + 100) damageBoss(14, B.x, B.y, false, true);
+    const B = G.boss; if (B && B.alive && Math.abs(B.x - cx) < hw + 100 && Math.abs(B.y - cy) < hh + 100) damageBoss(14 * mult, B.x, B.y, false, true);
+  }
+  // the combo: Zoey, Mira, Rumi and the pets join in around the girls, one big burst of light
+  function comboUlt(send) {
+    if (send && NET.role) netEmit("combo", { to: NET.partner });
+    G.combo = { t: 0 }; SFX.boom(); G.shake = 34;
+    showBanner("HỢP LỰC HUNTR/X!", "Tuyệt chiêu mạnh gấp 5 lần");
+  }
+  function drawCombo(L, T) {
+    const C = G.combo; if (!C) return;
+    C.t += 1 / 60; if (C.t > 3) { G.combo = null; return; }
+    const cx = L + VW / 2, cy = T + VH / 2, a = Math.min(1, C.t * 3) * (1 - ss(2.4, 3, C.t));
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 3; i++) {
+      const r = ((C.t * 900 + i * 400) % 1300) + 80;
+      ctx.strokeStyle = `rgba(${["255,110,199", "124,242,255", "255,211,77"][i]},${0.6 * a})`; ctx.lineWidth = 34; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+    glow(cx, cy, 900, "255,230,170", 0.45 * a);
+    // everyone who fights with the girls, in a ring, in their attack pose
+    const kinds = [...new Set([...PETE.map((p) => p.kind), ...QPETE.map((p) => p.kind)])];
+    kinds.forEach((k, i) => {
+      const D = PETS[k], ang = -Math.PI / 2 + (i - (kinds.length - 1) / 2) * 0.55, r = 520;
+      const x = cx + Math.cos(ang) * r * 1.4, y = cy + 260 + Math.sin(ang) * r * 0.9 - Math.sin(C.t * 6 + i) * 20;
+      const fn = D.art ? `${D.art}_atk_d0_w1` : `pet_${k}_atk_d0_w1`;
+      glow(x, y - 150, 220, D.rgb, 0.6 * a);
+      if (FR[fn]) spr(fn, x, y, false, CHAR_M * 1.2, a);
+    });
+    if (C.t < 0.2) { ctx.save(); ctx.globalAlpha = 1 - C.t / 0.2; ctx.fillStyle = "#fff"; ctx.fillRect(L, T, VW, VH); ctx.restore(); }
   }
 
   // ---------------------------------------------------------------- particles
@@ -2160,7 +2250,7 @@
       if (G.fadeDir > 0 && G.fade >= 1) { const f = G.onFade; G.onFade = null; G.fadeDir = -1; f && f(); }
       else if (G.fadeDir < 0 && G.fade <= 0) G.fadeDir = 0;
     }
-    if (API.autopilot && G.energy >= 100 && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter"))) IN.ultPressed = true;
+    if (API.autopilot && G.energy >= 100 && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter") || G.mons.some((m) => m.alive && m.c.heavy && !m.shield))) IN.ultPressed = true;
     if (IN.ultPressed) { IN.ultPressed = false; startUlt(); }
     updateHero(dt);
     updateUlt(dt);
@@ -2176,14 +2266,14 @@
     if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
     updateShots(dt);
     // camera: follow the girl, a little ahead of where she walks (in a story scene: the stage)
-    const cc = G.cine && G.cine.lock && G.arena ? [G.arena.x, G.arena.y - 260] : null;
+    const cc = G.cine && G.cine.lock && G.arena ? [G.arena.x, G.arena.y - (G.cine.ph === "outro" ? 640 : 880)] : null;
     const tx = clamp((cc ? cc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((cc ? cc[1] : P.y - 70 + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
     updateCine(dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
     updateParts(dt);
-    // the ultimate also charges by itself, a point at a time (full in about 40 s without any kills)
-    if (!G.ult && G.energy < 100 && !(G.cine && G.cine.lock) && (G.enAcc = (G.enAcc || 0) + dt * 2.5) >= 1) { G.enAcc -= 1; addEnergy(1); }
+    // the ultimate also charges by itself, a point at a time (full in at most 30 s, sooner with kills)
+    if (!G.ult && G.energy < 100 && !(G.cine && G.cine.lock) && (G.enAcc = (G.enAcc || 0) + dt * 3.4) >= 1) { G.enAcc -= 1; addEnergy(1); }
     const ultOff = G.energy < 100; if (ultOff !== G.ultOff) { G.ultOff = ultOff; $("bUlt").classList.toggle("off", ultOff); }
     if (G.frame % 6 === 0) { updateQuest(); drawMini(); }
   }
@@ -2448,7 +2538,7 @@
     if (m.kind === "witch" && m.st === "prep" && m.alive) glow(m.x + (flip ? -50 : 50), y - 60, 50, "130,255,90", 0.5);
     if (m.c.saja && m.alive) label(m.c.name, m.x, m.y - f.ay * f.s * mul - 40, 30, "#ffb3e6");
     // health pips once hurt
-    if (m.alive && m.hp < m.max) {
+    if (m.alive && m.hp < m.max && !m.c.heavy) {
       const top = (fly ? y - f.ay * f.s * mul : m.y - f.ay * f.s * mul) - 16, n = Math.min(m.max, 12), w = 13, filled = Math.ceil(m.hp / m.max * n);
       for (let i = 0; i < n; i++) { ctx.fillStyle = i < filled ? "#ff5a6a" : "rgba(0,0,0,.45)"; ctx.fillRect(m.x - (n * w) / 2 + i * w + 1, top, w - 3, 8); }
     }
@@ -2643,7 +2733,7 @@
   }
   // ground layer: things lying flat or hovering low, drawn under everyone
   function drawArena() {
-    const A = G.arena; if (!A) return;
+    const A = G.arena; if (!A || G.lvl.stage) return;
     fx("fx_circle_g", A.x, A.y, 1.6, G.boss ? 0.18 : 0.1, G.t * 0.05);
     if (!A.open) {
       // a sealed barrier of light around the plaza
@@ -2700,6 +2790,7 @@
   }
   // the guide: a golden chevron circling the girl toward the next waypoint (purple once it points at the open gate)
   function drawGuide() {
+    if (G.lvl && G.lvl.stage) return;
     if (G.mode !== "play" || P.dead || G.ult || P.winT) return;
     const T = guideTarget(); if (T.boss) return;
     const dx = T.x - P.x, dy = T.y - P.y, d = Math.hypot(dx, dy); if (d < 160) return;
@@ -2917,6 +3008,7 @@
     drawGwimaGone();
     drawParts(L, R, T, B);
     drawCineFx(L, T);
+    drawCombo(L, T);
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 1);
     if (Q && NET.role && Q.ultT > 0) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 1);
     if (G.ult) {
@@ -3168,7 +3260,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -3340,7 +3432,7 @@
           if (m) { damageMon(m, clamp(Math.floor(num(h[2])) || 1, 1, 14), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 250)); applyElem(m, el, "q"); }
         }
       } else if (msg.topic === "ult") {
-        ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400)); SFX.boom(); G.shake = 20;
+        ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); G.shake = 20;
         if (Q) G.parts.push({ type: "ring", x: Q.x, y: Q.y - 100, r: 40, vr: 2400, life: 0.9, max: 0.9, col: "255,236,170" });
       } else if (msg.topic === "shoo") shoo(num(d.x), num(d.y));
       else if (msg.topic === "portal") { if (G.portal && G.portal.open && !P.winT) enterPortal(); }
@@ -3352,6 +3444,7 @@
         else if (["star", "candy"].includes(d.ty)) pickItem(d.ty, x, y);
       } else if (msg.topic === "gain") addEnergy(clamp(num(d.n), 0, 30), num(d.x), num(d.y));
       else if (msg.topic === "xp") { gainXp(clamp(Math.floor(num(d.n)), 0, 200)); play("gem"); }
+      else if (msg.topic === "combo") comboUlt(false);
       else if (msg.topic === "pet" && PETS[d.k] && (PETS[d.k].owner === hero || isAlly(d.k))) rescuePet(d.k);
     }
   }
@@ -3396,7 +3489,7 @@
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
-      cn: G.cine ? [CPH.indexOf(G.cine.ph), Math.round(G.cine.t * 10), G.cine.spawned ? 1 : 0] : 0,
+      cn: G.cine ? [CPH.indexOf(G.cine.ph), Math.round(G.cine.t * 10), G.cine.spawned ? 1 : 0, G.cine.wave] : 0,
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
@@ -3513,10 +3606,10 @@
     G.foes = (Array.isArray(w.f) ? w.f : []).filter(Array.isArray).map((a) => ({ type: FTYPES[num(a[0])] || "fire", x: num(a[1]), y: num(a[2]), vx: num(a[3]), vy: num(a[4]), life: 1 }));
     // the finale's film runs on the host
     if (Array.isArray(w.cn) && G.lvl && G.lvl.stage) {
-      if (!G.cine) G.cine = { ph: "intro", t: 0, lock: true, shown: null };
+      if (!G.cine) G.cine = { ph: "intro", t: 0, lock: true, shown: null, wave: -1, shownWave: -1 };
       const ph = CPH[num(w.cn[0])] || "intro", t = num(w.cn[1]) / 10;
       if (ph !== G.cine.ph || Math.abs(t - G.cine.t) > 0.5) { G.cine.ph = ph; G.cine.t = t; }
-      G.cine.lock = ph === "intro" || ph === "outro"; G.cine.spawned = !!w.cn[2];
+      G.cine.lock = ph === "intro" || ph === "outro"; G.cine.spawned = !!w.cn[2]; G.cine.wave = clamp(Math.floor(num(w.cn[3])), -1, 2);
     }
     G.rings = (Array.isArray(w.v) ? w.v : []).filter(Array.isArray).map((a) => ({ x: num(a[0]), y: num(a[1]), r: num(a[2]), life: num(a[3]) / 10, delay: num(a[4]) / 10, sp: 470 }));
     // items, chests, cages, gate, score
