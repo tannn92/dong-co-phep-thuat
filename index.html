@@ -338,7 +338,7 @@
   const SFX = {
     zap() { tone("sawtooth", 2000, 420, 0.16, 0.06); tone("sine", 2800, 1200, 0.1, 0.06); },
     hit() { tone("triangle", 700, 380, 0.09, 0.12); noise(0.06, 0.08, 2500, 1); },
-    bark() { [0, 0.13].forEach((w) => { tone("square", 620, 310, 0.09, 0.07, w); noise(0.07, 0.07, 900, 1.5, w); }); },
+    bite() { tone("square", 420, 160, 0.07, 0.08); noise(0.06, 0.12, 1400, 1.2); tone("triangle", 900, 500, 0.05, 0.05, 0.05); },
     pop() { tone("sine", 180, 50, 0.3, 0.3); noise(0.22, 0.2, 1800, 0.6); [2349, 2960, 3520].forEach((f, i) => tone("sine", f, f, 0.22, 0.04, 0.04 + i * 0.05)); },
     hurt() { tone("square", 240, 90, 0.28, 0.1); noise(0.18, 0.1, 400, 1); },
     jump() { tone("sine", 380, 760, 0.14, 0.08); },
@@ -443,11 +443,11 @@
     s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, bounce: 2, r: 42 },
   };
   // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
-  // The cat (Matcha's Scottish Fold) pounces on a monster near her girl and scratches it.
-  // The poodle (Mochi's) barks when monsters come close: they are pushed back and slowed. at: where its cage sits along the path.
+  // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
+  // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
   const PETS = {
-    cat: { name: "Mèo Tai Cụp", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 1.1, range: 560, tip: "Bạn ấy sẽ đi theo và cào quái giúp Matcha" },
-    dog: { name: "Cún Poodle", owner: "g", at: 0.38, rgb: "200,130,90", col: "#c98a5e", cd: 3.2, range: 380, bark: true, tip: "Bạn ấy sủa đẩy lùi quái và làm chúng chậm lại" },
+    cat: { name: "Cafe", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 1.0, range: 560, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
+    dog: { name: "Coca", owner: "g", at: 0.38, rgb: "200,130,90", col: "#c98a5e", cd: 1.3, range: 520, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
   };
   const petDmg = (lv) => 3 + Math.floor(lv * 0.8);
   let hero = "g";
@@ -1503,25 +1503,28 @@
   }
 
   // ---------------------------------------------------------------- pets
-  // st: "follow" trails the girl; "pounce" runs at a monster near her and scratches it, then follows again
+  // st: "follow" trails the girl; "pounce" runs at a monster near her; "atk" plays the attack (Cafe's claw swipe,
+  // Coca's bite) and lands the hit halfway through; then she follows again
+  const PET_ATK = 0.42;   // attack animation length (s)
   let PETE = [], QPETE = [];
-  function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow" })); }
+  function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow", at: -1 })); }
   function followPets(list, owner, dt, act) {
     for (const p of list) {
-      p.scr = (p.scr || 0) - dt;
-      if (act && p.st === "pounce") {
+      if (p.at >= 0) { p.at += dt; if (p.at > PET_ATK) p.at = -1; }
+      if (act && (p.st === "pounce" || p.st === "atk")) {
         const T = p.tgt, B = G.boss, dead = !T || (T === B ? !B || !B.alive : !T.alive);
-        if (dead || d2(p.x, p.y, owner.x, owner.y) > 900 * 900) { p.st = "follow"; p.cd = 0.4; }
-        else {
-          const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1, reach = T === B ? 150 : T.r + 40;
-          if (d > reach) { const sp = Math.min(d - reach + 1, 950 * dt); p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; setFace(p, dx, dy); p.moving = true; continue; }
-          // scratch!
-          setFace(p, dx, dy); p.moving = false; p.scr = 0.3; p.st = "follow"; p.cd = PETS[p.kind].cd;
-          const dmg = petDmg(P.lv);
-          if (T === B) hitBoss(null, T.x, T.y); else hitMon(T, dmg, null, p.x, p.y, 90);
-          const cx = (p.x + T.x) / 2, cy = (p.y + T.y) / 2, rot = Math.atan2(dy, dx);
-          petClawFx(cx, cy, rot); play("hit");
-          if (NET.role && NET.fq.length < 10) NET.fq.push(["c", p.i, cx | 0, cy | 0, Math.round(rot * 100)]);
+        if (p.st === "pounce" && (dead || d2(p.x, p.y, owner.x, owner.y) > 900 * 900)) { p.st = "follow"; p.cd = 0.4; }
+        else if (p.st === "atk") {
+          // the blow lands halfway through the animation
+          if (!p.hit && p.at >= PET_ATK * 0.5) { p.hit = true; if (!dead) petStrike(p, T); }
+          if (p.at < 0) { p.st = "follow"; p.cd = PETS[p.kind].cd; }
+          continue;
+        } else {
+          const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1, reach = T === B ? 150 : T.r + 45;
+          setFace(p, dx, dy);
+          if (d > reach) { const sp = Math.min(d - reach + 1, 950 * dt); p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; p.moving = true; continue; }
+          p.moving = false; p.st = "atk"; p.at = 0; p.hit = false;
+          if (NET.role && NET.fq.length < 10) NET.fq.push(["a", p.i, p.face + (p.flip ? 8 : 0)]);
           continue;
         }
       }
@@ -1534,42 +1537,41 @@
       if (d > 4) { p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; if (sp > 1) setFace(p, dx, dy); }
       p.moving = sp > 40 * dt;
       if (!act || (p.cd -= dt) > 0) continue;
-      if (PETS[p.kind].bark) { bark(p, owner); continue; }
       const T = nearestFoes(owner.x, owner.y, PETS[p.kind].range, 1)[0];
       if (!T) { p.cd = 0.3; continue; }
       p.st = "pounce"; p.tgt = T;
     }
   }
-
+  // the hit itself: Cafe's claws hurt more; Coca's bite also knocks the monster back and slows it
+  function petStrike(p, T) {
+    const D = PETS[p.kind], B = G.boss, dx = T.x - p.x, dy = T.y - p.y, rot = Math.atan2(dy, dx);
+    const cx = p.x + dx * 0.6, cy = p.y + dy * 0.6;
+    if (T === B) hitBoss(D.bite ? "ice" : null, T.x, T.y);
+    else {
+      if (D.bite && NET.role !== "guest" && T.st === "prep") T.st = "walk";   // a bite breaks a wind-up
+      hitMon(T, D.bite ? Math.ceil(petDmg(P.lv) * 0.7) : petDmg(P.lv), D.bite ? "ice" : null, p.x, p.y, D.bite ? 260 + 10 * P.lv : 90);
+    }
+    petHitFx(p.kind, cx, cy, rot);
+    if (NET.role && NET.fq.length < 10) NET.fq.push(["h", p.i, cx | 0, cy | 0, Math.round(rot * 100)]);
+  }
+  function petHitFx(kind, x, y, rot) {
+    if (PETS[kind].bite) { G.parts.push({ type: "bite", x, y: y - 60, vx: 0, vy: 0, life: 0.32, max: 0.32 }); SFX.bite(); }
+    else { G.parts.push({ type: "claw", x, y: y - 70, vx: 0, vy: 0, rot, life: 0.32, max: 0.32 }); play("hit"); }
+    G.shake = Math.max(G.shake, 3);
+  }
   // the partner's pets go where their page says (pouncing included); older pages without positions just follow her
   function partnerPets(dt) {
     const pl = NET.pp && Array.isArray(NET.pp.gl) && Array.isArray(NET.pp.gl[14]) ? NET.pp.gl[14] : null;
+    for (const p of QPETE) if (p.at >= 0) { p.at += dt; if (p.at > PET_ATK) p.at = -1; }
     if (!pl) return followPets(QPETE, Q, dt, false);
     QPETE.forEach((p, i) => {
       const a = Array.isArray(pl[i]) ? pl[i] : null; if (!a) return;
       const tx = num(a[0]), ty = num(a[1]), dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), k = Math.min(1, dt * 14);
       if (d > 900) { p.x = tx; p.y = ty; } else { p.x += dx * k; p.y += dy * k; p.dist += d * k; }
-      p.moving = d * k > 30 * dt;
-      const fc = num(a[2]); p.face = clamp(fc & 7, 0, 4); p.flip = fc >= 8;
-      p.scr = (p.scr || 0) - dt;
+      p.moving = p.at < 0 && d * k > 30 * dt;
+      if (p.at < 0) { const fc = num(a[2]); p.face = clamp(fc & 7, 0, 4); p.flip = fc >= 8; }
     });
   }
-  // the poodle's bark: when monsters come close to her girl, a ring of sound pushes them back and slows them
-  function bark(p, owner) {
-    const D = PETS[p.kind], rr = D.range * D.range, near = G.mons.filter((m) => m.alive && (d2(m.x, m.y, p.x, p.y) < rr || d2(m.x, m.y, owner.x, owner.y) < rr * 0.6));
-    if (!near.length) { p.cd = 0.3; return; }
-    p.cd = D.cd; p.scr = 0.3;
-    const kb = 260 + 10 * P.lv;
-    for (const m of near) { if (NET.role !== "guest" && m.st === "prep") m.st = "walk"; hitMon(m, 1, "ice", p.x, p.y, kb); }   // a bark also breaks a wind-up
-    barkFx(p.x, p.y);
-    if (NET.role && NET.fq.length < 10) NET.fq.push(["b", p.i, p.x | 0, p.y | 0]);
-  }
-  function barkFx(x, y) {
-    G.parts.push({ type: "ring", x, y: y - 50, r: 40, vr: 1300, life: 0.35, max: 0.35, col: "255,230,190" });
-    G.parts.push({ type: "text", x, y: y - 140, vx: 0, vy: -110, life: 0.8, max: 0.8, txt: "Gâu!" });
-    SFX.bark();
-  }
-  function petClawFx(x, y, rot) { G.parts.push({ type: "claw", x, y: y - 70, vx: 0, vy: 0, rot, life: 0.3, max: 0.3 }); }
 
   // ---------------------------------------------------------------- boss (level 4)
   function startBoss() {
@@ -2081,9 +2083,16 @@
   function drawPet(p) {
     const D = PETS[p.kind], pre = `pet_${p.kind}_d${p.face}_w`, n = dirN(pre);
     if (n) {
-      const ph = p.dist / 150 * TAU, hop = p.moving ? Math.abs(Math.sin(ph)) * 6 : 0, lunge = p.scr > 0 ? Math.sin(p.scr / 0.3 * Math.PI) * 14 : 0;
-      shadow(p.x, p.y, 44, 12);
-      spr(pre + (p.moving ? Math.floor(p.dist / 150 * n) % n : 0), p.x, p.y - hop - lunge, p.flip, CHAR_M * (p.sc || 1));
+      const ph = p.dist / 150 * TAU, hop = p.moving ? Math.abs(Math.sin(ph)) * 5 : 0, sc = CHAR_M * (p.sc || 1);
+      shadow(p.x, p.y, 34, 10);
+      if (p.at >= 0) {
+        // attack: the attack sheet if there is one, else a hop forward on the walk frame
+        const apre = `pet_${p.kind}_atk_d${p.face}_w`, an = dirN(apre), k = clamp(p.at / PET_ATK, 0, 0.999);
+        if (an) spr(apre + Math.floor(k * an), p.x, p.y, p.flip, sc);
+        else spr(pre + "0", p.x, p.y - Math.sin(k * Math.PI) * 26, p.flip, sc);
+        return;
+      }
+      spr(pre + (p.moving ? Math.floor(p.dist / 150 * n) % n : 0), p.x, p.y - hop, p.flip, sc);
       return;
     }
     // no art for this pet yet: a glowing bubble with a paw print
@@ -2109,7 +2118,7 @@
       glow(c.x, c.y - 100, 160, D.rgb, 0.35 + 0.12 * Math.sin(G.t * 3));
       drawPet({ kind: c.kind, x: c.x, y: c.y - 22, face: 0, flip: false, moving: false, i: 0, dist: 0, sc: 0.72 });
       spr(PROPS.cage, c.x, c.y);
-      label("Cứu bạn " + D.name + "!", c.x, c.y - 230, 36);
+      label("Cứu " + D.name + "!", c.x, c.y - 230, 36);
     } else spr(PROPS.cageOpen, c.x, c.y, false, 1, 0.85);
   }
   function drawPortal() {
@@ -2295,9 +2304,20 @@
       else if (p.type === "dust") { ctx.globalAlpha = 1; spr("fx_smoke", p.x, p.y, p.x % 2 > 1, p.r / 34, a * 0.55); }
       else if (p.type === "fx") { ctx.globalAlpha = 1; fx(p.name, p.x, p.y, p.sc * (1 + (1 - a) * (p.grow || 0.6)), a, p.rot || 0, !!p.flip); }
       else if (p.type === "ring") { ctx.globalAlpha = a; ctx.strokeStyle = `rgba(${p.col},1)`; ctx.lineWidth = 26 * a + 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke(); }
+      else if (p.type === "bite") {
+        // two rows of teeth snapping shut
+        const k = 1 - a, gap = 34 * (1 - Math.min(1, k * 2.2));
+        ctx.save(); ctx.translate(p.x, p.y); ctx.globalAlpha = Math.min(1, a * 1.6); ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(120,60,30,.8)"; ctx.lineWidth = 4;
+        for (const sgn of [-1, 1]) {
+          ctx.beginPath(); ctx.moveTo(-46, sgn * gap);
+          for (let j = 0; j < 5; j++) { ctx.lineTo(-46 + j * 23 + 11.5, sgn * (gap - 22)); ctx.lineTo(-46 + (j + 1) * 23, sgn * gap); }
+          ctx.quadraticCurveTo(0, sgn * (gap + 30), -46, sgn * gap); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        ctx.restore();
+      }
       else if (p.type === "claw") {
         // three quick scratch marks
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + Math.PI / 2); ctx.globalAlpha = a; ctx.lineCap = "round";
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + Math.PI / 2); ctx.scale(1.5, 1.5); ctx.globalAlpha = Math.min(1, a * 1.5); ctx.lineCap = "round";
         const k = 1 - a * 0.6;
         for (let j = -1; j <= 1; j++) {
           ctx.strokeStyle = "rgba(255,170,90,.9)"; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(j * 26 - 30 * k, -46 * k); ctx.quadraticCurveTo(j * 26 + 12, 0, j * 26 - 30 * k, 46 * k); ctx.stroke();
@@ -2782,13 +2802,12 @@
         const a = num(b[2]) / 100;
         G.pshots.push({ x: num(b[0]), y: num(b[1]), vx: Math.cos(a) * H.bolt, vy: Math.sin(a) * H.bolt, life: (H.range + 200) / H.bolt, elem: ELS[num(b[3])] || null, hk: k, sc: clamp(num(b[4]) / 100 || 1, 0.5, 3) });
       }
-      // their pet's scratches and barks, replayed here
+      // their pet's attacks (start of the animation, then the hit), replayed here
       for (const f of Array.isArray(d.f) ? d.f.slice(0, 10) : []) {
         if (!Array.isArray(f) || !Q) break;
-        const i = clamp(Math.floor(num(f[1])), 0, 3), pe = QPETE[i], x = num(f[2]), y = num(f[3]);
-        if (pe) pe.scr = 0.3;
-        if (f[0] === "c") petClawFx(x, y, num(f[4]) / 100);
-        else if (f[0] === "b") barkFx(x, y);
+        const i = clamp(Math.floor(num(f[1])), 0, 3), pe = QPETE[i];
+        if (f[0] === "a" && pe) { pe.at = 0; const fc = num(f[2]); pe.face = clamp(fc & 7, 0, 4); pe.flip = fc >= 8; }
+        else if (f[0] === "h" && pe) petHitFx(pe.kind, num(f[2]), num(f[3]), num(f[4]) / 100);
       }
       return;
     }
