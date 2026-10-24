@@ -153,7 +153,7 @@
     <canvas id="mini" width="200" height="200" aria-label="Bản đồ nhỏ"></canvas>
   </div>
 </div>
-<div id="bossbar" hidden><div>Vua Bí Ngô</div><div class="bar"><div class="fill" id="bfill"></div></div></div>
+<div id="bossbar" hidden><div id="bossName">Vua Bí Ngô</div><div class="bar"><div class="fill" id="bfill"></div></div></div>
 
 <div id="controls" hidden>
   <div id="joyZone"></div>
@@ -449,6 +449,12 @@
       deco: [["pumpkin1", 3], ["pumpkin2", 3], ["pumpkin3", 2], ["grave2", 1], ["bush", 1]],
       gr: { base: "#5a5660", patch: ["#66616d", "#4b4852", "#55604f"], blade: ["#6d6977", "#46424d"], dot: ["#f6c453"], nDot: 12, tiles: true,
         stone: ["#cfc7bb", "#c2b9ab", "#b8ae9f"], gap: "#7b7268", edge: "#3a353c" } },
+    // the finale: a concert stage. A short walk-on, then the story plays (see the stage section)
+    { name: "Màn 5: Sân Khấu Cuối Cùng", seed: 5531, path: "stage", stage: true, arena: true, quota: 0, spawn: [0, 0], camps: 0,
+      kinds: [["bat", 1, 0]],
+      deco: [["lantern_on", 3], ["pumpkin1", 1]],
+      gr: { base: "#241a38", patch: ["#2e2248", "#1d1530", "#3a2a58"], blade: ["#3b2d58", "#2a2044"], dot: ["#ff6ec7", "#7cf2ff", "#ffd34d"], nDot: 24, tiles: true,
+        stone: ["#3a2f55", "#332a4c", "#2c2442"], gap: "#18122a", edge: "#120c20" } },
   ];
   const PATH_W = 270, STEP = 40, ARENA_R = 860, MAX_MONS = 120;
   // each level brings a stronger breed of the same monsters, tinted so it reads as new: hp multiplier, speed, hue.
@@ -471,7 +477,16 @@
     witch:    { hp: 5, en: 12, spd: 170, prep: 0.7, atk: 0.35, cd: 2.3, fly: true, hgt: 150 },
     ghost:    { hp: 2, en: 7,  spd: 95,  reach: 380, prep: 0.5, atk: 0.55, cd: 1.3, fly: true, hgt: 110 },
     bat:      { hp: 1, en: 5,  spd: 150, reach: 460, prep: 0.35, atk: 0.6, cd: 1.5, fly: true, hgt: 170 },
+    // the Saja Boys as demons (level 5): saja = fighting style, see updateSaja. heavy: barely knocked back
+    saja_mystery: { hp: 26, en: 20, spd: 150, prep: 0.5, atk: 0.4, cd: 2.6, saja: "phase", heavy: true, name: "Mystery" },
+    saja_abby:    { hp: 32, en: 20, spd: 120, prep: 0.7, atk: 0.45, cd: 3.0, saja: "slam", heavy: true, name: "Abby" },
+    saja_jinu:    { hp: 36, en: 20, spd: 140, prep: 0.55, atk: 0.4, cd: 2.4, saja: "blink", heavy: true, name: "Jinu" },
+    saja_baby:    { hp: 22, en: 20, spd: 190, prep: 0.35, atk: 0.35, cd: 2.4, saja: "dash", heavy: true, name: "Baby" },
+    saja_romance: { hp: 26, en: 20, spd: 140, prep: 0.6, atk: 0.4, cd: 3.0, saja: "hearts", heavy: true, name: "Romance" },
+    // Gwi Ma: the flame-toad demon king, shielded until the five are down
+    gwima:        { hp: 120, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
   };
+  const SAJA = ["saja_mystery", "saja_abby", "saja_jinu", "saja_baby", "saja_romance"];
   // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows. While one is held the auto-attack also fires faster.
   const ELEM = {
     fire:   { name: "Phép Lửa", tip: "Đốt cháy quái", rgb: "255,130,40", cols: ["#ff6a1a", "#ffb03a", "#fff0b0"], dot: 2.0, tick: 0.5 },
@@ -558,7 +573,7 @@
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [] };
   const IN = { ultPressed: false };
   let progress = 1;
-  try { progress = Math.max(1, Math.min(4, +localStorage.getItem("dcpt3-progress") || 1)); } catch (e) {}
+  try { progress = Math.max(1, Math.min(LEVELS.length, +localStorage.getItem("dcpt3-progress") || 1)); } catch (e) {}
   function loadPets() { P.pets = []; }   // each game sets her pets in startGame
 
   // ---------------------------------------------------------------- map generation
@@ -587,6 +602,8 @@
         const v = -h / 2 + k / (runs - 1) * h, d = (k % 2 ? -1 : 1) * dir0;
         cps.push(rot(-w * d, v), rot(-w * 0.3 * d, v + (R() - 0.5) * 120), rot(w * 0.35 * d, v + (R() - 0.5) * 120), rot(w * d, v));
       }
+    } else if (shape === "stage") {
+      cps.push(rot(-1900, 0), rot(-900, 0), rot(0, 0));
     } else {   // spiral
       const turns = 0.85 * amp, r0 = WORLD * 0.42, r1 = ARENA_R + 900, n = 20, spin = R() < 0.5 ? 1 : -1;
       for (let i = 0; i < n; i++) { const t = i / (n - 1), r = r0 + (r1 - r0) * Math.pow(t, 0.8); cps.push(rot(Math.cos(spin * t * turns * TAU) * r, Math.sin(spin * t * turns * TAU) * r)); }
@@ -621,6 +638,7 @@
         acc += seg;
       }
       best = { x: xs, y: ys, n: xs.length, len: (xs.length - 1) * STEP, cps };
+      if (L.path === "stage") break;
       if (best.len > 21000) amp *= 0.88; else if (best.len < 17500) amp *= 1.12; else break;
     }
     return best;
@@ -795,6 +813,8 @@
     if (NET.role === "guest") { P.x += 110; }
     NET.portalSent = false;
     makePetEnts();
+    G.cine = null;
+    if (L.stage) startStage();
   }
   function respawnHero() {
     const p = G.path, i = Math.min(3, p.n - 1), [dx, dy] = pathDir(i);
@@ -1044,7 +1064,7 @@
   function updateHero(dt) {
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
     if (P.dead) { P.moving = false; if ((G.reviveT -= dt) <= 0) reviveHero(); return; }
-    if (G.ult || P.winT) { P.vx = P.vy = 0; P.moving = false; return; }
+    if (G.ult || P.winT || (G.cine && G.cine.lock)) { P.vx = P.vy = 0; P.moving = false; return; }
     const [ax, ay] = readMove(), sp = 360 * (P.slowT > 0 ? 0.55 : 1);
     if (P.hurtT > 0) { P.vx *= Math.pow(0.01, dt); P.vy *= Math.pow(0.01, dt); }
     else {
@@ -1210,13 +1230,14 @@
     const c = T.spd === 1 ? base : { ...base, spd: base.spd * T.spd };
     const lv = Q && Q.lv ? (P.lv + Q.lv) / 2 : P.lv;
     const hp = Math.max(1, Math.round(base.hp * T.hp * (1 + 0.55 * (lv - 1)) * (1 + 0.3 * k) * (Q ? 1.5 : 1) * (elite ? 3 : 1)));
-    const r = (c.fly ? 46 : kind === "spider" ? 62 : 50) * (elite ? 1.25 : 1);
+    const r = c.gwima ? 200 : c.saja ? 64 : (c.fly ? 46 : kind === "spider" ? 62 : 50) * (elite ? 1.25 : 1);
     return { id: G.nextId++, kind, c, x, y, vx: 0, vy: 0, face: 0, flip: false, hp, max: hp, st: c.fly ? "fly" : "walk", t: 0, cd: rnd(0.4, 1.4), dist: 0, hurt: 0, flash: 0,
       alive: true, die: 0, ph: Math.random() * 10, r, hgt: c.hgt || 0, elite: !!elite };
   }
   function updateMon(m, dt) {
     if (!m.alive) { m.die += dt; return; }
     m.t += dt; m.cd -= dt; m.hurt -= dt; m.flash -= dt;
+    if (m.c.saja || m.c.gwima) return updateStageMon(m, dt);
     // a camp monster idles at its camp until a girl steps in or the camp is attacked
     if (m.wait) {
       if (m.hp < m.max) m.camp.hit = true;
@@ -1308,12 +1329,13 @@
   // kb: knock-back push (from the shooter's level). A light hit only nudges; it never stops a monster's lunge or resets its attack.
   function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
+    if (m.shield) { m.flash = 0.06; if (!dot && Math.random() < 0.3) burst(fx, fy - 120, 4, ["#ff6ec7", "#fff"], 160, 0.3); return; }
     m.hp -= dmg; m.flash = 0.12;
     if (m.hp <= 0) return killMon(m, true, by);
     if (dot) return;
     play("hit");
     if (m.st !== "atk" && m.st !== "prep") {
-      m.hurt = 0.1 + Math.min(0.12, kb / 2000); if (m.elite) kb *= 0.4;
+      m.hurt = 0.1 + Math.min(0.12, kb / 2000); if (m.elite) kb *= 0.4; if (m.c.heavy) { kb *= 0.2; m.hurt = 0.05; }
       const [nx, ny] = norm(m.x - fx, m.y - fy); m.vx = nx * kb * 2.5; m.vy = ny * kb * 2.5;
     }
   }
@@ -1409,7 +1431,7 @@
     if (!gs.length) return;
     // a sealed gate whose quota is met: the stream slows so the girls can walk on
     updateCamps(gs, dt);
-    if (!G.tierMsg && G.lt > 3.2 && tierOf().name) { G.tierMsg = true; showBanner(tierOf().name, "Quái mạnh hơn rồi, bé cố lên!"); }
+    if (!G.tierMsg && G.lt > 3.2 && tierOf().name && !L.stage) { G.tierMsg = true; showBanner(tierOf().name, "Quái mạnh hơn rồi, bé cố lên!"); }
     const open = (G.portal || G.arena).open, atGate = nearGate(gs);
     const rate = (L.spawn[0] + (L.spawn[1] - L.spawn[0]) * k) * (gs.length > 1 ? 1.4 : 1) * (open ? 0.45 : 1) * (atGate ? 3 : 1);
     if (atGate && !G.gateMsg) { G.gateMsg = true; showBanner("Quái canh cổng!", "Hạ hết để mở cổng nhé"); SFX.roar(); }
@@ -1603,6 +1625,7 @@
   function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow", at: -1 })); }
   function followPets(list, owner, dt, act) {
     for (const p of list) {
+      if (G.cine && G.cine.ph === "outro") { p.moving = false; p.at = -1; p.st = "follow"; continue; }   // lined up for the cheer
       if (p.at >= 0) { p.at += dt; if (p.at > petAtkLen(p.kind)) p.at = -1; }
       if (act && (p.st === "pounce" || p.st === "atk") && PETS[p.kind].style) {
         // Mira and Rumi: dash in, one big blow at ALLY_HIT, recover
@@ -1743,12 +1766,245 @@
     });
   }
 
+  // ---------------------------------------------------------------- the finale (level 5): the concert stage
+  // A short film first (the girls cannot move): the five Saja Boys tied up on the stage, Gwi Ma laughing behind them,
+  // his spell turns them into demons. Then the fight: the five demons, each with its own move; Gwi Ma is shielded
+  // until they are all down. When he falls, the boys are themselves again and everyone cheers.
+  // G.cine: { ph: intro | fight | gwima | outro, t, lock (no control), spawned }
+  const CPH = ["intro", "fight", "gwima", "outro"], BOYX = [-440, -220, 0, 220, 440];
+  const SAJA_RANGE = { blink: 900, slam: 260, phase: 900, hearts: 820, dash: 700 };
+  function startStage() {
+    const A = G.arena; A.open = true; G.arenaLock = true;
+    P.x = A.x + (NET.role === "guest" ? 130 : -130); P.y = A.y + 330; P.vx = P.vy = 0; P.face = 4; P.flip = false; P.prog = G.path.n - 1;
+    for (const p of PETE) { p.x = P.x + rnd(-160, 160); p.y = P.y + rnd(40, 120); }
+    G.cine = { ph: "intro", t: 0, lock: true, spawned: false, shown: null };
+    if (NET.role !== "guest") { const g = spawnMon("gwima", A.x, A.y - 270); g.shield = true; }
+  }
+  function openFinalPortal() {
+    const A = G.arena; if (!A || G.portal) return;
+    G.portal = { x: A.x, y: A.y + 120, open: true, t: 0 }; G.arenaLock = false;
+    SFX.portal(); showBanner("Cổng phép mới hiện ra!", "Cả nhóm cùng bước vào nhé");
+    burst(A.x, A.y - 60, 50, ["#c08bff", "#ff6ec7", "#fff"], 600, 1.2);
+  }
+  const stageMons = () => G.mons.filter((m) => m.alive && m.c.saja);
+  const gwimaMon = () => G.mons.find((m) => m.c.gwima);
+  function updateCine(dt) {
+    const c = G.cine; if (!c) return;
+    const A = G.arena, host = NET.role !== "guest";
+    c.t += dt;
+    if (c.shown !== c.ph) { c.shown = c.ph; onCinePhase(c.ph); }
+    if (c.ph === "intro") {
+      if (c.t > 2.5 && !c.laugh) { c.laugh = true; SFX.roar(); G.shake = 10; }
+      if (c.t > 4.8 && !c.spellMsg) { c.spellMsg = true; showBanner("Gwi Ma niệm phép!", "Ôi không…"); SFX.charge(); }
+      if (c.t > 4.8 && c.t < 7.3 && G.parts.length < 420) for (let i = 0; i < 3; i++) {
+        const k = Math.floor(Math.random() * 5), x0 = A.x + rnd(-60, 60), y0 = A.y - 560, x1 = A.x + BOYX[k], y1 = A.y - 200;
+        G.parts.push({ type: "dot", x: x0, y: y0, vx: (x1 - x0) * 1.4, vy: (y1 - y0) * 1.4, life: 0.7, max: 0.7, r: rnd(6, 11), col: Math.random() < 0.5 ? "#ff3d7f" : "#c08bff" });
+      }
+      if (c.t > 7.3 && !c.boom) { c.boom = true; SFX.boom(); G.shake = 22; for (const x of BOYX) burst(A.x + x, A.y - 160, 30, ["#3a0d4f", "#c08bff", "#ff3d7f", "#000"], 420, 1); }
+      if (host && c.t > 7.3 && !c.spawned) {
+        c.spawned = true;
+        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y - 60); m.face = 0; m.cd = 1.2 + i * 0.35; });
+      }
+      if (host && c.t > 9.6) { c.ph = "fight"; c.t = 0; c.lock = false; }
+    } else if (c.ph === "fight") {
+      if (host && c.spawned && !stageMons().length) { c.ph = "gwima"; c.t = 0; const g = gwimaMon(); if (g) { g.shield = false; g.cd = 1.5; } }
+    } else if (c.ph === "gwima") {
+      const g = gwimaMon();
+      if (g) { c.gx = g.x; c.gy = g.y; $("bfill").style.width = (100 * Math.max(0, g.hp) / g.max) + "%"; }
+      if (host && (!g || !g.alive)) { c.ph = "outro"; c.t = 0; c.lock = true; for (const m of G.mons) if (m.alive) killMon(m, false); }
+    } else if (c.ph === "outro") {
+      if (c.t < 7 && Math.random() < dt * 4) burst(A.x + rnd(-700, 700), A.y + rnd(-700, 200), 22, ["#ffd34d", "#ff6ec7", "#7cf2ff", "#b9a4ff", "#fff"], 420, 1);
+      if (c.t > 1.2 && !c.thanks) { c.thanks = true; showBanner("Cảm ơn các bạn nhỏ!", "Saja Boys đã trở lại là chính mình"); SFX.win(); }
+      if (host && c.t > 9 && !G.won) winGame();
+    }
+  }
+  function onCinePhase(ph) {
+    const A = G.arena;
+    if (ph === "intro") showBanner("Gwi Ma đã bắt Saja Boys!", "Cả nhóm hãy xem kìa…");
+    else if (ph === "fight") { showBanner("5 quỷ Saja tấn công!", "Hạ hết chúng để phá khiên của Gwi Ma"); SFX.roar(); }
+    else if (ph === "gwima") {
+      showBanner("Khiên của Gwi Ma đã vỡ!", "Đánh bại Gwi Ma nào!"); SFX.unlock();
+      $("bossbar").hidden = false; $("bossName").textContent = "Gwi Ma";
+    } else if (ph === "outro") {
+      $("bossbar").hidden = true; showBanner("Gwi Ma đã bị đánh bại!", "");
+      P.winT = 99; P.vx = P.vy = 0; P.x = A.x + (NET.role === "guest" ? 120 : -120); P.y = A.y + 250; P.face = 4;
+      // everyone in a row in front of the boys
+      PETE.forEach((p, i) => { const k = i + 1, side = k % 2 ? 1 : -1; p.x = P.x + side * (150 + Math.floor((k - 1) / 2) * 150); p.y = A.y + 230 + (k % 3) * 20; p.face = 0; p.flip = false; p.at = -1; p.st = "follow"; });
+      const c = G.cine; burst(c.gx || A.x, (c.gy || A.y - 270) - 250, 80, ["#ff3d7f", "#ff6ec7", "#fff", "#ffd34d"], 800, 1.5);
+    }
+  }
+  // the five boys during the film: tied up before the spell, free and cheering at the end
+  function cineBoys() {
+    const c = G.cine, A = G.arena; if (!c || !A) return [];
+    const tied = c.ph === "intro" && c.t < 7.4, happy = c.ph === "outro" && c.t > 0.5;
+    if (!tied && !happy) return [];
+    if (!c.boys || c.boys.happy !== happy) { c.boys = BOYX.map((x, i) => ({ x: A.x + x, y: A.y + (happy ? -20 : -60), i, happy })); c.boys.happy = happy; }
+    return c.boys;
+  }
+  function drawCineBoy(b) {
+    const fn = `saja_boys_d${b.happy ? 1 : 0}_w${b.i}`, c = G.cine;
+    shadow(b.x, b.y, 46, 12, 0.3);
+    if (!FR[fn]) { glow(b.x, b.y - 150, 90, "255,110,190", 0.6); return; }
+    let lift = 0, rot = 0;
+    if (b.happy) { lift = Math.abs(Math.sin(G.t * 5 + b.i * 1.3)) * 34; glow(b.x, b.y - 160, 150, "255,210,120", 0.25); }
+    else {
+      rot = Math.sin(G.t * 7 + b.i * 2) * 0.03;   // struggling against the ropes
+      glow(b.x, b.y - 150, 130, "255,60,90", 0.3 + 0.15 * Math.sin(G.t * 6 + b.i));
+      if (c.t > 4.8) glow(b.x, b.y - 150, 170, "190,90,255", Math.min(0.8, (c.t - 4.8) / 2.5));
+    }
+    spr(fn, b.x, b.y - lift, false, CHAR_M, 1, rot);
+  }
+  // white flash as the spell lands
+  function drawCineFx(L, T) {
+    const c = G.cine; if (!c) return;
+    const f = c.ph === "intro" ? clamp(1 - Math.abs(c.t - 7.35) / 0.5, 0, 1) : c.ph === "outro" ? clamp(1 - c.t / 0.8, 0, 1) : 0;
+    if (f > 0) { ctx.save(); ctx.globalAlpha = f * 0.85; ctx.fillStyle = "#fff"; ctx.fillRect(L - 50, T - 50, VW + 100, VH + 100); ctx.restore(); }
+  }
+  // the stage itself: a dark round floor with neon rims, a light wall at the back, sweeping spotlights
+  function drawStage() {
+    if (!G.lvl || !G.lvl.stage || !G.arena) return;
+    const A = G.arena, t = G.t;
+    ctx.save();
+    const g = ctx.createRadialGradient(A.x, A.y, 60, A.x, A.y, A.r + 60);
+    g.addColorStop(0, "#3a2560"); g.addColorStop(0.75, "#22163d"); g.addColorStop(1, "#120a22");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(A.x, A.y, A.r + 60, 0, TAU); ctx.fill();
+    ctx.globalCompositeOperation = "lighter";
+    for (const [r, col, w] of [[A.r + 40, "255,110,199", 18], [A.r - 10, "124,242,255", 8], [A.r * 0.55, "190,120,255", 6]]) {
+      ctx.strokeStyle = `rgba(${col},${0.45 + 0.25 * Math.sin(t * 3 + r)})`; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(A.x, A.y, r, 0, TAU); ctx.stroke();
+    }
+    // floor light stripes from the centre
+    for (let k = 0; k < 12; k++) {
+      const a = k / 12 * TAU + t * 0.15; ctx.strokeStyle = `rgba(255,${120 + 60 * Math.sin(t * 2 + k)},220,0.12)`; ctx.lineWidth = 26;
+      ctx.beginPath(); ctx.moveTo(A.x + Math.cos(a) * 140, A.y + Math.sin(a) * 140); ctx.lineTo(A.x + Math.cos(a) * (A.r - 40), A.y + Math.sin(a) * (A.r - 40)); ctx.stroke();
+    }
+    ctx.restore();
+    // the light wall behind the stage
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    for (let k = -6; k <= 6; k++) {
+      const x = A.x + k * 130, h = 180 + 120 * Math.abs(Math.sin(t * 2.2 + k * 0.7));
+      ctx.fillStyle = `rgba(${k % 2 ? "255,110,199" : "124,242,255"},0.35)`; ctx.fillRect(x - 40, A.y - A.r - 60 - h, 80, h);
+    }
+    ctx.restore();
+    for (let k = 0; k < 4; k++) glow(A.x + Math.sin(t * 0.7 + k * 1.7) * A.r * 0.7, A.y + Math.cos(t * 0.9 + k * 2.3) * A.r * 0.5, 260, k % 2 ? "255,120,210" : "120,230,255", 0.22);
+  }
+  // ---- the five demons
+  function updateStageMon(m, dt) {
+    if (m.c.gwima) return updateGwima(m, dt);
+    const c = m.c, A = G.arena, ox = m.x, oy = m.y;
+    if (G.cine && G.cine.lock) { m.st = "walk"; return; }
+    const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    if (m.st === "rest") { if (m.t > 0.5) { m.st = "walk"; m.t = 0; } }
+    if (m.st === "walk" || m.st === "rest") {
+      const keep = c.saja === "phase" || c.saja === "hearts" ? 480 : 130, want = d > keep + 40 ? 1 : d < keep - 40 ? -0.6 : 0, sw = Math.sin(G.t * 1.4 + m.ph) * 0.6;
+      if (!T.dead) { m.x += (ux * want - uy * sw * 0.5) * c.spd * dt; m.y += (uy * want + ux * sw * 0.5) * c.spd * dt; }
+      setFace(m, dx, dy);
+      if (m.st === "walk" && m.cd <= 0 && d < SAJA_RANGE[c.saja] && !T.dead) { m.st = "prep"; m.t = 0; m.combo = c.saja === "dash" ? 3 : 1; }
+    } else if (m.st === "prep") {
+      setFace(m, dx, dy);
+      if (m.t > (m.quick ? 0.22 : c.prep)) { m.st = "atk"; m.t = 0; sajaStrike(m, T, ux, uy); }
+    } else if (m.st === "atk") {
+      if (c.saja === "dash") {
+        m.x += m.vx * dt; m.y += m.vy * dt; m.vx *= Math.pow(0.08, dt); m.vy *= Math.pow(0.08, dt);
+        for (const g of girls()) if (d2(m.x, m.y, g.x, g.y) < (m.r + HERO_R + 20) ** 2) hurtTarget(g, m.x, m.y);
+        if (Math.random() < 0.6) G.parts.push({ type: "dot", x: m.x, y: m.y - 120, vx: 0, vy: 0, life: 0.3, max: 0.3, r: rnd(8, 14), col: "#7cf2ff" });
+      }
+      if (m.t > c.atk) {
+        if (c.saja === "phase") {   // vanish and reappear somewhere else on the stage
+          const a = Math.random() * TAU, r = rnd(200, A.r - 200); m.x = A.x + Math.cos(a) * r; m.y = A.y + Math.sin(a) * r;
+          burst(m.x, m.y - 140, 18, ["#c08bff", "#fff"], 260, 0.5);
+        }
+        if (--m.combo > 0) { m.st = "prep"; m.t = 0; m.quick = true; }
+        else { m.st = "rest"; m.t = 0; m.quick = false; m.cd = c.cd * rnd(0.85, 1.2); }
+      }
+    }
+    // stay on the stage
+    const ex = m.x - A.x, ey = m.y - A.y, ed = Math.hypot(ex, ey);
+    if (ed > A.r - 80) { m.x = A.x + ex / ed * (A.r - 80); m.y = A.y + ey / ed * (A.r - 80); }
+    m.dist += Math.hypot(m.x - ox, m.y - oy);
+    if (dt > 0) { m.evx = (m.x - ox) / dt; m.evy = (m.y - oy) / dt; }
+  }
+  function sajaStrike(m, T, ux, uy) {
+    const c = m.c;
+    if (c.saja === "blink") {
+      // Jinu: steps through the shadows to the far side of the girl and cuts
+      burst(m.x, m.y - 140, 20, ["#3a0d4f", "#c08bff"], 300, 0.5);
+      m.x = T.x + ux * 140; m.y = T.y + uy * 100; setFace(m, -ux, -uy);
+      burst(m.x, m.y - 140, 20, ["#3a0d4f", "#c08bff"], 300, 0.5);
+      G.parts.push({ type: "slash", x: T.x - ux * 60, y: T.y - 80, vx: 0, vy: 0, rot: Math.atan2(-uy, -ux), life: 0.4, max: 0.4 });
+      for (const g of girls()) if (d2(m.x, m.y, g.x, g.y) < 200 * 200) hurtTarget(g, m.x, m.y);
+      SFX.swoosh();
+    } else if (c.saja === "slam") {
+      // Abby: pounds the stage, a shockwave rolls out
+      G.rings.push({ x: m.x, y: m.y, r: 60, sp: 560, life: 1.3, delay: 0 }); G.shake = Math.max(G.shake, 12); SFX.slam();
+      for (const g of girls()) if (d2(m.x, m.y, g.x, g.y) < 190 * 190) hurtTarget(g, m.x, m.y);
+    } else if (c.saja === "phase") {
+      // Mystery: three ghost orbs, then he fades away
+      for (let i = -1; i <= 1; i++) { const a = Math.atan2(uy, ux) + i * 0.25; G.foes.push({ type: "orb", x: m.x + Math.cos(a) * 60, y: m.y + Math.sin(a) * 40, vx: Math.cos(a) * 620, vy: Math.sin(a) * 620, life: 2.2 }); }
+      play("fire");
+    } else if (c.saja === "hearts") {
+      // Romance: a fan of charm hearts that slow whoever they touch
+      for (let i = -2; i <= 2; i++) { const a = Math.atan2(uy, ux) + i * 0.22; G.foes.push({ type: "heart", x: m.x + Math.cos(a) * 60, y: m.y + Math.sin(a) * 40, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, life: 2.0 }); }
+      play("web");
+    } else if (c.saja === "dash") {
+      // Baby: three quick dashes in a row
+      m.vx = ux * 1150; m.vy = uy * 1150; play("swoosh");
+    }
+  }
+  // ---- Gwi Ma
+  function updateGwima(m, dt) {
+    if (m.shield || (G.cine && G.cine.lock)) { m.st = "walk"; return; }
+    const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    if (m.st === "walk" || m.st === "rest") { if (m.cd <= 0) { m.st = "prep"; m.t = 0; m.cyc = (m.cyc || 0) + 1; } }
+    else if (m.st === "prep") {
+      if (m.t > m.c.prep) {
+        m.st = "atk"; m.t = 0;
+        const k = m.cyc % 3;
+        if (k === 1) { for (let i = -3; i <= 3; i++) { const a = Math.atan2(uy, ux) + i * 0.16; G.foes.push({ type: "fire", x: m.x + Math.cos(a) * 120, y: m.y + 40, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, life: 2.6 }); } play("fire"); }
+        else if (k === 2) { G.rings.push({ x: m.x, y: m.y, r: 150, sp: 520, life: 1.8, delay: 0 }, { x: m.x, y: m.y, r: 150, sp: 520, life: 1.8, delay: 0.6 }); SFX.slam(); G.shake = 14; }
+        else if (G.mons.filter((b) => b.alive && b.kind === "bat").length < 8) {
+          for (let i = 0; i < 4; i++) { const a = Math.random() * TAU, b = spawnMon("bat", m.x + Math.cos(a) * 260, m.y + 120 + Math.sin(a) * 140); b.summoned = true; burst(b.x, b.y - b.hgt, 12, ["#ff3d7f", "#fff"], 220, 0.5); }
+          SFX.roar();
+        }
+      }
+    } else if (m.st === "atk" && m.t > m.c.atk) { m.st = "rest"; m.t = 0; m.cd = m.c.cd * rnd(0.85, 1.15); }
+  }
+  function gwimaFrame(m) {
+    const c = G.cine;
+    if (!m.alive) return "gwima_d1_w2";
+    if (c && c.ph === "intro") return c.t > 4.8 && c.t < 7.4 ? "gwima_d0_w2" : c.t > 2.4 && c.t < 4.8 ? "gwima_d0_w1" : "gwima_d0_w0";
+    if (m.hurt > 0 || m.flash > 0.08 && !m.shield) return "gwima_d1_w0";
+    if (m.st === "prep") return "gwima_d0_w2";
+    if (m.st === "atk") return m.cyc % 3 === 1 ? "gwima_d1_w1" : "gwima_d0_w3";
+    return Math.floor(G.t * 1.2) % 4 === 0 ? "gwima_d0_w1" : "gwima_d0_w0";
+  }
+  function drawGwima(m, f) {
+    const bob = Math.sin(G.t * 1.6) * 14, a = m.alive ? 1 : clamp(1 - m.die / 0.6, 0, 1);
+    glow(m.x, m.y - 300, 520, "255,60,140", 0.35 + 0.1 * Math.sin(G.t * 3));
+    shadow(m.x, m.y, 260, 50, 0.35 * a);
+    spr(f, m.x, m.y + bob, false, 1, a);
+    if (m.flash > 0) sprFlash(f, m.x, m.y + bob, false, 1, 0.5);
+    if (G.cine && G.cine.ph === "intro" && G.cine.t > 2.5 && G.cine.t < 4.8) label("Ha ha ha!", m.x + 260, m.y - 600 + Math.sin(G.t * 12) * 10, 80, "#ff6ec7");
+    if (m.shield && !(G.cine && G.cine.ph === "intro")) {
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(255,120,210,${0.45 + 0.2 * Math.sin(G.t * 4)})`; ctx.lineWidth = 14;
+      ctx.beginPath(); ctx.ellipse(m.x, m.y - 300, 360, 380, 0, 0, TAU); ctx.stroke();
+      ctx.fillStyle = "rgba(255,110,199,0.07)"; ctx.fill(); ctx.restore();
+    }
+  }
+  // the end of Gwi Ma: he shrinks to a wisp where he stood
+  function drawGwimaGone() {
+    const c = G.cine; if (!c || c.ph !== "outro" || c.t > 2.5) return;
+    const k = c.t / 2.5, fn = k < 0.5 ? "gwima_d1_w2" : "gwima_d1_w3";
+    if (FR[fn]) spr(fn, c.gx || G.arena.x, c.gy || G.arena.y - 270, false, 1 - 0.4 * k, 1 - k);
+  }
+
   // ---------------------------------------------------------------- boss (level 4)
   function startBoss() {
     const A = G.arena; G.arenaLock = true;
     if (d2(P.x, P.y, A.x, A.y) > (A.r - 80) ** 2) fadeTo(() => { const [nx, ny] = norm(P.x - A.x, P.y - A.y); P.x = A.x + nx * (A.r - 260); P.y = A.y + ny * (A.r - 260); });
     // he lands on the far side from where the girl came in
     const [nx, ny] = norm(A.x - P.x, A.y - P.y);
+    $("bossName").textContent = "Vua Bí Ngô";
     G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp: 70, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
     for (const m of G.mons) if (m.alive) killMon(m, false);
     $("bossbar").hidden = false; updateBossBar();
@@ -1759,7 +2015,7 @@
   function updateBoss(dt) {
     const B = G.boss; if (!B) return;
     B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt;
-    if (!B.alive) { B.die += dt; if (B.die > 2.4 && G.mode === "play" && !G.won) winGame(); return; }
+    if (!B.alive) { B.die += dt; if (B.die > 2.4 && G.mode === "play" && !G.won && !G.portal) { if (LEVELS[G.level + 1]) openFinalPortal(); else winGame(); } return; }
     const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.hp < B.max / 2, A = G.arena;
     if (B.st === "enter") {
       B.dropY = Math.min(0, B.dropY + 1800 * dt);
@@ -1822,8 +2078,8 @@
   function winGame() {
     G.won = true; P.winT = 99; SFX.win();
     $("againBtn").hidden = NET.role === "guest";
-    try { localStorage.setItem("dcpt3-progress", "4"); } catch (e) {}
-    progress = 4;
+    try { localStorage.setItem("dcpt3-progress", String(LEVELS.length)); } catch (e) {}
+    progress = LEVELS.length;
     setTimeout(() => {
       $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv} và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
       G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
@@ -1910,7 +2166,7 @@
     updateUlt(dt);
     if (P.elem) { P.elemT -= dt; if (P.elemT <= 0) { P.elem = null; showBanner("Hết phép đặc biệt"); } updateElemHud(); }
     netFrame(dt);
-    followPets(PETE, P, dt, !P.dead && !G.ult && !P.winT);
+    followPets(PETE, P, dt, !P.dead && !G.ult && !P.winT && !(G.cine && G.cine.lock));
     if (Q && NET.role) { if (QPETE.map((p) => p.kind).join() !== Q.pets.join()) QPETE = Q.pets.map((k, i) => ({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i })); partnerPets(dt); }
     for (const sh of G.pshots) {
       sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
@@ -1919,13 +2175,15 @@
     G.pshots = G.pshots.filter((sh) => sh.life > 0);
     if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
     updateShots(dt);
-    // camera: follow the girl, a little ahead of where she walks
-    const tx = clamp(P.x + P.vx * 0.3 - VW / 2, 0, WORLD - VW), ty = clamp(P.y - 70 + P.vy * 0.3 - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
+    // camera: follow the girl, a little ahead of where she walks (in a story scene: the stage)
+    const cc = G.cine && G.cine.lock && G.arena ? [G.arena.x, G.arena.y - 260] : null;
+    const tx = clamp((cc ? cc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((cc ? cc[1] : P.y - 70 + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
+    updateCine(dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
     updateParts(dt);
     // the ultimate also charges by itself, a point at a time (full in about 40 s without any kills)
-    if (!G.ult && G.energy < 100 && (G.enAcc = (G.enAcc || 0) + dt * 2.5) >= 1) { G.enAcc -= 1; addEnergy(1); }
+    if (!G.ult && G.energy < 100 && !(G.cine && G.cine.lock) && (G.enAcc = (G.enAcc || 0) + dt * 2.5) >= 1) { G.enAcc -= 1; addEnergy(1); }
     const ultOff = G.energy < 100; if (ultOff !== G.ultOff) { G.ultOff = ultOff; $("bUlt").classList.toggle("off", ultOff); }
     if (G.frame % 6 === 0) { updateQuest(); drawMini(); }
   }
@@ -1948,7 +2206,7 @@
       f.x += f.vx * dt; f.y += f.vy * dt; f.life -= dt;
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
       if (f.type === "web") { f.vx *= Math.pow(0.5, dt); f.vy *= Math.pow(0.5, dt); }
-      for (const g of girls()) if (f.life > 0 && d2(f.x, f.y, g.x, g.y) < 60 * 60) { f.life = 0; hurtTarget(g, f.x, f.y, f.type === "web"); }
+      for (const g of girls()) if (f.life > 0 && d2(f.x, f.y, g.x, g.y) < 60 * 60) { f.life = 0; hurtTarget(g, f.x, f.y, f.type === "web" || f.type === "heart"); }
       // the girl's bolts pop fireballs
       for (const s of G.shots) if (s.life > 0 && f.life > 0 && d2(s.x, s.y, f.x, f.y) < 50 * 50) { s.life = 0; f.life = 0; burst(f.x, f.y - 90, 10, ["#9dff6a", "#fff"], 200, 0.4); play("hit"); }
     }
@@ -1960,7 +2218,7 @@
       if (G.portal.open && !P.winT && girls().some((g) => !g.dead && d2(g.x, g.y, G.portal.x, G.portal.y - 30) < 95 * 95)) enterPortal();
     }
     const A = G.arena;
-    if (A && A.open && !G.boss && girls().some((g) => !g.dead && d2(g.x, g.y, A.x, A.y) < (A.r - 200) ** 2)) startBoss();
+    if (A && A.open && !G.boss && !G.lvl.stage && girls().some((g) => !g.dead && d2(g.x, g.y, A.x, A.y) < (A.r - 200) ** 2)) startBoss();
   }
   function enterPortal() {
     P.winT = 1.6; P.vx = P.vy = 0; SFX.portal();
@@ -2125,7 +2383,14 @@
     return WALK_DIST[m.kind] || !WALK_PERIOD[m.kind] ? Math.floor(m.dist / (WALK_DIST[m.kind] || 120) * n) % n : Math.floor(((G.t + m.ph) / WALK_PERIOD[m.kind]) * n) % n;
   }
   function monFrame(m) {
-    const k = m.kind, pre = `${k}_d${m.face}_`, n8 = dirN(pre + "w");
+    const k = m.kind;
+    if (m.c.saja) {
+      // four frames per facing: two walking, the wind-up, the strike
+      const pre = `${k}_d${m.face}_w`;
+      return [pre + (m.st === "prep" ? 2 : m.st === "atk" ? 3 : Math.floor(m.dist / 140) % 2), m.flip];
+    }
+    if (m.c.gwima) return [gwimaFrame(m), false];
+    const pre = `${k}_d${m.face}_`, n8 = dirN(pre + "w");
     const st = !m.alive || m.hurt > 0 ? "hurt" : m.st === "prep" || (m.st === "web" && m.t < 0.35) ? "prep" : m.st === "atk" || m.st === "web" ? "atk" : "";
     if (n8) return [st ? fr(pre + st, k + "_" + st) : pre + "w" + walkIdx(m, n8), m.flip];
     if (st) return [k + "_" + st, m.flip];
@@ -2149,7 +2414,7 @@
   // this level's breed: the monster frame hue-shifted toward the tier colour (made once per frame and level)
   const TIER_FR = new Map();
   function tierFrame(fn) {
-    const T = tierOf(); if (!T.col) return FR[fn];
+    const T = tierOf(); if (!T.col || fn.startsWith("saja_") || fn.startsWith("gwima")) return FR[fn];
     const key = G.level + fn; let t = TIER_FR.get(key);
     if (t) return t;
     const f = FR[fn], w = Math.ceil(f.w * f.s), h = Math.ceil(f.h * f.s), c = document.createElement("canvas"); c.width = w; c.height = h;
@@ -2164,6 +2429,8 @@
     const [fn, flip] = monFrame(m); if (!FR[fn]) return;
     const f = tierFrame(fn), fly = m.c.fly;
     let y = m.y - m.hgt, a = 1, rot = 0, mul = CHAR_M * (m.elite ? 1.3 : 1);
+    if (m.c.gwima) return drawGwima(m, f);
+    if (m.c.saja === "phase" && m.alive) a = m.st === "atk" ? Math.max(0.12, 1 - m.t / m.c.atk) : m.st === "rest" && m.t < 0.4 ? 0.2 + m.t * 2 : 1;
     if (fly) y += Math.sin(G.t * 3 + m.ph) * 10 - (m.st === "prep" ? 30 * Math.min(1, m.t / m.c.prep) : 0);
     if (!m.alive) { const t = m.die / 0.6; a = 1 - t; mul *= 1 - 0.4 * t; rot = (flip ? 1 : -1) * t * 0.8; y -= t * 40; }
     shadow(m.x, m.y, m.r * (fly ? 0.8 : 1.15), m.r * 0.32, (fly ? 0.18 : 0.3) * a);
@@ -2179,6 +2446,7 @@
     if (m.alive && m.burn > 0) drawFlames(m.x, cy, m.r * 2.4, fly ? 170 : 170, m.ph);
     if (m.flash > 0) sprFlash(f, m.x, y, flip, mul, 0.6, rot);
     if (m.kind === "witch" && m.st === "prep" && m.alive) glow(m.x + (flip ? -50 : 50), y - 60, 50, "130,255,90", 0.5);
+    if (m.c.saja && m.alive) label(m.c.name, m.x, m.y - f.ay * f.s * mul - 40, 30, "#ffb3e6");
     // health pips once hurt
     if (m.alive && m.hp < m.max) {
       const top = (fly ? y - f.ay * f.s * mul : m.y - f.ay * f.s * mul) - 16, n = Math.min(m.max, 12), w = 13, filled = Math.ceil(m.hp / m.max * n);
@@ -2281,6 +2549,7 @@
   }
   function drawAlly(p, D) {
     const pre = `${D.art}_d${p.face}_w`, n = dirN(pre), sc = CHAR_M * (p.sc || 1);
+    if (G.cine && G.cine.ph === "outro") { shadow(p.x, p.y, 40, 12); spr(`${D.art}_atk_d0_w3`, p.x, p.y - Math.abs(Math.sin(G.t * 5 + p.i)) * 30, false, sc); return; }
     shadow(p.x, p.y, 40, 12);
     if (p.at >= 0) {
       const apre = `${D.art}_atk_d${p.face}_w`, an = dirN(apre), len = petAtkLen(p.kind), k = clamp(p.at / len, 0, 0.999);
@@ -2294,6 +2563,7 @@
   }
   function drawPet(p) {
     const D = PETS[p.kind];
+    if (!D.art && G.cine && G.cine.ph === "outro") p = { ...p, dist: G.t * 300, moving: true };
     if (D.art && dirN(`${D.art}_d${p.face}_w`)) return drawAlly(p, D);
     const pre = `pet_${p.kind}_d${p.face}_w`, n = dirN(pre);
     if (n) {
@@ -2593,7 +2863,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawRings();
+    drawArena(); drawStage(); drawRings();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 0);
@@ -2613,6 +2883,7 @@
     for (const c of G.cages) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 300) add(c.y, 6, c);
     if (G.portal && G.portal.x > L - 250 && G.portal.x < R + 250 && G.portal.y > T - 50 && G.portal.y < B + 400) add(G.portal.y, 7, G.portal);
     if (G.mode !== "title") for (const p of PETE) add(p.y, 8, p);
+    if (G.cine) for (const b of cineBoys()) add(b.y, 9, b);
     if (Q && NET.role) for (const p of QPETE) add(p.y, 8, p);
     const list = DL.slice(0, n).sort((a, b) => a.y - b.y);
     for (const e of list) {
@@ -2627,11 +2898,14 @@
         case 6: drawCage(o); break;
         case 7: drawPortal(); break;
         case 8: drawPet(o); break;
+        case 9: drawCineBoy(o); break;
       }
     }
     // things in the air
     for (const f of G.foes) {
       if (f.type === "fire") { shadow(f.x, f.y, 22, 7, 0.2); glow(f.x, f.y - 90, 70, "130,255,90", 0.4); fxDir("fx_witchfire", f.x - Math.sign(f.vx) * 20, f.y - 90, f.vx, f.vy, 1, 1); }
+      else if (f.type === "orb") { glow(f.x, f.y - 100, 80, "190,110,255", 0.7); fx("fx_twinkle", f.x, f.y - 100, 0.6, 1, G.t * 6); }
+      else if (f.type === "heart") { glow(f.x, f.y - 100, 70, "255,110,190", 0.6); fx("fx_heart", f.x, f.y - 100, 1.1, 1, Math.sin(G.t * 8) * 0.3); }
       else drawWeb(f.x, f.y - 60, 26, 0.9);
     }
     for (const s of G.shots) {
@@ -2640,7 +2914,9 @@
       else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk, s.sc);
     }
     for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc);
+    drawGwimaGone();
     drawParts(L, R, T, B);
+    drawCineFx(L, T);
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 1);
     if (Q && NET.role && Q.ultT > 0) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 1);
     if (G.ult) {
@@ -2711,7 +2987,7 @@
   function updateQuest() {
     const el = $("quest"), goal = G.portal || G.arena;
     let html = "", open = false;
-    if (G.boss) html = "";
+    if (G.boss || (G.lvl && G.lvl.stage)) html = "";
     else if (goal && !goal.open) html = `${G.portal ? "Mở cổng phép" : "Mở đấu trường"}: hạ thêm <b>${quotaLeft()}</b> quái`;
     else if (goal) { open = true; html = G.portal ? "Cổng phép đã mở! Đi theo mũi tên" : "Vào đấu trường gặp Vua Bí Ngô!"; }
     if (html === questTxt) return;
@@ -2866,6 +3142,7 @@
   // One iPad hosts: it runs the whole world (monsters, drops, gems, chests, boss) and treats the other girl as a second
   // target. The guest runs only its own girl, mirrors the host's world from the host's presence,
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
+  const FTYPES = ["fire", "web", "orb", "heart"];
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back"];
   const BST = ["enter", "walk", "prep", "slam", "rest"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
@@ -3114,11 +3391,12 @@
     return {
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
-        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0), Math.round(m.t * 10), m.max]),
+        (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max]),
       b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0] : 0,
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
-      f: G.foes.map((f) => [f.type === "web" ? 1 : 0, f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
+      f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
+      cn: G.cine ? [CPH.indexOf(G.cine.ph), Math.round(G.cine.t * 10), G.cine.spawned ? 1 : 0] : 0,
       v: G.rings.map((w) => [w.x | 0, w.y | 0, w.r | 0, Math.round(w.life * 10), Math.round(w.delay * 10)]),
       it: bitsOf(G.items), ch: bitsOf(G.chests), cg: bitsOf(G.cages),
       po: G.portal && G.portal.open ? 1 : 0, ao: G.arena && G.arena.open ? 1 : 0, al: G.arenaLock ? 1 : 0, st: G.stars, k: G.kills, lk: G.lvKills, won: G.won ? 1 : 0, cp: G.camps.map((c) => c.st * 1000 + Math.max(0, c.left)),
@@ -3187,7 +3465,7 @@
       m.tt = now; m.tx = x; m.ty = y; m.face = clamp(fc & 7, 0, 4); m.flip = fc >= 8;
       m.st = MST[num(a[5])] || "walk"; m.t = num(a[8]) / 10; m.hp = num(a[6]); m.max = num(a[9]) || m.max;
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
-      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64);
+      m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.shield = !!(bits & 256);
     }
     for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
       m.alive = false; m.die = 0;
@@ -3232,13 +3510,21 @@
       gems.push({ id: a[0], x: o ? o.x : num(a[1]), y: o ? o.y : num(a[2]), tx: num(a[1]), ty: num(a[2]), v: num(a[3]), t: 1, ph: o ? o.ph : Math.random() * 6 });
     }
     G.gems = gems;
-    G.foes = (Array.isArray(w.f) ? w.f : []).filter(Array.isArray).map((a) => ({ type: a[0] ? "web" : "fire", x: num(a[1]), y: num(a[2]), vx: num(a[3]), vy: num(a[4]), life: 1 }));
+    G.foes = (Array.isArray(w.f) ? w.f : []).filter(Array.isArray).map((a) => ({ type: FTYPES[num(a[0])] || "fire", x: num(a[1]), y: num(a[2]), vx: num(a[3]), vy: num(a[4]), life: 1 }));
+    // the finale's film runs on the host
+    if (Array.isArray(w.cn) && G.lvl && G.lvl.stage) {
+      if (!G.cine) G.cine = { ph: "intro", t: 0, lock: true, shown: null };
+      const ph = CPH[num(w.cn[0])] || "intro", t = num(w.cn[1]) / 10;
+      if (ph !== G.cine.ph || Math.abs(t - G.cine.t) > 0.5) { G.cine.ph = ph; G.cine.t = t; }
+      G.cine.lock = ph === "intro" || ph === "outro"; G.cine.spawned = !!w.cn[2];
+    }
     G.rings = (Array.isArray(w.v) ? w.v : []).filter(Array.isArray).map((a) => ({ x: num(a[0]), y: num(a[1]), r: num(a[2]), life: num(a[3]) / 10, delay: num(a[4]) / 10, sp: 470 }));
     // items, chests, cages, gate, score
     const flags = (s, list, onOpen) => { if (typeof s === "string") list.forEach((o, i) => { const v = s[i] === "1"; if (v && !(o.got || o.open) && onOpen) onOpen(o); if ("got" in o) o.got = v; else o.open = v; }); };
     flags(w.it, G.items, null);
     flags(w.ch, G.chests, (c) => { c.t = 0; chestFx(c); });
     flags(w.cg, G.cages, (c) => openCageFx(c));
+    if (w.po && !G.portal && G.arena && !G.lvl.stage && LEVELS[G.level + 1]) openFinalPortal();
     if (G.portal && w.po && !G.portal.open) { G.portal.open = true; SFX.unlock(); showBanner("Cổng phép đã mở!", "Đi theo mũi tên nhé"); }
     G.stars = num(w.st); G.kills = num(w.k); G.lvKills = num(w.lk); updateHud();
     if (Array.isArray(w.cp)) w.cp.forEach((v, i) => { const c = G.camps[i]; if (c) { v = num(v); c.st = clamp(Math.floor(v / 1000), 0, 3); c.left = v % 1000; } });
