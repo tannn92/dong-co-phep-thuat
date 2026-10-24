@@ -1114,7 +1114,8 @@
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
-    const [wx, wy] = ahead && dirN(`${hero}_cast_d${P.face}_w`) ? wandTip(hero, P.face, P.flip) : [Math.cos(a) * 46, Math.sin(a) * 30];
+    const castShown = P.fn && P.fn[0].includes("_cast_");
+    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.flip) : [Math.cos(a) * 46, Math.sin(a) * 30];
     const x = P.x + wx, y = P.y + wy;
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
     G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
@@ -2008,11 +2009,15 @@
   // ---------------------------------------------------------------- frames for the 8-direction art (with side-view fallback)
   // o: { hk, skin, face, flip, moving, dist, castT, hurtT, dead, winT } -> [frame name, mirror]
   const DIR_CYCLE = 240;   // world units walked per 8-direction walk cycle
+  const SIDE_CYCLE = 300;  // ... and per side-view walk cycle (two steps)
   function heroFrame(o) {
     const sk = o.skin, base = o.hk;
     if (o.winT) return [fr(sk + "_win", base + "_win"), o.flip];
     if (o.dead) return [fr(sk + "_sit", base + "_sit", sk + "_hurt", base + "_hurt"), o.flip];
     if (o.hurtT > 0) return [fr(`${sk}_d${o.face}_hurt`, `${base}_d${o.face}_hurt`, sk + "_hurt", base + "_hurt"), o.flip];
+    // walking left, right or diagonally: the original side-view walk cycle (six real steps, legs clearly alternating),
+    // mirrored by facing; the 8-direction sheets' legs barely move
+    if (o.moving && o.face >= 1 && o.face <= 3 && FR[base + "_walk4"]) { const n = FR[base + "_walk5"] ? 6 : 5; return [base + "_walk" + (Math.floor(o.dist / SIDE_CYCLE * n) % n), o.flip]; }
     // 8-direction art first: the outfit's own; an outfit without it (and once loaded) uses its own side view below
     const own = sk === base || !SKIN[sk] || SKIN[sk].then;
     for (const p of own ? [base] : [sk]) {
@@ -2125,7 +2130,7 @@
     const ph = walk / DIR_CYCLE * TAU, up = Math.abs(Math.sin(ph)), i = Math.floor(walk / DIR_CYCLE * 2);
     if (o.stepI !== undefined && o.stepI >= 0 && i !== o.stepI) dust(o.x, o.y, 2);
     o.stepI = i;
-    return [up * 6, Math.sin(ph) * 0.02, 1 + 0.015 * up - 0.015 * (1 - up)];   // gentle: short child steps
+    return [0, 0, 1];   // the walk art carries its own step and bob: no extra hop
   }
   function dust(x, y, n) {
     for (let k = 0; k < n; k++) G.parts.push({ type: "dust", x: x + rnd(-24, 24), y: y + rnd(-4, 6), vx: rnd(-50, 50), vy: rnd(-30, -5), life: 0.42, max: 0.42, r: rnd(10, 16) });
@@ -2162,7 +2167,7 @@
       groundCircle(hero === "s" ? "fx_circle_s" : "fx_circle_g", P.x, P.y, 0.45 + 0.25 * k, 0.5 + 0.4 * k, G.t);
     }
     drawHeroSprite(hero, G.ult ? fr(mySkin() + "_jump", hero + "_jump") : fn, P.x, P.y, P.z, flip, blink ? 0.45 : 1, G.ult ? G.ult.t : 0, stepPose(P, P.moving && !G.ult ? P.dist : -1));
-    if (P.castT > 0.15 && !G.ult) { const [wx, wy] = wandTip(hero, P.face, flip); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
+    if (P.castT > 0.15 && !G.ult && fn.includes("_cast_")) { const [wx, wy] = wandTip(hero, P.face, flip); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
     if (P.slowT > 0) drawWeb(P.x, P.y - 70, 40, Math.min(1, P.slowT));
   }
   function drawPartner() {
