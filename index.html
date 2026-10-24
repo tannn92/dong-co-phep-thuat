@@ -387,22 +387,22 @@
   // spawn: monsters per second at start / after the 5-minute ramp. camps: monster camps waiting beside the path.
   // gr: ground palette. deco: [sprite, weight] scattered beside the path. pets: caged friends to rescue along the path (PETS[k].at).
   const LEVELS = [
-    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
+    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
       kinds: [["zombie", 3, 0], ["bat", 2, 0], ["skeleton", 2, 0.15], ["ghost", 2, 0.35]],
       deco: [["tree", 3], ["bush", 4], ["mushrooms", 1], ["pumpkin2", 1], ["pumpkin3", 1]],
       gr: { base: "#679c4a", patch: ["#84b75c", "#558a3e", "#76a94f"], blade: ["#93c96a", "#4f8a3a", "#a6d77a"], dot: ["#ffd3f0", "#fff3b0", "#ffffff", "#ff9ec7", "#c9b6ff"], nDot: 70,
         stone: ["#e3d4b4", "#d8c7a3", "#cdb995"], gap: "#9c8a6c", edge: "#6f5d44" } },
-    { name: "Màn 2: Rừng Ma", seed: 2207, quota: 140, spawn: [0.8, 1.7], camps: 10,
+    { name: "Màn 2: Rừng Ma", seed: 2207, path: "loop", quota: 140, spawn: [0.8, 1.7], camps: 10,
       kinds: [["spider", 3, 0], ["ghost", 2, 0], ["bat", 2, 0.1], ["mummy", 2, 0.3]],
       deco: [["tree", 4], ["mushrooms", 4], ["bush", 2], ["pumpkin3", 1]],
       gr: { base: "#3f5340", patch: ["#536b4a", "#2f3f34", "#4d4466", "#45405c"], blade: ["#5f7d55", "#2c3a2e", "#6b5f86"], dot: ["#b9a4ff", "#7cf2c6", "#e0b8ff"], nDot: 45,
         stone: ["#a3a69a", "#959a8c", "#8a9180"], gap: "#5a5e55", edge: "#2a302c" } },
-    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, quota: 160, spawn: [0.8, 1.8], camps: 11,
+    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", quota: 160, spawn: [0.8, 1.8], camps: 11,
       kinds: [["skeleton", 3, 0], ["bat", 2, 0], ["mummy", 2, 0.1], ["witch", 1, 0.25], ["vampire", 1, 0.45]],
       deco: [["grave1", 3], ["grave2", 3], ["tree", 1], ["pumpkin3", 1], ["pumpkin1", 1]],
       gr: { base: "#4f4a5a", patch: ["#5d5768", "#423d4c", "#5a5a4a", "#5b4a5e"], blade: ["#6a6577", "#3d3846", "#6e6a52"], dot: ["#d8d0e8", "#ff9ab8"], nDot: 30,
         stone: ["#bdb5bf", "#aea5b2", "#a39aa8"], gap: "#6e6578", edge: "#35303d" } },
-    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true,
+    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true,
       kinds: [["skeleton", 2, 0], ["bat", 2, 0], ["mummy", 2, 0.05], ["witch", 2, 0.15], ["vampire", 2, 0.3]],
       deco: [["pumpkin1", 3], ["pumpkin2", 3], ["pumpkin3", 2], ["grave2", 1], ["bush", 1]],
       gr: { base: "#5a5660", patch: ["#66616d", "#4b4852", "#55604f"], blade: ["#6d6977", "#46424d"], dot: ["#f6c453"], nDot: 12, tiles: true,
@@ -511,18 +511,41 @@
 
   // ---------------------------------------------------------------- map generation
   // A winding path: Catmull-Rom spline through 10-14 control points zig-zagging across the world, resampled every STEP units.
-  function genPath(L, R) {
-    const n = 15 + Math.floor(R() * 5), a0 = R() * TAU, c = WORLD / 2, rad = WORLD * (L.arena ? 0.3 : 0.36);
-    const sx = c + Math.cos(a0) * rad, sy = c + Math.sin(a0) * rad, ex = c - Math.cos(a0) * rad, ey = c - Math.sin(a0) * rad;
-    const jit = Array.from({ length: n * 3 }, R);
-    let amp = 1, best = null;
-    for (let tries = 0; tries < 12; tries++) {
-      const dx = ex - sx, dy = ey - sy, ln = Math.hypot(dx, dy), nx = -dy / ln, ny = dx / ln, cps = [];
-      for (let i = 0; i < n; i++) {
-        const t = i / (n - 1), mid = i > 0 && i < n - 1;
-        const off = mid ? (i % 2 ? 1 : -1) * (300 + jit[i * 3] * 450) * amp : 0, along = mid ? (jit[i * 3 + 1] - 0.5) * 160 : 0;
-        cps.push([clamp(sx + dx * t + nx * off + dx / ln * along, 450, WORLD - 450), clamp(sy + dy * t + ny * off + dy / ln * along, 450, WORLD - 450)]);
+  // Each level has its own path shape (L.path); amp is tuned until the walk is 17.5-21k units long.
+  //  river:  a few wide, lazy S-bends across the meadow
+  //  loop:   a road that curls once right round in the middle of the forest
+  //  maze:   long straight runs joined by tight turns, like rows between graves
+  //  spiral: winds inward around the castle to the arena in the middle
+  function pathCps(shape, R, amp) {
+    const c = WORLD / 2, a0 = R() * TAU, ca = Math.cos(a0), sa = Math.sin(a0);
+    const rot = (u, v) => [c + u * ca - v * sa, c + u * sa + v * ca];   // (u along the main axis, v across it)
+    const cps = [];
+    if (shape === "river") {
+      const n = 8, half = WORLD * 0.38, ph = R() < 0.5 ? 0 : Math.PI;
+      for (let i = 0; i < n; i++) { const t = i / (n - 1); cps.push(rot(-half + 2 * half * t, Math.sin(t * Math.PI * 2.5 + ph) * 1500 * amp * (i && i < n - 1 ? 1 : 0.4))); }
+    } else if (shape === "loop") {
+      const half = WORLD * 0.38, r = 1250 * Math.min(1.4, amp), side = R() < 0.5 ? 1 : -1;
+      cps.push(rot(-half, -600 * side), rot(-half * 0.55, 500 * side), rot(-r * 1.1, 0));
+      // the curl: once around a circle beside the road
+      for (let k = 1; k <= 7; k++) { const a = -Math.PI / 2 + k / 8 * TAU; cps.push(rot(Math.cos(a) * r, side * (r + Math.sin(a) * r))); }
+      cps.push(rot(r * 1.1, 0), rot(half * 0.55, -500 * side * amp), rot(half, 600 * side));
+    } else if (shape === "maze") {
+      const runs = 4, w = WORLD * 0.36 * Math.min(1.25, amp), h = WORLD * 0.62, dir0 = R() < 0.5 ? 1 : -1;
+      for (let k = 0; k < runs; k++) {
+        const v = -h / 2 + k / (runs - 1) * h, d = (k % 2 ? -1 : 1) * dir0;
+        cps.push(rot(-w * d, v), rot(-w * 0.3 * d, v + (R() - 0.5) * 120), rot(w * 0.35 * d, v + (R() - 0.5) * 120), rot(w * d, v));
       }
+    } else {   // spiral
+      const turns = 0.85 * amp, r0 = WORLD * 0.42, r1 = ARENA_R + 900, n = 20, spin = R() < 0.5 ? 1 : -1;
+      for (let i = 0; i < n; i++) { const t = i / (n - 1), r = r0 + (r1 - r0) * Math.pow(t, 0.8); cps.push(rot(Math.cos(spin * t * turns * TAU) * r, Math.sin(spin * t * turns * TAU) * r)); }
+    }
+    return cps.map(([x, y]) => [clamp(x, 450, WORLD - 450), clamp(y, 450, WORLD - 450)]);
+  }
+  function genPath(L, R) {
+    const seed = R() * 1e9;
+    let amp = 1, best = null;
+    for (let tries = 0; tries < 14; tries++) {
+      const cps = pathCps(L.path || "river", mulberry(seed), amp), n = cps.length;
       const raw = [];
       for (let i = 0; i < n - 1; i++) {
         const p0 = cps[Math.max(0, i - 1)], p1 = cps[i], p2 = cps[i + 1], p3 = cps[Math.min(n - 1, i + 2)];
@@ -546,7 +569,7 @@
         acc += seg;
       }
       best = { x: xs, y: ys, n: xs.length, len: (xs.length - 1) * STEP, cps };
-      if (best.len > 21000) amp *= 0.85; else if (best.len < 17500) amp *= 1.15; else break;
+      if (best.len > 21000) amp *= 0.88; else if (best.len < 17500) amp *= 1.12; else break;
     }
     return best;
   }
@@ -1040,11 +1063,16 @@
       fireBolt(a, S);
       if (i === 0 && !P.moving) setFace(P, Math.cos(a), Math.sin(a));
     }
+    // Mochi's gift: half the time one more heart flies out, a little off to the side
+    if (hero === "g" && Math.random() < 0.5) {
+      const t = T[Math.floor(Math.random() * T.length)];
+      fireBolt(Math.atan2(t.y - P.y, t.x - P.x) + (Math.random() < 0.5 ? -1 : 1) * 0.12, S);
+    }
     play("zap");
   }
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
-  const WAND = { g: [[42, 30], [55, 21], [63, 19], [64, 10], [45, 10]], s: [[64, 18], [74, 7], [83, 7], [75, 9], [40, 0]] };
+  const WAND = { g: [[70, -16], [89, -30], [106, -33], [101, -47], [74, -47]], s: [[104, -29], [119, -45], [131, -45], [124, -42], [40, 0]] };
   function wandTip(hk, face, flip) { const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip ? -1 : 1), w[1]]; }
   function fireBolt(a, S) {
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
