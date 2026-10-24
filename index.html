@@ -2930,7 +2930,7 @@
     const msg = $("coopMsg"), box = $("coopBtns"); box.innerHTML = "";
     const btn = (txt, fn, ghost) => { const b = document.createElement("button"); b.className = "btn" + (ghost ? " ghost" : ""); b.textContent = txt; b.addEventListener("click", fn); box.append(b); };
     // the room-code steps carry their own cancel / back button
-    $("coopBack").hidden = NET.state === "p2p" && ["connecting", "joining", "hosting", "join"].includes(NET.stage);
+    $("coopBack").style.display = NET.state === "p2p" && ["connecting", "joining", "hosting", "join"].includes(NET.stage) ? "none" : "";
     if (NET.state === "wait") { msg.textContent = "Đang kết nối…"; return; }
     if (NET.state === "p2p") return renderP2p(msg, box, btn);
     if (NET.state === "none") { msg.textContent = "Chơi 2 người chỉ chạy khi mở game trên trang claude.ai. Hãy mở cùng đường link này trên cả hai iPad."; return; }
