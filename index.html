@@ -1341,6 +1341,8 @@
   // kb: knock-back push (from the shooter's level). A light hit only nudges; it never stops a monster's lunge or resets its attack.
   function damageMon(m, dmg, fx, fy, dot, by, kb = 60) {
     if (!m.alive) return;
+    // alone at last (Jinu down), Gwi Ma is weaker: double damage
+    if (m.c.gwima && G.cine && !G.mons.some((o) => o.alive && o.c.name)) dmg *= 2;
     if (m.shield) { m.flash = 0.06; if (!dot && Math.random() < 0.3) burst(fx, fy - 120, 4, ["#ff6ec7", "#fff"], 160, 0.3); return; }
     m.hp -= dmg; m.flash = 0.12;
     if (m.hp <= 0) return killMon(m, true, by);
@@ -1867,7 +1869,7 @@
         if ((c.shoutT = (c.shoutT ?? 9) - dt) <= 0) {
           c.shoutT = rnd(13, 17); gwimaShout();
           if (NET.role) netEmit("shout", { to: NET.partner });
-          const n = Math.max(0, Math.min(c.wave === 2 ? 4 : 3, 6 - G.mons.filter((m) => m.alive && m.kind === "saja_minion").length));
+          const alone = c.wave === 2 && !stageMons().length, n = Math.max(0, Math.min(alone ? 2 : c.wave === 2 ? 4 : 3, (alone ? 3 : 6) - G.mons.filter((m) => m.alive && m.kind === "saja_minion").length));
           for (let i = 0; i < n; i++) setTimeout(() => {
             if (!G.cine || G.cine.ph !== "fight") return;
             const side = i % 2 ? 1 : -1, m = spawnMon("saja_minion", A.x + side * rnd(300, 950), A.y - 820);
@@ -2057,6 +2059,8 @@
   // ---- Gwi Ma
   function updateGwima(m, dt) {
     if (m.shield || (G.cine && G.cine.lock)) { m.st = "walk"; return; }
+    // alone at last, he comes forward onto the main stage
+    if (!G.mons.some((o) => o.alive && o.c.name)) m.y += (G.arena.y - 820 - m.y) * Math.min(1, dt * 0.8);
     const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
     if (m.st === "walk" || m.st === "rest") { if (m.cd <= 0) { m.st = "prep"; m.t = 0; m.cyc = (m.cyc || 0) + 1; } }
     else if (m.st === "prep") {
