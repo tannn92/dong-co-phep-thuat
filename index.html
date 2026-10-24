@@ -2574,8 +2574,13 @@
     const list = () => Object.freeze([...peers.values()]);
     const fire = (ch) => setTimeout(() => ph.forEach((h) => h({ peers: list(), joined: [], left: [], updated: [], ...ch })), 0);
     const send = (m) => { if (conn && conn.open) try { conn.send(m); } catch (e) {} };
+    let remote = null;   // the joining side remembers the host, to dial again if the link drops
     function wire(c) {
-      if (conn && conn !== c) { c.on("open", () => c.close()); return; }   // one partner per room
+      // one partner per room; the same partner dialling again replaces its old (maybe half-dead) link
+      if (conn && conn !== c) {
+        if (c.peer !== conn.peer) { c.on("open", () => c.close()); return; }
+        const old = conn; conn = null; try { old.close(); } catch (e) {}
+      }
       conn = c;
       c.on("open", () => { send({ k: "pres", presence: mine }); onState("open"); });
       c.on("data", (m) => {
@@ -2586,8 +2591,21 @@
         } else if (m.k === "emit" && typeof m.topic === "string")
           (th[m.topic] || []).forEach((h) => h({ topic: m.topic, data: m.data, peer: c.peer, by: null, isMe: false, sameTab: false, kind: "viewer", guest: false }));
       });
-      const gone = () => { if (conn !== c) return; conn = null; const pp = peers.get(c.peer); peers.delete(c.peer); if (pp) fire({ left: [pp] }); onState("closed"); };
+      const gone = () => {
+        if (conn !== c) return;
+        conn = null; const pp = peers.get(c.peer); peers.delete(c.peer); if (pp) fire({ left: [pp] }); onState("closed");
+        if (remote && !closed) redial();
+      };
       c.on("close", gone); c.on("error", gone);
+    }
+    function redial() {
+      setTimeout(() => {
+        if (closed || conn) return;
+        try { if (peer.disconnected) peer.reconnect(); } catch (e) {}
+        try { wire(peer.connect(remote, { reliable: true, serialization: "json" })); } catch (e) { redial(); return; }
+        // still not open a few seconds later: try again
+        setTimeout(() => { if (!closed && conn && !conn.open) { const c = conn; conn = null; try { c.close(); } catch (e) {} redial(); } }, 4000);
+      }, 1200);
     }
     await new Promise((res, rej) => {
       peer.on("open", (id) => { myId = id; peers.set(id, snap(id, mine)); res(); });
@@ -2595,7 +2613,7 @@
     });
     peer.on("disconnected", () => { if (!closed) try { peer.reconnect(); } catch (e) {} });
     if (hosting) peer.on("connection", wire);
-    else wire(peer.connect(P2P_PREFIX + code, { reliable: true, serialization: "json" }));
+    else { remote = P2P_PREFIX + code; wire(peer.connect(remote, { reliable: true, serialization: "json" })); }
     return {
       async emit(topic, data) { send({ k: "emit", topic, data }); },
       on(topic, h) { (th[topic] = th[topic] || []).push(h); return () => {}; },
@@ -2607,6 +2625,7 @@
       onPeers(h) { ph.push(h); fire({ joined: list() }); return () => {}; },
       connected: () => !!(conn && conn.open),
       destroy() { closed = true; try { peer.destroy(); } catch (e) {} },
+      _drop() { if (conn) conn.close(); },   // for testing a dropped link
     };
   }
   function p2pClose() {
@@ -2718,12 +2737,15 @@
     // the partner is gone if they left the room or stopped playing with us
     const pc = NET.pp && NET.pp.co;
     const linked = pc && (pc.with === NET.me || (pc.role === "join" && pc.host === NET.me));
+    // (generous: an iPad can stall for a few seconds, and a dropped room-code link dials itself again)
     NET.goneT = linked ? 0 : NET.goneT + dt;
-    if (NET.goneT > 4) return partnerLeft();
+    if (NET.goneT > (pc ? 6 : 15)) return partnerLeft(!pc);
     // a link that died silently (e.g. the iPad changed network) stops the partner's heartbeat
     const hb = NET.pp && NET.pp.hb;
     if (hb !== NET.lastHb) { NET.lastHb = hb; NET.quietT = 0; } else NET.quietT = (NET.quietT || 0) + dt;
-    if (NET.quietT > 4) { NET.quietT = 0; return partnerLeft(true); }
+    const lost = Math.max(NET.quietT, pc ? 0 : NET.goneT);
+    if (lost > 2.5 && Math.floor(lost) !== Math.floor(lost - dt)) showBanner("Đang chờ bạn kia…", "Mạng chậm, chờ chút nhé");
+    if (NET.quietT > 15) { NET.quietT = 0; return partnerLeft(true); }
     if (NET.role === "host" && pc && pc.role === "join" && (NET.startT -= dt) <= 0) sendStart();
     if ((NET.sendT -= dt) > 0) return;
     NET.sendT = 1 / 20;
@@ -2942,7 +2964,11 @@
     msg.textContent = NET.stage === "error" ? NET.err : "Hai iPad cần có mạng, tốt nhất cùng một wifi. Một bé bấm “Mở phòng”, bé kia bấm “Vào phòng” rồi nhập mã.";
     btn("Mở phòng", p2pHost); btn("Vào phòng", () => { NET.stage = "join"; NET.err = ""; renderCoop(); }, true);
   }
-  $("coopBtn").addEventListener("click", () => { initAudio(); openWardrobe(() => { $("coopScreen").hidden = false; renderCoop(); }); });
+  $("coopBtn").addEventListener("click", () => {
+    initAudio();
+    const go = () => { $("titleScreen").hidden = true; $("coopScreen").hidden = false; renderCoop(); };
+    if (OUTFITS_ON) openWardrobe(go); else go();
+  });
   $("coopBack").addEventListener("click", () => {
     if (NET.co && !NET.role) setCo(null);
     if (NET.state === "p2p" && !NET.role) { p2pClose(); NET.stage = null; NET.err = ""; } $("coopScreen").hidden = true; $("titleScreen").hidden = false; });
@@ -2965,8 +2991,8 @@
       else if (G.mode === "win") { G.t += dt; G.frame++; updateParts(dt); if (Math.random() < 0.3) burst(G.camX + rnd(0, VW), G.camY + rnd(200, VH * 0.6), 12, ["#ffd34d", "#ff9ad5", "#b9a4ff", "#7cf2c6"], 300, 1); }
       render();
       if (music && AC) music.tick();
-      netTick(dt);
     } catch (err) { console.error(err); }
+    try { netTick(dt); } catch (err) { console.error(err); }
   }
   requestAnimationFrame(loop);
 
