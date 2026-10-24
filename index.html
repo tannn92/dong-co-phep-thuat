@@ -485,13 +485,15 @@
     ghost:    { hp: 2, en: 7,  spd: 95,  reach: 380, prep: 0.5, atk: 0.55, cd: 1.3, fly: true, hgt: 110 },
     bat:      { hp: 1, en: 5,  spd: 150, reach: 460, prep: 0.35, atk: 0.6, cd: 1.5, fly: true, hgt: 170 },
     // the Saja Boys as demons (level 5): saja = fighting style, see updateSaja. heavy: barely knocked back
-    saja_mystery: { hp: 26, en: 20, spd: 150, prep: 0.5, atk: 0.4, cd: 2.6, saja: "phase", heavy: true, name: "Mystery" },
-    saja_abby:    { hp: 32, en: 20, spd: 120, prep: 0.7, atk: 0.45, cd: 3.0, saja: "slam", heavy: true, name: "Abby" },
-    saja_jinu:    { hp: 36, en: 20, spd: 140, prep: 0.55, atk: 0.4, cd: 2.4, saja: "blink", heavy: true, name: "Jinu" },
-    saja_baby:    { hp: 22, en: 20, spd: 190, prep: 0.35, atk: 0.35, cd: 2.4, saja: "dash", heavy: true, name: "Baby" },
-    saja_romance: { hp: 26, en: 20, spd: 140, prep: 0.6, atk: 0.4, cd: 3.0, saja: "hearts", heavy: true, name: "Romance" },
+    saja_mystery: { hp: 22, en: 20, spd: 150, prep: 0.5, atk: 0.4, cd: 2.6, saja: "phase", heavy: true, name: "Mystery" },
+    saja_abby:    { hp: 26, en: 20, spd: 120, prep: 0.7, atk: 0.45, cd: 3.0, saja: "slam", heavy: true, name: "Abby" },
+    saja_jinu:    { hp: 30, en: 20, spd: 140, prep: 0.55, atk: 0.4, cd: 2.4, saja: "blink", heavy: true, name: "Jinu" },
+    saja_baby:    { hp: 18, en: 20, spd: 190, prep: 0.35, atk: 0.35, cd: 2.4, saja: "dash", heavy: true, name: "Baby" },
+    saja_romance: { hp: 22, en: 20, spd: 140, prep: 0.6, atk: 0.4, cd: 3.0, saja: "hearts", heavy: true, name: "Romance" },
     // Gwi Ma: the flame-toad demon king, shielded until the five are down
-    gwima:        { hp: 135, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
+    // Gwi Ma's summoned demons (level 5): plain fighters, swept away by an ultimate
+    saja_minion:  { hp: 7, en: 8, spd: 125, prep: 0.5, atk: 0.35, cd: 1.6, saja: "claw" },
+    gwima:        { hp: 118, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true },
   };
   const SAJA = ["saja_mystery", "saja_abby", "saja_jinu", "saja_baby", "saja_romance"];
   // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows. While one is held the auto-attack also fires faster.
@@ -1092,7 +1094,7 @@
   // keeps a girl inside the world, out of a sealed arena, and inside the arena during the boss fight
   function fence(o) {
     const A = G.arena;
-    if (A && G.lvl && G.lvl.stage && G.cine) { inStage(o, 60); return; }
+    if (A && G.lvl && G.lvl.stage && G.cine) { inStage(o, 60, true); return; }
     if (A) {
       const dx = o.x - A.x, dy = o.y - A.y, d = Math.hypot(dx, dy) || 1;
       if (G.arenaLock && d > A.r - 60) { o.x = A.x + dx / d * (A.r - 60); o.y = A.y + dy / d * (A.r - 60); }
@@ -1120,13 +1122,15 @@
     };
   }
   // up to n nearest monsters (and the boss) within range r
+  // a Saja demon waiting backstage for its turn: not a target, bolts fly past it
+  const offStage = (m) => m.c.saja && m.shield;
   function nearestFoes(x, y, r, n) {
     const out = [], ds = [], rr = r * r;
     const add = (o, d) => {
       let i = out.length; while (i > 0 && ds[i - 1] > d) i--;
       if (i >= n) return; out.splice(i, 0, o); ds.splice(i, 0, d); if (out.length > n) { out.pop(); ds.pop(); }
     };
-    for (const m of G.mons) { if (!m.alive) continue; const d = d2(x, y, m.x, m.y); if (d < rr) add(m, d); }
+    for (const m of G.mons) { if (!m.alive || offStage(m)) continue; const d = d2(x, y, m.x, m.y); if (d < rr) add(m, d); }
     const B = G.boss; if (B && B.alive && B.st !== "enter") { const d = d2(x, y, B.x, B.y) - 120 * 120; if (d < rr) add(B, d); }
     return out;
   }
@@ -1178,7 +1182,7 @@
       }
       for (const m of G.mons) {
         if (s.life <= 0) break;
-        if (!m.alive || (s.hit && s.hit.has(m.id))) continue;
+        if (!m.alive || offStage(m) || (s.hit && s.hit.has(m.id))) continue;
         const rr = s.r + m.r; if (d2(s.x, s.y, m.x, m.y) > rr * rr) continue;
         hitMon(m, s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
         if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
@@ -1728,12 +1732,12 @@
     let cx, cy;
     if (D.style === "sweep") {
       cx = p.x + p.ux * 120; cy = p.y + p.uy * 90;
-      for (const m of G.mons) if (m.alive && d2(m.x, m.y, cx, cy) < 300 * 300) hitIt(m);
+      for (const m of G.mons) if (m.alive && !offStage(m) && d2(m.x, m.y, cx, cy) < 300 * 300) hitIt(m);
       if (B && B.alive && d2(B.x, B.y, cx, cy) < 420 * 420) hitIt(B);
     } else {
       cx = p.ax0; cy = p.ay0; const ex = p.ax0 + p.ux * 520, ey = p.ay0 + p.uy * 380;
       const segD = (m) => { const vx = ex - cx, vy = ey - cy, l2 = vx * vx + vy * vy, t = clamp(((m.x - cx) * vx + (m.y - cy) * vy) / l2, 0, 1); return Math.hypot(m.x - cx - vx * t, m.y - cy - vy * t); };
-      for (const m of G.mons) if (m.alive && segD(m) < 130) hitIt(m);
+      for (const m of G.mons) if (m.alive && !offStage(m) && segD(m) < 130) hitIt(m);
       if (B && B.alive && segD(B) < 240) hitIt(B);
     }
     const rot = Math.atan2(p.uy, p.ux);
@@ -1785,10 +1789,21 @@
   const WAVES = [["saja_mystery", "saja_romance"], ["saja_abby", "saja_baby"], ["saja_jinu"]];
   const WAVE_MSG = [["Mystery và Romance ra trận!", "Hai quỷ đầu tiên"], ["Abby và Baby ra trận!", "Thêm hai quỷ nữa"], ["Jinu và Gwi Ma!", "Trận cuối cùng, cố lên!"]];
   const SR = { x0: -1750, x1: 1750, y0: -1250, y1: 1150 };   // the walkable stage area, relative to the arena centre
-  const SAJA_RANGE = { blink: 900, slam: 260, phase: 900, hearts: 820, dash: 700 };
+  const SAJA_RANGE = { blink: 900, slam: 260, phase: 900, hearts: 820, dash: 700, claw: 170 };
+  // backstage: two roped-off wings beside the main stage where the demons wait their turn (the girls cannot go in)
+  const BACKSTAGE = [{ x0: -1730, x1: -1060, y0: -1240, y1: -790 }, { x0: 1060, x1: 1730, y0: -1240, y1: -790 }];
+  const BACK_HOME = { saja_abby: [-1530, -930], saja_baby: [-1260, -930], saja_jinu: [1400, -930] };
   const BOY_Y = -880, GWIMA_Y = -1010;
-  function inStage(o, pad) {
+  function inStage(o, pad, keepOut) {
     const A = G.arena; o.x = clamp(o.x, A.x + SR.x0 + pad, A.x + SR.x1 - pad); o.y = clamp(o.y, A.y + SR.y0 + pad, A.y + SR.y1 - pad);
+    if (keepOut) for (const b of BACKSTAGE) {
+      const lx = o.x - A.x, ly = o.y - A.y;
+      if (lx > b.x0 - pad && lx < b.x1 + pad && ly > b.y0 && ly < b.y1 + pad) {
+        // out the nearest open side: the front, or the side next to the main stage
+        const dFront = b.y1 + pad - ly, dSide = b.x0 < 0 ? b.x1 + pad - lx : lx - (b.x0 - pad);
+        if (dFront < dSide) o.y = A.y + b.y1 + pad; else o.x = A.x + (b.x0 < 0 ? b.x1 + pad : b.x0 - pad);
+      }
+    }
   }
   function startStage() {
     const A = G.arena; A.open = true; G.arenaLock = false;
@@ -1806,7 +1821,12 @@
     SFX.portal(); showBanner("Cổng phép mới hiện ra!", "Cả nhóm cùng bước vào nhé");
     burst(A.x, A.y - 60, 50, ["#c08bff", "#ff6ec7", "#fff"], 600, 1.2);
   }
-  const stageMons = () => G.mons.filter((m) => m.alive && m.c.saja);
+  const stageMons = () => G.mons.filter((m) => m.alive && m.c.saja && m.c.name);
+  function gwimaShout() {
+    const g = gwimaMon(); if (!g) return;
+    g.shoutT = 1.6; SFX.roar(); G.shake = Math.max(G.shake, 16);
+    showBanner("Gwi Ma gầm lên!", "Quỷ con kéo tới giúp Saja Boys");
+  }
   const gwimaMon = () => G.mons.find((m) => m.c.gwima);
   // which wave a demon belongs to
   const waveOf = (k) => WAVES.findIndex((w) => w.includes(k));
@@ -1832,11 +1852,28 @@
       if (host && c.t > 7.3 && !c.spawned) {
         c.spawned = true;
         // the demons line up on the main stage; each waits (shielded) for its turn
-        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y + BOY_Y); m.face = 0; m.wait = true; m.shield = true; m.home = [m.x, m.y]; });
+        SAJA.forEach((k, i) => { const m = spawnMon(k, A.x + BOYX[i], A.y + BOY_Y); m.face = 0; m.wait = true; m.shield = true; const h = BACK_HOME[k] || [BOYX[i], BOY_Y]; m.home = [A.x + h[0], A.y + h[1]]; });
       }
       if (host && c.t > 9.6) { c.ph = "fight"; c.t = 0; c.lock = false; startWave(0); }
     } else if (c.ph === "fight") {
       if (host) {
+        // presents falling onto the stage now and then
+        if ((c.dropT = (c.dropT ?? 4) - dt) <= 0) {
+          c.dropT = rnd(4, 7);
+          const x = A.x + rnd(SR.x0 + 250, SR.x1 - 250), y = A.y + rnd(-700, SR.y1 - 200);
+          spawnDrop(x, y); const d = G.drops[G.drops.length - 1]; d.z = 1100; d.vz = 0; d.vx = d.vy = 0;
+        }
+        // Gwi Ma roars and calls his demons out to help
+        if ((c.shoutT = (c.shoutT ?? 9) - dt) <= 0) {
+          c.shoutT = rnd(13, 17); gwimaShout();
+          if (NET.role) netEmit("shout", { to: NET.partner });
+          const n = Math.max(0, Math.min(c.wave === 2 ? 4 : 3, 6 - G.mons.filter((m) => m.alive && m.kind === "saja_minion").length));
+          for (let i = 0; i < n; i++) setTimeout(() => {
+            if (!G.cine || G.cine.ph !== "fight") return;
+            const side = i % 2 ? 1 : -1, m = spawnMon("saja_minion", A.x + side * rnd(300, 950), A.y - 820);
+            m.summoned = true; m.face = 0; burst(m.x, m.y - 150, 26, ["#5b2bd6", "#c08bff", "#3a0d4f"], 360, 0.8);
+          }, 600 + i * 250);
+        }
         const left = stageMons().filter((m) => waveOf(m.kind) === c.wave).length, g = gwimaMon();
         if (c.wave < 2 && !left) startWave(c.wave + 1);
         else if (c.wave === 2 && !left && (!g || !g.alive)) { c.ph = "outro"; c.t = 0; c.lock = true; for (const m of G.mons) if (m.alive) killMon(m, false); }
@@ -1852,7 +1889,7 @@
   // a health bar for each demon (and Gwi Ma) that is fighting right now
   function renderStageBars() {
     const box = $("sbars"), c = G.cine;
-    const list = c && c.ph === "fight" ? G.mons.filter((m) => m.alive && (m.c.saja || m.c.gwima) && !m.wait && !m.shield) : [];
+    const list = c && c.ph === "fight" ? G.mons.filter((m) => m.alive && (m.c.name || m.c.gwima) && !m.shield) : [];
     const key = list.map((m) => m.id).join();
     if (box.dataset.key !== key) {
       box.dataset.key = key; box.innerHTML = "";
@@ -1921,6 +1958,16 @@
     // the silver stage: main stage, runway, catwalk
     const sil = ctx.createLinearGradient(0, Y(-1180), 0, Y(-40)); sil.addColorStop(0, "#c9c4d8"); sil.addColorStop(1, "#8f89a6");
     box(-1000, -1180, 1000, -760, sil, "#efeaff"); box(-120, -770, 120, -220, sil, "#efeaff"); box(-1350, -230, 1350, -60, sil, "#efeaff");
+    // backstage wings, roped off
+    for (const b of BACKSTAGE) {
+      box(b.x0, b.y0, b.x1, b.y1, "rgba(90,20,40,.75)", "rgba(255,90,120,.6)");
+      ctx.strokeStyle = "#d9b36a"; ctx.lineWidth = 6;
+      for (let x = b.x0 + 40; x <= b.x1 - 30; x += 110) {
+        ctx.beginPath(); ctx.moveTo(X(x), Y(b.y1 + 4)); ctx.lineTo(X(x), Y(b.y1 - 46)); ctx.stroke();
+        if (x + 110 <= b.x1 - 30) { ctx.strokeStyle = "#b3122f"; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(X(x), Y(b.y1 - 40)); ctx.quadraticCurveTo(X(x + 55), Y(b.y1 - 10), X(x + 110), Y(b.y1 - 40)); ctx.stroke(); ctx.strokeStyle = "#d9b36a"; ctx.lineWidth = 6; }
+      }
+      ctx.font = "800 46px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,200,210,.5)"; ctx.fillText("HẬU TRƯỜNG", X((b.x0 + b.x1) / 2), Y(b.y0 + 70));
+    }
     // fan zone labels
     ctx.font = "800 60px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "rgba(255,255,255,.35)";
     ctx.fillText("FANZONE A", X(-700), Y(-470)); ctx.fillText("FANZONE B", X(700), Y(-470)); ctx.fillText("STAGE", X(0), Y(-960));
@@ -1997,6 +2044,11 @@
       // Romance: a fan of charm hearts that slow whoever they touch
       for (let i = -2; i <= 2; i++) { const a = Math.atan2(uy, ux) + i * 0.22; G.foes.push({ type: "heart", x: m.x + Math.cos(a) * 60, y: m.y + Math.sin(a) * 40, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, life: 2.0 }); }
       play("web");
+    } else if (c.saja === "claw") {
+      // a summoned demon: one big claw swipe
+      G.parts.push({ type: "claw", x: m.x + ux * 90, y: m.y + uy * 60 - 60, vx: 0, vy: 0, rot: Math.atan2(uy, ux), life: 0.3, max: 0.3 });
+      for (const g of girls()) if (d2(m.x + ux * 80, m.y + uy * 60, g.x, g.y) < 160 * 160) hurtTarget(g, m.x, m.y);
+      SFX.swoosh();
     } else if (c.saja === "dash") {
       // Baby: three quick dashes in a row
       m.vx = ux * 1150; m.vy = uy * 1150; play("swoosh");
@@ -2025,6 +2077,7 @@
     if (!m.alive) return "gwima_d1_w2";
     if (c && c.ph === "intro") return c.t > 4.8 && c.t < 7.4 ? "gwima_d0_w2" : c.t > 2.4 && c.t < 4.8 ? "gwima_d0_w1" : "gwima_d0_w0";
     if (m.hurt > 0 || m.flash > 0.08 && !m.shield) return "gwima_d1_w0";
+    if (m.shoutT > 0) return "gwima_d0_w3";
     if (m.st === "prep") return "gwima_d0_w2";
     if (m.st === "atk") return m.cyc % 3 === 1 ? "gwima_d1_w1" : "gwima_d0_w3";
     return Math.floor(G.t * 1.2) % 4 === 0 ? "gwima_d0_w1" : "gwima_d0_w0";
@@ -2035,6 +2088,7 @@
     shadow(m.x, m.y, 260, 50, 0.35 * a);
     spr(f, m.x, m.y + bob, false, 1, a);
     if (m.flash > 0) sprFlash(f, m.x, m.y + bob, false, 1, 0.5);
+    if ((m.shoutT = (m.shoutT || 0) - 1 / 60) > 0) { label("GRÀOOO!", m.x, m.y - 760 + Math.sin(G.t * 30) * 8, 110, "#ff3d7f"); glow(m.x, m.y - 420, 600, "255,40,90", 0.4 * Math.min(1, m.shoutT)); }
     if (G.cine && G.cine.ph === "intro" && G.cine.t > 2.5 && G.cine.t < 4.8) label("Ha ha ha!", m.x + 260, m.y - 600 + Math.sin(G.t * 12) * 10, 80, "#ff6ec7");
     if (m.shield && !(G.cine && G.cine.ph === "intro")) {
       ctx.save(); ctx.globalCompositeOperation = "lighter";
@@ -2171,7 +2225,7 @@
     // the stage demons and Gwi Ma lose a tenth of their health (half on a combo) instead of dying at once
     const all = mult > 1;
     for (const m of G.mons) {
-      if (!m.alive || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
+      if (!m.alive || offStage(m) || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
       if (m.c.heavy) damageMon(m, Math.ceil(m.max * 0.1 * mult), m.x, m.y, true, "p");
       else killMon(m, false);
     }
@@ -2536,7 +2590,7 @@
     if (m.alive && m.burn > 0) drawFlames(m.x, cy, m.r * 2.4, fly ? 170 : 170, m.ph);
     if (m.flash > 0) sprFlash(f, m.x, y, flip, mul, 0.6, rot);
     if (m.kind === "witch" && m.st === "prep" && m.alive) glow(m.x + (flip ? -50 : 50), y - 60, 50, "130,255,90", 0.5);
-    if (m.c.saja && m.alive) label(m.c.name, m.x, m.y - f.ay * f.s * mul - 40, 30, "#ffb3e6");
+    if (m.c.name && m.alive) label(m.c.name, m.x, m.y - f.ay * f.s * mul - 40, 30, "#ffb3e6");
     // health pips once hurt
     if (m.alive && m.hp < m.max && !m.c.heavy) {
       const top = (fly ? y - f.ay * f.s * mul : m.y - f.ay * f.s * mul) - 16, n = Math.min(m.max, 12), w = 13, filled = Math.ceil(m.hp / m.max * n);
@@ -3260,7 +3314,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -3445,6 +3499,7 @@
       } else if (msg.topic === "gain") addEnergy(clamp(num(d.n), 0, 30), num(d.x), num(d.y));
       else if (msg.topic === "xp") { gainXp(clamp(Math.floor(num(d.n)), 0, 200)); play("gem"); }
       else if (msg.topic === "combo") comboUlt(false);
+      else if (msg.topic === "shout") gwimaShout();
       else if (msg.topic === "pet" && PETS[d.k] && (PETS[d.k].owner === hero || isAlly(d.k))) rescuePet(d.k);
     }
   }
