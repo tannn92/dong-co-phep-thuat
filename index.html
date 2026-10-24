@@ -446,8 +446,8 @@
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
   // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
   const PETS = {
-    cat: { name: "Cafe", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 1.0, range: 560, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
-    dog: { name: "Coca", owner: "g", at: 0.38, rgb: "200,130,90", col: "#c98a5e", cd: 1.3, range: 520, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
+    cat: { name: "Cafe", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 0.8, range: 600, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
+    dog: { name: "Coca", owner: "g", at: 0.38, rgb: "200,130,90", col: "#c98a5e", cd: 1.0, range: 600, bite: true, tip: "Coca sẽ lao tới cắn quái, làm chúng lùi lại và chậm đi" },
   };
   const petDmg = (lv) => 3 + Math.floor(lv * 0.8);
   let hero = "g";
@@ -1072,7 +1072,7 @@
   }
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
-  const WAND = { g: [[70, -16], [89, -30], [106, -33], [101, -47], [74, -47]], s: [[104, -29], [119, -45], [131, -45], [124, -42], [40, 0]] };
+  const WAND = { g: [[109, -13], [117, -21], [118, -21], [118, -23], [100, -49]], s: [[109, -44], [126, -45], [128, -50], [117, -55], [102, -93]] };
   function wandTip(hk, face, flip) { const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip ? -1 : 1), w[1]]; }
   function fireBolt(a, S) {
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
@@ -1542,7 +1542,8 @@
   // ---------------------------------------------------------------- pets
   // st: "follow" trails the girl; "pounce" runs at a monster near her; "atk" plays the attack (Cafe's claw swipe,
   // Coca's bite) and lands the hit halfway through; then she follows again
-  const PET_ATK = 0.42;   // attack animation length (s)
+  // attack: leap onto the monster (0-LEAP), a flurry of swipes or bites with a hit each (LEAP-COMBO), a back-flip home
+  const PET_ATK = 1.25, PET_LEAP = 0.2, PET_COMBO = 0.95, PET_HITS = 3;
   let PETE = [], QPETE = [];
   function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow", at: -1 })); }
   function followPets(list, owner, dt, act) {
@@ -1552,15 +1553,30 @@
         const T = p.tgt, B = G.boss, dead = !T || (T === B ? !B || !B.alive : !T.alive);
         if (p.st === "pounce" && (dead || d2(p.x, p.y, owner.x, owner.y) > 900 * 900)) { p.st = "follow"; p.cd = 0.4; }
         else if (p.st === "atk") {
-          // the blow lands halfway through the animation
-          if (!p.hit && p.at >= PET_ATK * 0.5) { p.hit = true; if (!dead) petStrike(p, T); }
-          if (p.at < 0) { p.st = "follow"; p.cd = PETS[p.kind].cd; }
+          const t = p.at < 0 ? PET_ATK : p.at;
+          if (!dead) { const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1; p.ux = dx / d; p.uy = dy / d; }
+          if (t < PET_LEAP && !dead) {
+            // leap: close the gap to the monster
+            const k = t / PET_LEAP, tx = T.x - p.ux * 55, ty = T.y - p.uy * 40;
+            p.x = p.ax0 + (tx - p.ax0) * k; p.y = p.ay0 + (ty - p.ay0) * k;
+          } else if (t < PET_COMBO) {
+            // the flurry: clinging on, a hit at evenly spaced moments
+            if (!dead) { p.x = T.x - p.ux * 55; p.y = T.y - p.uy * 40; }
+            const hitN = Math.min(PET_HITS, Math.floor((t - PET_LEAP) / ((PET_COMBO - PET_LEAP) / PET_HITS)) + 1);
+            while ((p.hits || 0) < hitN) { p.hits = (p.hits || 0) + 1; if (!dead) petStrike(p, T, PET_HITS); }
+          } else {
+            // back-flip: spring back toward the girl
+            const k = (t - PET_COMBO) / (PET_ATK - PET_COMBO);
+            if (!p.bx0) { p.bx0 = p.x; p.by0 = p.y; }
+            p.x = p.bx0 - (p.ux || 0) * 170 * k; p.y = p.by0 - (p.uy || 0) * 120 * k;
+          }
+          if (p.at < 0) { p.st = "follow"; p.cd = PETS[p.kind].cd; p.bx0 = 0; }
           continue;
         } else {
-          const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1, reach = T === B ? 150 : T.r + 45;
+          const dx = T.x - p.x, dy = T.y - p.y, d = Math.hypot(dx, dy) || 1, reach = T === B ? 260 : T.r + 230;   // leaps the last stretch
           setFace(p, dx, dy);
           if (d > reach) { const sp = Math.min(d - reach + 1, 950 * dt); p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; p.moving = true; continue; }
-          p.moving = false; p.st = "atk"; p.at = 0; p.hit = false;
+          p.moving = false; p.st = "atk"; p.at = 0; p.hits = 0; p.ax0 = p.x; p.ay0 = p.y; p.bx0 = 0;
           if (NET.role && NET.fq.length < 10) NET.fq.push(["a", p.i, p.face + (p.flip ? 8 : 0)]);
           continue;
         }
@@ -1580,13 +1596,13 @@
     }
   }
   // the hit itself: Cafe's claws hurt more; Coca's bite also knocks the monster back and slows it
-  function petStrike(p, T) {
-    const D = PETS[p.kind], B = G.boss, dx = T.x - p.x, dy = T.y - p.y, rot = Math.atan2(dy, dx);
-    const cx = p.x + dx * 0.6, cy = p.y + dy * 0.6;
+  function petStrike(p, T, parts = 1) {
+    const D = PETS[p.kind], B = G.boss, dx = T.x - p.x, dy = T.y - p.y, rot = Math.atan2(dy, dx) + rnd(-0.6, 0.6);
+    const cx = p.x + dx * 0.7 + rnd(-30, 30), cy = p.y + dy * 0.7 + rnd(-40, 20);
     if (T === B) hitBoss(D.bite ? "ice" : null, T.x, T.y);
     else {
       if (D.bite && NET.role !== "guest" && T.st === "prep") T.st = "walk";   // a bite breaks a wind-up
-      hitMon(T, D.bite ? Math.ceil(petDmg(P.lv) * 0.7) : petDmg(P.lv), D.bite ? "ice" : null, p.x, p.y, D.bite ? 260 + 10 * P.lv : 90);
+      hitMon(T, Math.max(1, Math.round((D.bite ? petDmg(P.lv) * 0.7 : petDmg(P.lv)) * 1.6 / parts)), D.bite ? "ice" : null, p.x, p.y, D.bite ? (260 + 10 * P.lv) / parts : 40);
     }
     petHitFx(p.kind, cx, cy, rot);
     if (NET.role && NET.fq.length < 10) NET.fq.push(["h", p.i, cx | 0, cy | 0, Math.round(rot * 100)]);
@@ -1791,6 +1807,8 @@
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
     updateParts(dt);
+    // the ultimate also charges by itself, a point at a time (full in about 40 s without any kills)
+    if (!G.ult && G.energy < 100 && (G.enAcc = (G.enAcc || 0) + dt * 2.5) >= 1) { G.enAcc -= 1; addEnergy(1); }
     $("bUlt").classList.toggle("off", G.energy < 100);
     if (G.frame % 6 === 0) { updateQuest(); drawMini(); }
   }
@@ -2075,21 +2093,26 @@
   function dust(x, y, n) {
     for (let k = 0; k < n; k++) G.parts.push({ type: "dust", x: x + rnd(-24, 24), y: y + rnd(-4, 6), vx: rnd(-50, 50), vy: rnd(-30, -5), life: 0.42, max: 0.42, r: rnd(10, 16) });
   }
+  // the side-view poses (hurt, resting, win, ultimate) are slimmer than the chibi 8-direction art: scaled up so
+  // she looks the same size (ratio of body areas, measured from the atlas)
+  const SIDE_K = { g: 1.36, s: 1.17 };
+  const sideK = (hk, fn) => (/_d\d_/.test(fn) ? 1 : SIDE_K[hk] || 1);
   function drawHeroSprite(hk, fn, x, y, z, flip, alpha, ultT, step) {
+    const M = CHAR_M * sideK(hk, typeof fn === "string" ? fn : "");
     if (ultT > 0) {
       // the ultimate: she floats up and spins in light
       const spin = ultT > 0.25 && ultT < 1.7 ? (ultT - 0.25) * 9 : 0, sx = Math.cos(spin), lt = ss(0.05, 0.4, ultT) * (1 - ss(1.9, 2.4, ultT));
       shadow(x, y, 46, 12, 0.25);
       glow(x, y - z - 100, 260, hk === "s" ? "170,255,170" : "255,200,236", 0.55 * lt);
       ctx.save(); ctx.translate(x, y - z); ctx.scale(Math.abs(sx) < 0.08 ? 0.08 * Math.sign(sx || 1) : sx, 1);
-      spr(fn, 0, 0, flip, CHAR_M, 1 - lt); spr(hk + "_light", 0, 0, flip, CHAR_M, lt);
+      spr(fn, 0, 0, flip, M, 1 - lt); spr(hk + "_light", 0, 0, flip, M, lt);
       ctx.restore(); return;
     }
     const [lift, rock, sq] = step || [0, 0, 1];
     shadow(x, y, 44 - lift * 0.6, 12, 0.3);
     let sy = sq;
     if (/_stand$|_d\d_s$/.test(fn)) sy = 1 + Math.sin(G.t * 2.6) * 0.008;
-    spr(fn, x, y - z - lift, flip, CHAR_M, alpha, rock, sy);
+    spr(fn, x, y - z - lift, flip, M, alpha, rock, sy);
   }
   function drawHero() {
     if (G.mode === "title") return;
@@ -2126,10 +2149,21 @@
       const ph = p.dist / 150 * TAU, hop = p.moving ? Math.abs(Math.sin(ph)) * 5 : 0, sc = CHAR_M * (p.sc || 1);
       shadow(p.x, p.y, 34, 10);
       if (p.at >= 0) {
-        // attack: the attack sheet if there is one, else a hop forward on the walk frame
-        const apre = `pet_${p.kind}_atk_d${p.face}_w`, an = dirN(apre), k = clamp(p.at / PET_ATK, 0, 0.999);
-        if (an) spr(apre + Math.floor(k * an), p.x, p.y, p.flip, sc);
-        else spr(pre + "0", p.x, p.y - Math.sin(k * Math.PI) * 26, p.flip, sc);
+        const t = p.at, apre = `pet_${p.kind}_atk_d${p.face}_w`, an = dirN(apre);
+        let fn = an ? apre + "1" : pre + "0", lift = 0, rot = 0;
+        if (t < PET_LEAP) { const k = t / PET_LEAP; lift = Math.sin(k * Math.PI) * 70; fn = an ? apre + "0" : fn; }
+        else if (t < PET_COMBO) {
+          // swipe after swipe: cycle the raise / strike frames, with a little shake
+          const c = (t - PET_LEAP) / (PET_COMBO - PET_LEAP) * PET_HITS, f = c % 1;
+          fn = an ? apre + (f < 0.45 ? 1 : 2) : fn; lift = 10 + Math.abs(Math.sin(c * Math.PI)) * 14;
+          rot = Math.sin(c * TAU * 2) * 0.08;
+        } else {
+          // back-flip home: a full turn in the air
+          const k = (t - PET_COMBO) / (PET_ATK - PET_COMBO); lift = Math.sin(k * Math.PI) * 80; rot = k * TAU * (p.flip ? 1 : -1);
+          fn = an ? apre + "3" : fn;
+        }
+        if (rot) { ctx.save(); ctx.translate(p.x, p.y - lift - 50); ctx.rotate(rot); spr(fn, 0, 50, p.flip, sc); ctx.restore(); }
+        else spr(fn, p.x, p.y - lift, p.flip, sc);
         return;
       }
       spr(pre + (p.moving ? Math.floor(p.dist / 150 * n) % n : 0), p.x, p.y - hop, p.flip, sc);
