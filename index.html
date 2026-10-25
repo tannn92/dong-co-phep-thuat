@@ -97,6 +97,15 @@
   #banner.show { opacity: 1; transform: scale(1); }
 
   /* Screens */
+  #quizH { font: 700 calc(2.4 * var(--u)) Grandstander, system-ui; color: #ffe9a6; text-align: center; }
+  #quiz { position: fixed; top: calc(15 * var(--u)); left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: calc(2.4 * var(--u));
+    padding: calc(1.4 * var(--u)) calc(3.6 * var(--u)); border-radius: 999px; background: rgba(28,16,48,.86); border: 3px solid #ffd34d; box-shadow: 0 0 30px rgba(255,211,77,.45); pointer-events: none; }
+  #quizQ { font: 800 calc(7 * var(--u)) Grandstander, system-ui; color: #fff; letter-spacing: .03em; text-shadow: 0 3px 0 rgba(0,0,0,.4); }
+  #quizRing { --k: 1; width: calc(8 * var(--u)); height: calc(8 * var(--u)); border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(#ffd34d calc(var(--k) * 360deg), rgba(255,255,255,.15) 0); }
+  #quizRing span { width: 78%; height: 78%; border-radius: 50%; display: grid; place-items: center; background: #2a1a44; font: 800 calc(4.2 * var(--u)) Grandstander, system-ui; color: #ffd34d; }
+  #quiz.hurry #quizRing { background: conic-gradient(#ff5a5a calc(var(--k) * 360deg), rgba(255,255,255,.15) 0); animation: verPulse .5s ease-in-out infinite alternate; }
+  #quiz.hurry #quizRing span { color: #ff8a8a; }
   .ver { position: absolute; top: max(1.2vh, env(safe-area-inset-top)); right: max(1.5vw, env(safe-area-inset-right)); display: flex; gap: .8em; justify-content: center; align-items: center; font-size: .78em; opacity: .85; }
   .ver button { font: inherit; font-weight: 700; color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35); border-radius: 99px; padding: .35em 1em; }
   .ver button.new { background: #ff5a9d; border-color: #ffd1e6; opacity: 1; animation: verPulse 1s ease-in-out infinite alternate; }
@@ -173,6 +182,7 @@
 </div>
 
 <div id="banner"></div>
+<div id="quiz" hidden><div><div id="quizQ"></div><div id="quizH">Chạy tới ô có đáp án đúng!</div></div><div id="quizRing"><span id="quizS"></span></div></div>
 
 <div class="screen" id="titleScreen">
   <div class="card">
@@ -259,7 +269,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.1643", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261025.1709", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -494,22 +504,22 @@
   // spawn: monsters per second at start / after the 5-minute ramp. camps: monster camps waiting beside the path.
   // gr: ground palette. deco: [sprite, weight] scattered beside the path. pets: caged friends to rescue along the path (PETS[k].at).
   const LEVELS = [
-    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", arena: true, boss: { art: "mboss_d0", name: "Bù Nhìn Khổng Lồ", hp: 30, tip: "Cây cào xé đất thành đường nứt nổ tung!", summon: "bat", style: "furrow" }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
+    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", arena: true, boss: { art: "mboss_d0", name: "Bù Nhìn Khổng Lồ", hp: 30, tip: "Cây cào xé đất thành đường nứt nổ tung!", summon: "bat", style: "furrow", quiz: { op: "+", lim: 10, T: 7, n: [2, 3], hz: "qk_bomb" } }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
       kinds: [["zombie", 3, 0], ["bat", 2, 0], ["skeleton", 2, 0.15], ["ghost", 2, 0.35]],
       deco: [["tree", 3], ["bush", 4], ["mushrooms", 1], ["pumpkin2", 1], ["pumpkin3", 1]],
       gr: { base: "#679c4a", patch: ["#84b75c", "#558a3e", "#76a94f"], blade: ["#93c96a", "#4f8a3a", "#a6d77a"], dot: ["#ffd3f0", "#fff3b0", "#ffffff", "#ff9ec7", "#c9b6ff"], nDot: 70,
         stone: ["#e3d4b4", "#d8c7a3", "#cdb995"], gap: "#9c8a6c", edge: "#6f5d44" } },
-    { name: "Màn 2: Rừng Ma", seed: 2207, path: "bends", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa nhảy vồ và phun tơ!", summon: "spider", style: "spider" }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
+    { name: "Màn 2: Rừng Ma", seed: 2207, path: "bends", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa nhảy vồ và phun tơ!", summon: "spider", style: "spider", quiz: { op: "-", lim: 10, T: 7, n: [2, 4], hz: "hz_spike" } }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
       kinds: [["spider", 3, 0], ["ghost", 2, 0], ["bat", 2, 0.1], ["mummy", 2, 0.3]],
       deco: [["tree", 4], ["mushrooms", 4], ["bush", 2], ["pumpkin3", 1]],
       gr: { base: "#3f5340", patch: ["#536b4a", "#2f3f34", "#4d4466", "#45405c"], blade: ["#5f7d55", "#2c3a2e", "#6b5f86"], dot: ["#b9a4ff", "#7cf2c6", "#e0b8ff"], nDot: 45,
         stone: ["#a3a69a", "#959a8c", "#8a9180"], gap: "#5a5e55", edge: "#2a302c" } },
-    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", arena: true, boss: { art: "mboss_d2", name: "Hiệp Sĩ Xương", hp: 50, tip: "Hiệp sĩ lao tới rồi chém đất nứt chữ thập!", summon: "skeleton", style: "knight" }, quota: 160, spawn: [0.8, 1.8], camps: 11, pets: ["mira"],
+    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", arena: true, boss: { art: "mboss_d2", name: "Hiệp Sĩ Xương", hp: 50, tip: "Hiệp sĩ lao tới rồi chém đất nứt chữ thập!", summon: "skeleton", style: "knight", quiz: { op: "+", lim: 20, T: 15, n: [3, 4], hz: "hz_sword" } }, quota: 160, spawn: [0.8, 1.8], camps: 11, pets: ["mira"],
       kinds: [["skeleton", 3, 0], ["bat", 2, 0], ["mummy", 2, 0.1], ["witch", 1, 0.25], ["vampire", 1, 0.45]],
       deco: [["grave1", 3], ["grave2", 3], ["tree", 1], ["pumpkin3", 1], ["pumpkin1", 1]],
       gr: { base: "#4f4a5a", patch: ["#5d5768", "#423d4c", "#5a5a4a", "#5b4a5e"], blade: ["#6a6577", "#3d3846", "#6e6a52"], dot: ["#d8d0e8", "#ff9ab8"], nDot: 30,
         stone: ["#bdb5bf", "#aea5b2", "#a39aa8"], gap: "#6e6578", edge: "#35303d" } },
-    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true, boss: { art: "boss", name: "Vua Bí Ngô", hp: 70, tip: "Coi chừng bom bí ngô và đất nổ!", summon: "bat", style: "king" }, pets: ["rumi"],
+    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true, boss: { art: "boss", name: "Vua Bí Ngô", hp: 70, tip: "Coi chừng bom bí ngô và đất nổ!", summon: "bat", style: "king", quiz: { op: "-", lim: 20, T: 15, n: [3, 4], hz: "hz_meteor" } }, pets: ["rumi"],
       kinds: [["skeleton", 2, 0], ["bat", 2, 0], ["mummy", 2, 0.05], ["witch", 2, 0.15], ["vampire", 2, 0.3]],
       deco: [["pumpkin1", 3], ["pumpkin2", 3], ["pumpkin3", 2], ["grave2", 1], ["bush", 1]],
       gr: { base: "#5a5660", patch: ["#66616d", "#4b4852", "#55604f"], blade: ["#6d6977", "#46424d"], dot: ["#f6c453"], nDot: 12, tiles: true,
@@ -888,7 +898,7 @@
     }
     // reset the play state
     G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = [];
-    G.boss = null; G.ult = null; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
+    G.boss = null; G.ult = null; G.quiz = null; $("quiz").hidden = true; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
     chunkCache.clear(); miniBase = null;
     $("lvlName").textContent = L.name;
     respawnHero();
@@ -1073,6 +1083,7 @@
   function autopilot() {
     const B = G.boss;
     let tx, ty, dx, dy, d;
+    if (G.quiz && G.arena) { const [qx, qy] = quadCentre(G.quiz.ok); dx = qx - P.x; dy = qy - P.y; d = Math.hypot(dx, dy); return d < 40 ? [0, 0] : [dx / d, dy / d]; }
     if (B && B.alive && B.st !== "enter") {
       dx = B.x - P.x; dy = B.y - P.y; d = Math.hypot(dx, dy) || 1;
       const w = d > 560 ? 1 : d < 400 ? -1 : 0;
@@ -1138,6 +1149,7 @@
   const rescuing = () => !!(Q && NET.role && !Q.dead && d2(Q.x, Q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
+    for (const e of PETE) e.faintT = 0;
     P.dead = false; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
     burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 40, vr: 1400, life: 0.6, max: 0.6, col: "255,236,170" });
@@ -1215,7 +1227,7 @@
       if (i >= n) return; out.splice(i, 0, o); ds.splice(i, 0, d); if (out.length > n) { out.pop(); ds.pop(); }
     };
     for (const m of G.mons) { if (!m.alive || offStage(m)) continue; const d = d2(x, y, m.x, m.y); if (d < rr) add(m, d); }
-    const B = G.boss; if (B && B.alive && B.st !== "enter") { const d = d2(x, y, B.x, B.y) - 120 * 120; if (d < rr) add(B, d); }
+    const B = G.boss; if (B && B.alive && B.st !== "enter" && B.st !== "quiz") { const d = d2(x, y, B.x, B.y) - 120 * 120; if (d < rr) add(B, d); }
     return out;
   }
   function autoFire() {
@@ -1736,6 +1748,9 @@
     }
   }
   const rsEase = (t) => t * t * (3 - 2 * t);
+  // the quiz: the camera pulls back so the whole arena and its four answers fit on screen
+  let qzK = 0;
+  const quizZoom = () => 1 - 0.3 * rsEase(qzK);
   const rescueZoom = () => { const r = G.rescue; if (!r) return 1; const k = Math.min(rsEase(clamp(r.t / 0.7, 0, 1)), 1 - rsEase(clamp((r.t - (RS_END - 0.6)) / 0.6, 0, 1))); return 1 + 0.55 * k; };
   // drawn over the scene: her, her ultimate, her thanks
   function drawRescue() {
@@ -1814,6 +1829,8 @@
   function followPets(list, owner, dt, act) {
     for (const p of list) {
       if (G.cine && G.cine.ph === "outro") { p.moving = false; p.at = -1; p.st = "follow"; continue; }   // lined up for the cheer
+      if (p.faintT > 0) { p.faintT -= dt; p.moving = false; p.at = -1; p.st = "follow"; continue; }
+      if (G.quiz && (p.st === "pounce" || p.st === "atk")) { p.st = "follow"; p.at = -1; }
       if (p.at >= 0) { p.at += dt; if (p.at > petAtkLen(p.kind)) p.at = -1; }
       if (act && (p.st === "pounce" || p.st === "atk") && PETS[p.kind].style) {
         // Mira and Rumi: dash in, one big blow at ALLY_HIT, recover
@@ -1871,11 +1888,12 @@
         }
       }
       // trail behind the girl, one on each side
-      const side = p.i % 2 ? 1 : -1, back = 120 + Math.floor(p.i / 2) * 60;
-      const fx = owner.flip ? 1 : -1, tx = owner.x + fx * back * 0.8 + side * 30, ty = owner.y + side * 70;
+      // (during a quiz they keep close, so they end up on her square)
+      const qz = !!G.quiz, side = p.i % 2 ? 1 : -1, back = qz ? 60 + Math.floor(p.i / 2) * 30 : 120 + Math.floor(p.i / 2) * 60;
+      const fx = owner.flip ? 1 : -1, tx = owner.x + fx * back * 0.8 + side * (qz ? 20 : 30), ty = owner.y + side * (qz ? 35 : 70);
       const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
       if (d > 1400) { p.x = tx; p.y = ty; continue; }
-      const sp = Math.min(d * 3.2, 560) * dt;
+      const sp = Math.min(d * 3.2, qz ? 900 : 560) * dt;
       if (d > 4) { p.x += dx / d * sp; p.y += dy / d * sp; p.dist += sp; if (sp > 1) setFace(p, dx, dy); }
       p.moving = sp > 40 * dt;
       const D = PETS[p.kind];
@@ -1954,7 +1972,8 @@
       const tx = num(a[0]), ty = num(a[1]), dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy), k = Math.min(1, dt * 14);
       if (d > 900) { p.x = tx; p.y = ty; } else { p.x += dx * k; p.y += dy * k; p.dist += d * k; }
       p.moving = p.at < 0 && d * k > 30 * dt;
-      if (p.at < 0) { const fc = num(a[2]); p.face = clamp(fc & 7, 0, 4); p.flip = fc >= 8; }
+      const fc = num(a[2]); p.faintT = fc & 16 ? 1 : 0;
+      if (p.at < 0) { p.face = clamp(fc & 7, 0, 4); p.flip = !!(fc & 8); }
     });
   }
 
@@ -2401,6 +2420,8 @@
     const BD = G.lvl.boss;
     $("bossName").textContent = BD.name;
     G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp: BD.hp, max: BD.hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
+    // the maths quizzes: 2-4 of them (per level), each when his health falls to the next mark
+    if (BD.quiz) { const [a, b] = BD.quiz.n, n = a + Math.floor(Math.random() * (b - a + 1)); G.boss.quizHp = Array.from({ length: n }, (_, i) => Math.round(BD.hp * (1 - (i + 1) / (n + 1)))); }
     for (const m of G.mons) if (m.alive) killMon(m, false);
     $("bossbar").hidden = false; updateBossBar();
     SFX.roar(); showBanner(BD.name + "!", BD.tip);
@@ -2412,6 +2433,7 @@
     B.t += dt; B.flash -= dt; B.hurtPose -= dt; B.iT -= dt;
     if (!B.alive) { B.die += dt; if (B.die > 2.4 && G.mode === "play" && !G.won && !G.portal) { if (LEVELS[G.level + 1]) openFinalPortal(); else winGame(); } return; }
     const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.hp < B.max / 2, A = G.arena;
+    if (B.st === "quiz") return updateQuiz(B, dt);
     if (B.st === "enter") {
       B.dropY = Math.min(0, B.dropY + 1800 * dt);
       if (B.dropY >= 0 && B.t > 0.5) { if (!B.landed) { B.landed = true; SFX.slam(); G.shake = 20; dust(B.x, B.y, 20); } if (B.t > 1.2) { B.st = "walk"; B.t = 0; } }
@@ -2444,6 +2466,146 @@
     if (ad > A.r - 150) { B.x = A.x + ax * (A.r - 150); B.y = A.y + ay * (A.r - 150); }
     // body contact
     if (!(B.jz > 60)) for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 120 * 120) hurtTarget(g, B.x, B.y);
+  }
+  // ---------------------------------------------------------------- the boss's maths quiz
+  // He leaps out of sight and a fence closes the arena; a sum shows with a countdown and the floor splits into four
+  // squares, each with an answer. When time is up, bombs / spikes / swords / fireballs (by level) rain on the wrong
+  // squares: a girl or a friend standing there faints at once. Then he drops back in and the fight goes on.
+  const QZ_UP = 1.0, QZ_DROP = 1.5, QZ_HIT = 0.7, QZ_DOWN = 1.1, QPH = ["up", "ask", "drop", "down"];
+  function makeSum(cfg) {
+    let a, b, r;
+    if (cfg.op === "+") {
+      if (cfg.lim <= 10) { r = 2 + Math.floor(Math.random() * 9); a = 1 + Math.floor(Math.random() * (r - 1)); }
+      else { r = 11 + Math.floor(Math.random() * 10); a = Math.max(r - 10, 2) + Math.floor(Math.random() * (Math.min(10, r - 2) - Math.max(r - 10, 2) + 1)); }
+      b = r - a;
+    } else {
+      if (cfg.lim <= 10) { a = 3 + Math.floor(Math.random() * 8); b = 1 + Math.floor(Math.random() * (a - 1)); }
+      else { a = 11 + Math.floor(Math.random() * 10); b = 2 + Math.floor(Math.random() * 8); if (a - b > 10 && Math.random() < 0.6) b = a - 2 - Math.floor(Math.random() * 8); }
+      r = a - b;
+    }
+    // three wrong answers close to the right one
+    const ans = [r], near = [1, -1, 2, -2, 3, -3, 4].sort(() => Math.random() - 0.5);
+    for (const d of near) { const v = r + d; if (ans.length < 4 && v >= 0 && v <= cfg.lim && !ans.includes(v)) ans.push(v); }
+    for (let v = 0; ans.length < 4; v++) if (!ans.includes(v)) ans.push(v);
+    ans.sort(() => Math.random() - 0.5);
+    return { a, b, op: cfg.op, ans, ok: ans.indexOf(r) };
+  }
+  function startQuiz(B) {
+    const cfg = G.lvl.boss.quiz;
+    B.st = "quiz"; B.t = 0; B.jz = 0;
+    G.quiz = { ph: "up", t: 0, T: cfg.T, hz: cfg.hz, ...makeSum(cfg), drops: [], hit: false, lastSec: -1 };
+    for (const m of G.mons) if (m.alive) killMon(m, false);
+    G.quakes = []; G.foes = [];
+    SFX.roar(); G.shake = 14; dust(B.x, B.y, 20);
+    showBanner("Câu đố của " + G.lvl.boss.name + "!", "");
+  }
+  const quadOf = (x, y) => { const A = G.arena; return (x >= A.x ? 1 : 0) + (y >= A.y ? 2 : 0); };
+  const quadCentre = (i) => { const A = G.arena, k = A.r * 0.44; return [A.x + (i & 1 ? k : -k), A.y + (i & 2 ? k : -k)]; };
+  function updateQuiz(B, dt) {
+    const z = G.quiz; if (!z) { B.st = "rest"; B.t = 0; return; }
+    z.t += dt; quizLocal(dt);
+    const A = G.arena;
+    if (z.ph === "up") { B.jz = 1400 * Math.pow(clamp(z.t / QZ_UP, 0, 1), 1.6); if (z.t >= QZ_UP) { z.ph = "ask"; z.t = 0; } }
+    else if (z.ph === "ask") { if (z.t >= z.T) { z.ph = "drop"; z.t = 0; } }
+    else if (z.ph === "drop") { if (z.t >= QZ_DROP) { z.ph = "down"; z.t = 0; B.x = A.x; B.y = A.y - 60; } }
+    else if (z.ph === "down") {
+      const k = clamp(z.t / QZ_DOWN, 0, 1); B.jz = 1400 * (1 - k * k);
+      if (k >= 1) { B.jz = 0; G.quiz = null; B.st = "rest"; B.t = 0; SFX.slam(); G.shake = 20; dust(B.x, B.y, 24); addQuake(B.x, B.y, 200, 0).nohurt = true; }
+    }
+  }
+  // what each page does for itself: the ticking, the rain on the wrong squares, fainting its own girl and friends
+  function quizLocal(dt) {
+    const z = G.quiz; if (!z) return;
+    if (z.ph === "ask") {
+      const sec = Math.ceil(z.T - z.t);
+      if (sec !== z.lastSec) { z.lastSec = sec; if (sec <= 3 && sec > 0) sample("bell", 0.7); }
+    }
+    if (z.ph === "drop" && !z.drops.length) {
+      const A = G.arena;
+      for (let i = 0; i < 4; i++) if (i !== z.ok) for (let k = 0; k < 6; k++) {
+        const [cx, cy] = quadCentre(i), x = cx + rnd(-A.r * 0.28, A.r * 0.28), y = cy + rnd(-A.r * 0.28, A.r * 0.28);
+        if (d2(x, y, A.x, A.y) < (A.r - 90) ** 2) z.drops.push({ x, y, d: rnd(0, 0.25) });
+      }
+    }
+    if (z.ph === "drop" && !z.hit && z.t >= QZ_HIT) {
+      z.hit = true; SFX.boom(); G.shake = 28;
+      for (const d of z.drops) addQuake(d.x, d.y, 150, 0).nohurt = true;
+      // anyone on a wrong square faints on the spot
+      if (!P.dead && quadOf(P.x, P.y) !== z.ok) { P.inv = 0; heroDown(); }
+      else if (!P.dead) { floatText(P.x, P.y - 300, "Đúng rồi!"); G.stars += 3; updateHud(); SFX.level && SFX.level(); burst(P.x, P.y - 160, 40, ["#ffd34d", "#7cf2c6", "#fff"], 520, 1); }
+      for (const e of PETE) if (quadOf(e.x, e.y) !== z.ok) { e.faintT = FAINT_T; e.at = -1; e.st = "follow"; }
+    }
+    updateQuizHud();
+  }
+  function updateQuizHud() {
+    const z = G.quiz, el = $("quiz");
+    if (!z || z.ph === "up" || z.ph === "down" || G.mode !== "play") { if (!el.hidden) el.hidden = true; return; }
+    el.hidden = false;
+    const q = `${z.a} ${z.op === "+" ? "+" : "−"} ${z.b} = ?`, sec = z.ph === "ask" ? Math.max(0, Math.ceil(z.T - z.t)) : 0;
+    if (el.dataset.q !== q) { el.dataset.q = q; $("quizQ").textContent = q; }
+    if (el.dataset.s !== String(sec)) { el.dataset.s = String(sec); $("quizS").textContent = sec; el.classList.toggle("hurry", sec <= 3); }
+    $("quizRing").style.setProperty("--k", z.ph === "ask" ? clamp(1 - z.t / z.T, 0, 1) : 0);
+  }
+  // the floor: four squares split by glowing lines, the answers painted big, the wrong ones scorched after the rain
+  function drawQuizFloor() {
+    const z = G.quiz, A = G.arena; if (!z || !A || z.ph === "up" || z.ph === "down") return;
+    const k = z.ph === "ask" ? clamp(z.t / 0.4, 0, 1) : 1, mine = quadOf(P.x, P.y), after = z.ph === "drop" && z.hit;
+    ctx.save(); ctx.beginPath(); ctx.arc(A.x, A.y, A.r - 10, 0, TAU); ctx.clip();
+    for (let i = 0; i < 4; i++) {
+      const x0 = i & 1 ? A.x : A.x - A.r, y0 = i & 2 ? A.y : A.y - A.r;
+      const col = after ? (i === z.ok ? "124,242,198" : "255,60,40") : i === mine ? "255,230,150" : "255,255,255";
+      ctx.globalAlpha = (after ? 0.3 : i === mine ? 0.2 : 0.08) * k; ctx.fillStyle = `rgb(${col})`; ctx.fillRect(x0, y0, A.r, A.r);
+    }
+    ctx.globalAlpha = 0.85 * k; ctx.strokeStyle = "#fff"; ctx.lineWidth = 18; ctx.shadowColor = "rgba(255,230,150,.9)"; ctx.shadowBlur = 24;
+    ctx.beginPath(); ctx.moveTo(A.x - A.r, A.y); ctx.lineTo(A.x + A.r, A.y); ctx.moveTo(A.x, A.y - A.r); ctx.lineTo(A.x, A.y + A.r); ctx.stroke();
+    ctx.restore();
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = quadCentre(i), sz = 230 * (0.6 + 0.4 * k) * (i === mine && !after ? 1 + 0.05 * Math.sin(G.t * 8) : 1);
+      ctx.save(); ctx.globalAlpha = k * (after && i !== z.ok ? 0.45 : 1);
+      ctx.font = `800 ${sz | 0}px Grandstander, system-ui`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = sz * 0.12; ctx.strokeStyle = "rgba(40,20,60,.85)"; ctx.strokeText(z.ans[i], x, y);
+      ctx.fillStyle = after && i === z.ok ? "#7cf2c6" : "#ffe9a6"; ctx.fillText(z.ans[i], x, y);
+      ctx.restore();
+    }
+  }
+  // the rain: each piece falls from the sky onto its spot, landing at QZ_HIT
+  function drawQuizRain() {
+    const z = G.quiz; if (!z || z.ph !== "drop" || z.hit) return;
+    for (const d of z.drops) {
+      const k = clamp((z.t - d.d) / (QZ_HIT - d.d), 0, 1); if (k <= 0) continue;
+      const h = 1300 * (1 - k * k);
+      shadow(d.x, d.y, 30 + 40 * k, 10 + 14 * k, 0.15 + 0.3 * k);
+      glow(d.x, d.y - h - 40, 90, z.hz === "hz_meteor" ? "120,255,110" : z.hz === "hz_spike" ? "190,110,255" : "255,150,60", 0.5);
+      if (!sprW(z.hz, d.x, d.y - h - 60, z.hz === "qk_bomb" ? 140 : 150, 1, z.hz === "qk_bomb" ? G.t * 6 : 0)) sprW("qk_bomb", d.x, d.y - h - 60, 140);
+    }
+  }
+  // the fence round the arena while the quiz runs: rises from the ground, sinks back after
+  function fenceRise() {
+    const z = G.quiz; if (!z) return 0;
+    if (z.ph === "up") return clamp(z.t / QZ_UP, 0, 1);
+    if (z.ph === "down") return 1 - clamp(z.t / QZ_DOWN, 0, 1);
+    return 1;
+  }
+  const FENCE_N = 30;
+  function fencePosts() {
+    const A = G.arena, out = [];
+    for (let i = 0; i < FENCE_N; i++) { const a = i / FENCE_N * TAU; out.push({ x: A.x + Math.cos(a) * (A.r + 40), y: A.y + Math.sin(a) * (A.r + 40), i }); }
+    return out;
+  }
+  function drawFencePost(o) {
+    const k = fenceRise(); if (k <= 0) return;
+    const f = FR["fence_" + (G.level + 1)];
+    if (f) { const m = 210 / (f.h * f.s); spr(f, o.x, o.y, o.i % 2 === 1, m, 1, 0, k); }
+    else { ctx.fillStyle = "#3a2a1a"; ctx.fillRect(o.x - 14, o.y - 200 * k, 28, 200 * k); }
+    if (k < 1 && Math.random() < 0.15) dust(o.x, o.y, 1);
+  }
+  // a friend knocked out: lying down with stars going round
+  function drawPetFaint(p, D) {
+    const fn = D.art ? `${D.art}_d0_w0` : `pet_${p.kind}_d0_w0`, f = FR[fn], sc = CHAR_M * (p.sc || 1);
+    shadow(p.x, p.y, 50, 12);
+    if (f) spr(f, p.x + f.h * f.s * sc * 0.4, p.y - 10, false, sc, 1, -Math.PI / 2);
+    const hx = p.x - (f ? f.h * f.s * sc * 0.1 : 0), hy = p.y - 60;
+    for (let i = 0; i < 3; i++) { const a = G.t * 4 + i * TAU / 3; fx("fx_twinkle", hx + Math.cos(a) * 55, hy - 30 + Math.sin(a) * 18, 0.8, 1, G.t * 6); }
   }
   // each boss winds up its own move (B.move), aimed where the girl stands now
   const BMOVES = ["furrow", "crows", "leap", "spit", "charge", "meteor", "bombs"];
@@ -2509,7 +2671,7 @@
     for (const q of G.quakes) {
       q.t += dt;
       if (!q.done && q.t >= q.w) { q.done = true; quakeBoom(q); }
-      if (hurt && q.done && q.t < q.w + 0.22)
+      if (hurt && !q.nohurt && q.done && q.t < q.w + 0.22)
         for (const g of girls()) { const ex = g.x - q.x, ey = (g.y - q.y) / 0.62; if (ex * ex + ey * ey < q.r * q.r) hurtTarget(g, q.x, q.y); }
     }
     G.quakes = G.quakes.filter((q) => q.t < q.w + 2.2);
@@ -2578,7 +2740,9 @@
     }
   }
   function damageBoss(dmg, x, y, dot, big) {
-    const B = G.boss; if (!B || !B.alive || B.st === "enter") return;
+    const B = G.boss; if (!B || !B.alive || B.st === "enter" || B.st === "quiz") return;
+    // the next quiz mark stops the health there and starts the quiz
+    if (B.quizHp && B.quizHp.length && B.hp - dmg <= B.quizHp[0]) { B.hp = B.quizHp.shift(); updateBossBar(); startQuiz(B); return; }
     // a short guard after each hit so the fight lasts, however fast the bolts fly
     if (!dot && !big) { if (B.iT > 0) { B.flash = 0.06; return; } B.iT = 0.33; }
     B.hp -= dmg; B.flash = 0.12; if (!dot && (B.st === "walk" || B.st === "rest")) B.hurtPose = 0.18;
@@ -2741,7 +2905,7 @@
     updateHero(dt);
     updateUlt(dt);
     if (P.elem) { P.elemT -= dt; if (P.elemT <= 0) { P.elem = null; showBanner("Hết phép đặc biệt"); } updateElemHud(); }
-    netFrame(dt);
+    netFrame(dt); updateQuizHud();
     followPets(PETE, P, dt, !P.dead && !G.ult && !P.winT && !(G.cine && G.cine.lock));
     if (Q && NET.role) { if (QPETE.map((p) => p.kind).join() !== Q.pets.join()) QPETE = Q.pets.map((k, i) => ({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i })); partnerPets(dt); }
     for (const sh of G.pshots) {
@@ -2753,7 +2917,9 @@
     updateShots(dt);
     // camera: follow the girl, a little ahead of where she walks (in a story scene: the stage)
     const ce = G.cine, cc = ce && ce.lock && G.arena ? (ce.focus ? ce.focus : [G.arena.x, G.arena.y - (ce.ph === "intro" ? 1180 : ce.t < OUT_BOOM + 0.4 ? -(ce.gy || G.arena.y + GWIMA_Y) + G.arena.y + 380 : 640)]) : null;
-    const tx = clamp((cc ? cc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((cc ? cc[1] : P.y - 70 + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
+    qzK = clamp(qzK + (G.quiz && G.quiz.ph !== "down" ? dt : -dt) / 0.6, 0, 1);
+    const qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - 40, rsEase(qzK))] : null;
+    const tx = clamp((cc ? cc[0] : qc ? qc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((cc ? cc[1] : qc ? qc[1] : P.y - 70 + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
     updateCine(dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
     G.shake = Math.max(0, G.shake - 40 * dt);
@@ -3034,7 +3200,7 @@
     const B = G.boss, art = (G.lvl.boss && G.lvl.boss.art) || "boss";
     let pose = "stand";
     if (!B.alive) pose = B.die < 0.4 ? "hurt" : "dead";
-    else if (B.st === "prep" || B.st === "dash") pose = "prep";
+    else if (B.st === "prep" || B.st === "dash" || B.st === "quiz") pose = "prep";
     else if (B.st === "leap") pose = B.t < 0.45 ? "prep" : "slam";
     else if (B.st === "slam") pose = B.t < 0.7 ? "slam" : "stand";
     else if (B.hurtPose > 0) pose = "hurt";
@@ -3167,6 +3333,7 @@
   function drawPet(p) {
     const D = PETS[p.kind];
     if (G.rescue && G.rescue.kind === p.kind) return;
+    if (p.faintT > 0) return drawPetFaint(p, D);
     if (!D.art && G.cine && G.cine.ph === "outro") p = { ...p, dist: G.t * 300, moving: true };
     if (D.art && dirN(`${D.art}_d${p.face}_w`)) return drawAlly(p, D);
     const pre = `pet_${p.kind}_d${p.face}_w`, n = dirN(pre);
@@ -3488,9 +3655,10 @@
     const sc = SCALE * DPR, offX = (W - VW * sc) / 2, offY = (H - VH * sc) / 2;
     const shx = G.shake ? rnd(-G.shake, G.shake) : 0, shy = G.shake ? rnd(-G.shake, G.shake) : 0;
     // zoomed in (the rescue scene) around the middle of the view
-    const zm = rescueZoom(), zs = sc * zm;
+    const zm = rescueZoom() * quizZoom(), zs = sc * zm;
     ctx.setTransform(zs, 0, 0, zs, offX + (VW / 2 - (G.camX + VW / 2 - shx) * zm) * sc, offY + (VH / 2 - (G.camY + VH / 2 - shy) * zm) * sc);
-    const L = G.camX, R = G.camX + VW, T = G.camY, B = G.camY + VH;
+    // what is on screen (wider when zoomed out)
+    const hw = VW / 2 / zm, hh = VH / 2 / zm, L = G.camX + VW / 2 - hw, R = G.camX + VW / 2 + hw, T = G.camY + VH / 2 - hh, B = G.camY + VH / 2 + hh;
     // ground chunks (a couple of new ones painted per frame)
     chunkBudget = 2;
     for (let ix = Math.floor(L / CH); ix <= Math.floor(R / CH); ix++) for (let iy = Math.floor(T / CH); iy <= Math.floor(B / CH); iy++) {
@@ -3499,7 +3667,7 @@
       else { ctx.fillStyle = G.lvl.gr.base; ctx.fillRect(ix * CH, iy * CH, CH + CH_PAD, CH + CH_PAD); }
     }
     // flat things
-    drawArena(); drawStage(); drawRings();
+    drawArena(); drawStage(); drawRings(); drawQuizFloor();
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 0);
@@ -3515,6 +3683,7 @@
     if (G.mode !== "title") add(P.y, 2, P);
     if (Q && NET.role && Q.x > L - 200 && Q.x < R + 200 && Q.y > T - 100 && Q.y < B + 300) add(Q.y, 3, Q);
     if (G.boss) add(G.boss.y, 4, G.boss);
+    if (G.quiz && G.arena) for (const o of fencePosts()) if (o.x > L - 200 && o.x < R + 200 && o.y > T - 20 && o.y < B + 300) add(o.y, 10, o);
     for (const c of G.chests) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
     for (const c of G.cages) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 300) add(c.y, 6, c);
     if (G.portal && G.portal.x > L - 250 && G.portal.x < R + 250 && G.portal.y > T - 50 && G.portal.y < B + 400) add(G.portal.y, 7, G.portal);
@@ -3535,6 +3704,7 @@
         case 7: drawPortal(); break;
         case 8: drawPet(o); break;
         case 9: drawCineBoy(o); break;
+        case 10: drawFencePost(o); break;
       }
     }
     // things in the air
@@ -3553,6 +3723,7 @@
     for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc);
     drawGwimaGone();
     drawQuakesAir();
+    drawQuizRain();
     drawRescue();
     drawParts(L, R, T, B);
     drawCineFx(L, T);
@@ -3760,7 +3931,7 @@
   function toTitle() {
     if (NET.role) leaveCoop();
     if (G.mode !== "title" && G.lvl) selLv = G.level;   // back home: the level she was on is picked
-    G.mode = "title"; renderLevels(); renderHeroes();
+    G.mode = "title"; $("quiz").hidden = true; renderLevels(); renderHeroes();
     $("titleScreen").hidden = false; $("hud").hidden = true; $("controls").hidden = true; $("bossbar").hidden = true; $("winScreen").hidden = true;
   }
   // starting straight at a later level gives the girl a head start in experience
@@ -3785,7 +3956,7 @@
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
   const FTYPES = ["fire", "web", "orb", "heart", "webball"];
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back"];
-  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
+  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
   let Q = null;   // the other girl, as last reported in their presence
@@ -4026,7 +4197,7 @@
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0);
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn && P.fn[0]) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, mySkin(), P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0];
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0];
   }
   function worldState() {
     const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
@@ -4037,6 +4208,7 @@
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max, m.jz | 0]),
       b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100)] : 0,
+      qz: G.quiz ? [QPH.indexOf(G.quiz.ph), Math.round(G.quiz.t * 10), G.quiz.T, G.quiz.ok, G.quiz.a, G.quiz.b, G.quiz.op === "+" ? 0 : 1, ...G.quiz.ans] : 0,
       q: G.quakes.map((q) => [q.id, q.x | 0, q.y | 0, q.r | 0, Math.round(q.t * 20), Math.round(q.w * 20), q.k === "bomb" ? 1 : 0, q.sx | 0, q.sy | 0]),
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
@@ -4167,6 +4339,15 @@
       G.cine.lock = !!w.cn[4]; G.cine.spawned = !!w.cn[2]; G.cine.wave = clamp(Math.floor(num(w.cn[3])), -1, 3);
       G.cine.focus = w.cn[5] || w.cn[6] ? [num(w.cn[5]), num(w.cn[6])] : null;
     }
+    // the quiz: the host's question and phase; this page runs the clock between updates and its own rain and fainting
+    if (Array.isArray(w.qz)) {
+      const a = w.qz.map(num), ph = QPH[a[0]] || "ask", t = a[1] / 10;
+      if (!G.quiz || G.quiz.a !== a[4] || G.quiz.b !== a[5]) {
+        G.quiz = { ph, t, T: a[2], ok: clamp(a[3], 0, 3), a: a[4], b: a[5], op: a[6] ? "-" : "+", ans: a.slice(7, 11), drops: [], hit: false, lastSec: -1, hz: (G.lvl.boss && G.lvl.boss.quiz && G.lvl.boss.quiz.hz) || "qk_bomb" };
+        if (ph === "up") showBanner("Câu đố của " + G.lvl.boss.name + "!", "");
+      } else if (G.quiz.ph !== ph) { G.quiz.ph = ph; G.quiz.t = t; }
+      else if (Math.abs(G.quiz.t - t) > 0.5) G.quiz.t = t;
+    } else if (G.quiz && w.qz === 0) G.quiz = null;
     // quakes: new ones join, known ones keep their own clock (it is close enough) so each bursts once here too
     if (Array.isArray(w.q)) {
       const have = new Map(G.quakes.map((q) => [q.id, q]));
@@ -4211,6 +4392,7 @@
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
     }
     updateRings(dt, false); updateQuakes(dt, false);
+    if (G.quiz) { G.quiz.t += dt; quizLocal(dt); } else updateQuizHud();
     for (const c of G.chests) c.t += dt;
     if (G.portal) {
       G.portal.t += dt;
@@ -4311,7 +4493,7 @@
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadPets(); renderHeroes(); },
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
-    heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, startBoss,
+    heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, startBoss, pets: () => PETE,
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     killAll: () => { for (const m of G.mons) if (m.alive) killMon(m, true, "p"); },
     openGate: () => { G.lvKills = Math.max(G.lvKills, G.quota); checkGate(); },
