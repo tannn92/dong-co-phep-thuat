@@ -98,7 +98,7 @@
 
   /* Screens */
   #quizH { font: 700 calc(2.4 * var(--u)) Grandstander, system-ui; color: #ffe9a6; text-align: center; }
-  #quiz { position: fixed; top: calc(15 * var(--u)); left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: calc(2.4 * var(--u));
+  #quiz { position: fixed; top: calc(1.2 * var(--u)); left: 50%; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: calc(2.4 * var(--u));
     padding: calc(1.4 * var(--u)) calc(3.6 * var(--u)); border-radius: 999px; background: rgba(28,16,48,.86); border: 3px solid #ffd34d; box-shadow: 0 0 30px rgba(255,211,77,.45); pointer-events: none; }
   #quizQ { font: 800 calc(7 * var(--u)) Grandstander, system-ui; color: #fff; letter-spacing: .03em; text-shadow: 0 3px 0 rgba(0,0,0,.4); }
   #quizRing { --k: 1; width: calc(8 * var(--u)); height: calc(8 * var(--u)); border-radius: 50%; display: grid; place-items: center;
@@ -269,7 +269,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.1709", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261025.1803", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1233,7 +1233,7 @@
   function autoFire() {
     const S = heroStats(hero, P.lv, P.elem), T = nearestFoes(P.x, P.y, S.range, S.n);
     if (!T.length) { P.shootCd = 0.08; return; }
-    P.shootCd = S.cd; P.castT = 0.3;
+    P.shootCd = S.cd; P.castT = S.cd + 0.25;   // held through steady fire, so the wand does not flick up and down
     const used = new Map();
     for (let i = 0; i < S.n; i++) {
       const t = T[i % T.length], k = used.get(t) || 0; used.set(t, k + 1);
@@ -1253,13 +1253,24 @@
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
   const WAND = { g: [[78, -32], [111, -40], [112, -38], [103, -42], [79, -60]], s: [[85, -51], [140, -49], [155, -50], [120, -60], [40, 0]] };
-  function wandTip(hk, face, flip) { const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip ? -1 : 1), w[1]]; }
+  // the walking-cast drawings (wand in her right hand, so facing left is its own picture, front and back never mirrored)
+  const WAND_WC = { g: { wc: [60, -64], wcL: [-68, -59], d0: [-19, -53], d4: [43, -75] } };
+  function wandTip(hk, face, flip, fn) {
+    const W2 = WAND_WC[hk];
+    if (W2 && fn) {
+      if (fn.includes("_wcL")) return W2.wcL;
+      if (fn.includes("_wc")) return [W2.wc[0] * (flip ? -1 : 1), W2.wc[1]];
+      if (fn.includes("_cast_d0")) return W2.d0;
+      if (fn.includes("_cast_d4")) return W2.d4;
+    }
+    const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip && face !== 0 && face !== 4 ? -1 : 1), w[1]];
+  }
   function fireBolt(a, S) {
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
-    const castShown = P.fn && P.fn[0].includes("_cast_");
-    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.flip) : [Math.cos(a) * 46, Math.sin(a) * 30];
+    const castShown = P.fn && /_cast_|_wc/.test(P.fn[0]);
+    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.fn[1], P.fn[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
     const x = P.x + wx, y = P.y + wy;
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
     G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
@@ -2539,7 +2550,8 @@
   }
   function updateQuizHud() {
     const z = G.quiz, el = $("quiz");
-    if (!z || z.ph === "up" || z.ph === "down" || G.mode !== "play") { if (!el.hidden) el.hidden = true; return; }
+    if (!z || z.ph === "up" || z.ph === "down" || G.mode !== "play") { if (!el.hidden) { el.hidden = true; if (G.boss && G.boss.alive) $("bossbar").hidden = false; } return; }
+    if (el.hidden) $("bossbar").hidden = true;
     el.hidden = false;
     const q = `${z.a} ${z.op === "+" ? "+" : "−"} ${z.b} = ?`, sec = z.ph === "ask" ? Math.max(0, Math.ceil(z.T - z.t)) : 0;
     if (el.dataset.q !== q) { el.dataset.q = q; $("quizQ").textContent = q; }
@@ -2918,7 +2930,7 @@
     // camera: follow the girl, a little ahead of where she walks (in a story scene: the stage)
     const ce = G.cine, cc = ce && ce.lock && G.arena ? (ce.focus ? ce.focus : [G.arena.x, G.arena.y - (ce.ph === "intro" ? 1180 : ce.t < OUT_BOOM + 0.4 ? -(ce.gy || G.arena.y + GWIMA_Y) + G.arena.y + 380 : 640)]) : null;
     qzK = clamp(qzK + (G.quiz && G.quiz.ph !== "down" ? dt : -dt) / 0.6, 0, 1);
-    const qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - 40, rsEase(qzK))] : null;
+    const qc = qzK > 0 && G.arena ? [lerp(P.x, G.arena.x, rsEase(qzK)), lerp(P.y - 70, G.arena.y - 150, rsEase(qzK))] : null;
     const tx = clamp((cc ? cc[0] : qc ? qc[0] : P.x + P.vx * 0.3) - VW / 2, 0, WORLD - VW), ty = clamp((cc ? cc[1] : qc ? qc[1] : P.y - 70 + P.vy * 0.3) - VH / 2, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
     updateCine(dt);
     G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k);
@@ -3098,6 +3110,12 @@
     // walking left, right or diagonally: the original side-view walk cycle (six real steps, legs clearly alternating),
     // mirrored by facing; the 8-direction sheets' legs barely move
     // (the side sheet has one feet-together pose and several strides: step, pass, step, pass, so the legs read as alternating)
+    // casting sideways: the same walk with the wand held out ahead (standing: the feet-together frame of it)
+    // (she is right handed: facing left has its own drawings, so the wand never jumps to her left hand)
+    const side = o.face >= 1 && o.face <= 3, step = [0, 1, 2, 1][Math.floor(o.dist / SIDE_CYCLE * 4) % 4];
+    if (side && o.flip && o.castT > 0 && FR[base + "_wcL0"]) return [base + "_wcL" + (o.moving ? step : 1), false];
+    if (side && o.flip && FR[base + "_walkL0"]) return [base + "_walkL" + (o.moving ? step : 1), false];
+    if (o.castT > 0 && side && FR[base + "_wc0"]) return [base + "_wc" + (o.moving ? step : 1), o.flip];
     if (o.moving && o.face >= 1 && o.face <= 3 && FR[base + "_walk4"]) return [base + "_walk" + SIDE_STEPS[Math.floor(o.dist / SIDE_CYCLE * 4) % 4], o.flip];
     // standing still sideways (not casting): the original standing pose, same proportions as the side walk
     if (!o.moving && !(o.castT > 0) && o.face >= 1 && o.face <= 3 && FR[base + "_stand"]) return [base + "_stand", o.flip];
@@ -3108,9 +3126,11 @@
       if (!n) continue;
       // casting: the same walk with her wand arm pointing ahead (standing: one frame of it)
       const cpre = `${p}_cast_d${o.face}_w`, cn = o.castT > 0 ? dirN(cpre) : 0;
-      if (cn) return [cpre + (o.moving ? Math.floor(o.dist / DIR_CYCLE * cn) % cn : 1 % cn), o.flip];
-      if (o.moving) return [pre + (Math.floor(o.dist / DIR_CYCLE * n) % n), o.flip];
-      return [FR[pre + "s"] ? pre + "s" : pre + "0", o.flip];
+      // toward / away from us: never mirrored (the wand stays in her right hand)
+      const fl = o.face === 0 || o.face === 4 ? false : o.flip;
+      if (cn) return [cpre + (o.moving ? Math.floor(o.dist / DIR_CYCLE * cn) % cn : 1 % cn), fl];
+      if (o.moving) return [pre + (Math.floor(o.dist / DIR_CYCLE * n) % n), fl];
+      return [FR[pre + "s"] ? pre + "s" : pre + "0", fl];
     }
     // side view, mirrored by facing
     const h = sk + "_";
@@ -3262,32 +3282,35 @@
     if (P.elem && !G.ult) glow(P.x, P.y - 100, 150, ELEM[P.elem].rgb, 0.16 + 0.06 * Math.sin(G.t * 5));
     if (P.dead) return drawFainted(hero, P.x, P.y, 1 - clamp(G.reviveT / FAINT_T, 0, 1), P.helped, Q && NET.role ? Q : null);
     drawHeroSprite(hero, G.ult ? fr(mySkin() + "_jump", hero + "_jump") : fn, P.x, P.y, P.z, flip, blink ? 0.45 : 1, G.ult ? G.ult.t : 0, stepPose(P, P.moving && !G.ult ? P.dist : -1));
-    if (P.castT > 0.15 && !G.ult && fn.includes("_cast_")) { const [wx, wy] = wandTip(hero, P.face, flip); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
+    if (P.castT > 0.15 && !G.ult && /_cast_|_wc/.test(fn)) { const [wx, wy] = wandTip(hero, P.face, flip, fn); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
     if (P.slowT > 0) drawWeb(P.x, P.y - 70, 40, Math.min(1, P.slowT));
   }
   // a fainted girl: lying on the ground with stars circling her head, a ring filling up until she wakes;
   // when her friend stands close, sparkles flow from the friend to her and the ring fills five times faster
+  // where her eyes are in her hurt pose (fractions of the frame), for the dizzy swirls
+  const HURT_EYES = { g: [[0.43, 0.219], [0.53, 0.2]], s: [[0.42, 0.285], [0.55, 0.27]] };
   function drawFainted(hk, x, y, k, helped, friend) {
     const f = FR[hk + "_hurt"] || FR[hk + "_stand"]; if (!f) return;
-    const M = CHAR_M * sideK(hk, hk + "_hurt"), h = f.h * f.s * M, head = [x - h * 0.42, y - 34];
+    const M = CHAR_M * sideK(hk, hk + "_hurt"), kk = f.s * M, h = f.h * kk, axw = x + h * 0.5, ayw = y - 10;
     shadow(x, y, h * 0.55, 18, 0.35);
-    spr(f, x + h * 0.5, y - 10, false, M, 1, -Math.PI / 2);
-    // dizzy: stars and swirls going round above her head
-    for (let i = 0; i < 4; i++) {
-      const a = G.t * 4 + i * TAU / 4, sx = head[0] + Math.cos(a) * 85, sy = head[1] - 90 + Math.sin(a) * 28;
-      glow(sx, sy, 40, "255,230,120", 0.6); fx("fx_twinkle", sx, sy, 1.0, 1, G.t * 6);
+    spr(f, axw, ayw, false, M, 1, -Math.PI / 2);
+    // dizzy: a spiral turning on each eye (the frame is turned a quarter left: (dx, dy) -> (dy, -dx))
+    ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.shadowColor = "rgba(60,0,90,.8)"; ctx.shadowBlur = 5;
+    for (const [ex, ey] of HURT_EYES[hk] || HURT_EYES.g) {
+      const dx = (ex * f.w - f.ax) * kk, dy = (ey * f.h - f.ay) * kk, cx = axw + dy, cy = ayw - dx;
+      ctx.beginPath(); for (let t = 0; t < 3 * Math.PI; t += 0.25) { const r = 1 + t * 0.95, a = t - G.t * 9; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.stroke();
     }
-    ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 6;
-    for (const dx of [-20, 20]) { ctx.beginPath(); for (let t = 0; t < 2.8 * Math.PI; t += 0.25) { const r = 3 + t * 3, a = t - G.t * 8; ctx.lineTo(head[0] + dx + Math.cos(a) * r, head[1] - 22 + Math.sin(a) * r); } ctx.stroke(); }
     ctx.restore();
-    // the waking ring
-    ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.5);
-    ctx.lineWidth = 30; ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.beginPath(); ctx.arc(0, 0, h * 0.62, 0, TAU); ctx.stroke();
-    ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = helped ? "rgba(124,242,198,.95)" : "rgba(255,211,77,.9)";
-    ctx.beginPath(); ctx.arc(0, 0, h * 0.62, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke();
+    // the waking clock above her: a ring filling up round the seconds left
+    const left = Math.max(1, Math.ceil((1 - k) * FAINT_T / (helped ? 5 : 1))), rx = x, ry = y - 190, R = 46;
+    ctx.save();
+    ctx.fillStyle = "rgba(28,16,48,.85)"; ctx.beginPath(); ctx.arc(rx, ry, R + 10, 0, TAU); ctx.fill();
+    ctx.lineWidth = 12; ctx.lineCap = "round"; ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.beginPath(); ctx.arc(rx, ry, R, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = helped ? "#7cf2c6" : "#ffd34d"; ctx.beginPath(); ctx.arc(rx, ry, R, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke();
+    ctx.font = "800 52px Grandstander, system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = helped ? "#7cf2c6" : "#fff"; ctx.fillText(left, rx, ry + 3);
     ctx.restore();
     if (helped && friend) {
-      label("Đang cứu!", x, y - h * 0.5 - 60, 40, "#7cf2c6");
+      label("Đang cứu!", x, y - 270, 40, "#7cf2c6");
       if (Math.random() < 0.6 && G.parts.length < 420) { const t = Math.random(); G.parts.push({ type: "dot", x: friend.x + (x - friend.x) * t, y: friend.y - 120 + (y - 60 - friend.y + 120) * t, vx: (x - friend.x) * 1.5, vy: (y - friend.y) * 1.5, life: 0.5, max: 0.5, r: rnd(5, 9), col: "#7cf2c6" }); }
     }
   }
