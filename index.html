@@ -97,6 +97,10 @@
   #banner.show { opacity: 1; transform: scale(1); }
 
   /* Screens */
+  .ver { margin-top: 1.4em; display: flex; gap: .8em; justify-content: center; align-items: center; font-size: .78em; opacity: .85; }
+  .ver button { font: inherit; font-weight: 700; color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35); border-radius: 99px; padding: .35em 1em; }
+  .ver button.new { background: #ff5a9d; border-color: #ffd1e6; opacity: 1; animation: verPulse 1s ease-in-out infinite alternate; }
+  @keyframes verPulse { to { transform: scale(1.08); } }
   .screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 4vh 6vw; background: radial-gradient(90% 90% at 50% 40%, rgba(18,14,38,.45), rgba(18,14,38,.9)); font-size: calc(2.7 * var(--u)); z-index: 5; }
   .card { width: 100%; max-width: 34em; display: grid; gap: 1em; text-align: center; justify-items: center; }
   .card h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 2.9em; line-height: .98; text-wrap: balance; color: var(--cream); text-shadow: 0 5px 0 #5b2d8f, 0 0 34px rgba(255,111,168,.55); }
@@ -180,6 +184,7 @@
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
+    <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
   </div>
 </div>
 
@@ -253,9 +258,36 @@
   const IMG = {}, FR = {};
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+  // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
+  const BUILD_VER = "261025.1614", isBuilt = !BUILD_VER.startsWith("__");
+  async function latestVer() {
+    try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
+  }
+  // a new address makes the iPad fetch the page itself again instead of the stored one
+  const reloadTo = (v) => location.replace(location.pathname + "?v=" + encodeURIComponent(v || Date.now()));
+  function initVersion() {
+    const num = document.getElementById("verNum"), btn = document.getElementById("verBtn");
+    num.textContent = "Bản " + (isBuilt ? BUILD_VER : "thử");
+    let newer = null;
+    const check = async (go) => {
+      btn.textContent = "Đang kiểm tra…";
+      const v = await latestVer();
+      if (v && isBuilt && v !== BUILD_VER) { newer = v; btn.textContent = "Có bản mới " + v + " – bấm để cập nhật"; btn.classList.add("new"); if (go) { btn.textContent = "Đang tải bản mới…"; reloadTo(v); } }
+      else if (v || !isBuilt) btn.textContent = go ? "Đã là bản mới nhất ✓" : "Kiểm tra bản mới";
+      else btn.textContent = go ? "Chưa kiểm tra được, thử lại nhé" : "Kiểm tra bản mới";
+    };
+    btn.addEventListener("click", () => { if (newer) { btn.textContent = "Đang tải bản mới…"; reloadTo(newer); } else check(true); });
+    check(false);
+    // back on the home screen after a while away: look again
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && G.mode === "title") check(false); });
+  }
+  initVersion();
   async function loadAssets() {
-    META = await (await fetch("assets/atlas.json")).json();
-    const sheets = await Promise.all(META.sheets.map((s) => loadImg("assets/" + s)));
+    // the atlas is checked with the server every time; its sheets carry a hash of it so a new pack is never mixed with old pictures
+    const txt = await (await fetch("assets/atlas.json", { cache: "no-cache" })).text();
+    META = JSON.parse(txt);
+    let hv = 0; for (let i = 0; i < txt.length; i += 7) hv = (hv * 31 + txt.charCodeAt(i)) | 0;
+    const sheets = await Promise.all(META.sheets.map((s) => loadImg("assets/" + s + "?v=" + (hv >>> 0).toString(36))));
     for (const [n, f] of Object.entries(META.frames)) FR[n] = { img: sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
     const bgs = await Promise.all([1, 2, 3, 4].map((i) => loadImg(`assets/bg${i}.jpg`)));
     bgs.forEach((b, i) => (IMG["bg" + (i + 1)] = b));
@@ -418,7 +450,7 @@
   }
   async function loadSamples() {
     let meta;
-    try { meta = await (await fetch("assets/sfx/sfx.json?v=music2")).json(); } catch (e) { startMusic(); return; }
+    try { meta = await (await fetch("assets/sfx/sfx.json", { cache: "no-cache" })).json(); } catch (e) { startMusic(); return; }
     const get = async (fn) => AC.decodeAudioData(await (await fetch("assets/sfx/" + fn)).arrayBuffer());
     // music: the loops load as they are needed (see musicTick)
     if (meta._music && typeof meta._music === "object") { musicFiles = meta._music; music = { tick: musicTick }; } else startMusic();
@@ -462,22 +494,22 @@
   // spawn: monsters per second at start / after the 5-minute ramp. camps: monster camps waiting beside the path.
   // gr: ground palette. deco: [sprite, weight] scattered beside the path. pets: caged friends to rescue along the path (PETS[k].at).
   const LEVELS = [
-    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", arena: true, boss: { art: "mboss_d0", name: "Bù Nhìn Khổng Lồ", hp: 30, tip: "Cẩn thận cây cào đập đất!", summon: "bat" }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
+    { name: "Màn 1: Đồng Cỏ Hoàng Hôn", seed: 1101, path: "river", arena: true, boss: { art: "mboss_d0", name: "Bù Nhìn Khổng Lồ", hp: 30, tip: "Cây cào xé đất thành đường nứt nổ tung!", summon: "bat", style: "furrow" }, quota: 120, spawn: [0.7, 1.6], camps: 9, pets: ["cat", "dog"],
       kinds: [["zombie", 3, 0], ["bat", 2, 0], ["skeleton", 2, 0.15], ["ghost", 2, 0.35]],
       deco: [["tree", 3], ["bush", 4], ["mushrooms", 1], ["pumpkin2", 1], ["pumpkin3", 1]],
       gr: { base: "#679c4a", patch: ["#84b75c", "#558a3e", "#76a94f"], blade: ["#93c96a", "#4f8a3a", "#a6d77a"], dot: ["#ffd3f0", "#fff3b0", "#ffffff", "#ff9ec7", "#c9b6ff"], nDot: 70,
         stone: ["#e3d4b4", "#d8c7a3", "#cdb995"], gap: "#9c8a6c", edge: "#6f5d44" } },
-    { name: "Màn 2: Rừng Ma", seed: 2207, path: "loop", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa gọi đàn nhện con!", summon: "spider" }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
+    { name: "Màn 2: Rừng Ma", seed: 2207, path: "loop", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa nhảy vồ và phun tơ!", summon: "spider", style: "spider" }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
       kinds: [["spider", 3, 0], ["ghost", 2, 0], ["bat", 2, 0.1], ["mummy", 2, 0.3]],
       deco: [["tree", 4], ["mushrooms", 4], ["bush", 2], ["pumpkin3", 1]],
       gr: { base: "#3f5340", patch: ["#536b4a", "#2f3f34", "#4d4466", "#45405c"], blade: ["#5f7d55", "#2c3a2e", "#6b5f86"], dot: ["#b9a4ff", "#7cf2c6", "#e0b8ff"], nDot: 45,
         stone: ["#a3a69a", "#959a8c", "#8a9180"], gap: "#5a5e55", edge: "#2a302c" } },
-    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", arena: true, boss: { art: "mboss_d2", name: "Hiệp Sĩ Xương", hp: 50, tip: "Thanh kiếm đập tạo sóng xung kích!", summon: "skeleton" }, quota: 160, spawn: [0.8, 1.8], camps: 11, pets: ["mira"],
+    { name: "Màn 3: Nghĩa Địa Trăng Máu", seed: 3313, path: "maze", arena: true, boss: { art: "mboss_d2", name: "Hiệp Sĩ Xương", hp: 50, tip: "Hiệp sĩ lao tới rồi chém đất nứt chữ thập!", summon: "skeleton", style: "knight" }, quota: 160, spawn: [0.8, 1.8], camps: 11, pets: ["mira"],
       kinds: [["skeleton", 3, 0], ["bat", 2, 0], ["mummy", 2, 0.1], ["witch", 1, 0.25], ["vampire", 1, 0.45]],
       deco: [["grave1", 3], ["grave2", 3], ["tree", 1], ["pumpkin3", 1], ["pumpkin1", 1]],
       gr: { base: "#4f4a5a", patch: ["#5d5768", "#423d4c", "#5a5a4a", "#5b4a5e"], blade: ["#6a6577", "#3d3846", "#6e6a52"], dot: ["#d8d0e8", "#ff9ab8"], nDot: 30,
         stone: ["#bdb5bf", "#aea5b2", "#a39aa8"], gap: "#6e6578", edge: "#35303d" } },
-    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true, boss: { art: "boss", name: "Vua Bí Ngô", hp: 70, tip: "Tránh xa vòng sóng xung kích", summon: "bat" }, pets: ["rumi"],
+    { name: "Màn 4: Lâu Đài Phù Thuỷ", seed: 4421, path: "spiral", quota: 150, spawn: [0.8, 1.8], camps: 10, arena: true, boss: { art: "boss", name: "Vua Bí Ngô", hp: 70, tip: "Coi chừng bom bí ngô và đất nổ!", summon: "bat", style: "king" }, pets: ["rumi"],
       kinds: [["skeleton", 2, 0], ["bat", 2, 0], ["mummy", 2, 0.05], ["witch", 2, 0.15], ["vampire", 2, 0.3]],
       deco: [["pumpkin1", 3], ["pumpkin2", 3], ["pumpkin3", 2], ["grave2", 1], ["bush", 1]],
       gr: { base: "#5a5660", patch: ["#66616d", "#4b4852", "#55604f"], blade: ["#6d6977", "#46424d"], dot: ["#f6c453"], nDot: 12, tiles: true,
@@ -603,7 +635,7 @@
 
   // ---------------------------------------------------------------- game state
   const G = { mode: "title", level: 0, t: 0, lt: 0, frame: 0, stars: 0, hearts: 5, energy: 0, camX: 0, camY: 0, shake: 0, fade: 0, fadeDir: 0, onFade: null,
-    mons: [], parts: [], shots: [], pshots: [], foes: [], items: [], drops: [], gems: [], rings: [], chests: [], cages: [], deco: [], lamps: [],
+    mons: [], parts: [], shots: [], pshots: [], foes: [], items: [], drops: [], gems: [], rings: [], quakes: [], chests: [], cages: [], deco: [], lamps: [],
     portal: null, arena: null, boss: null, ult: null, nextId: 1, lvl: null, kills: 0, lvKills: 0, spawnAcc: 0, surgeT: 30, arenaLock: false, won: false, path: null };
   const P = { x: 0, y: 0, vx: 0, vy: 0, z: 0, face: 0, flip: false, moving: false, dist: 0, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0, dead: false, winT: 0,
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [] };
@@ -840,7 +872,7 @@
       addDeco(d);
     }
     // reset the play state
-    G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = [];
+    G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = [];
     G.boss = null; G.ult = null; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
     chunkCache.clear(); miniBase = null;
     $("lvlName").textContent = L.name;
@@ -1852,7 +1884,7 @@
     const J = m.jump; if (!J) return false;
     J.t += dt; const k = clamp(J.t / J.d, 0, 1);
     m.x = J.x0 + (J.x1 - J.x0) * k; m.y = J.y0 + (J.y1 - J.y0) * k; m.jz = Math.sin(k * Math.PI) * J.h;
-    if (k >= 1) { m.jump = null; m.jz = 0; G.shake = Math.max(G.shake, m.c.gwima ? 30 : 14); SFX.slam(); dust(m.x, m.y, 14); burst(m.x, m.y - 40, 24, ["#c08bff", "#fff", "#3a0d4f"], 420, 0.6); if (m.c.gwima) G.rings.push({ x: m.x, y: m.y, r: 120, sp: 650, life: 1.2, delay: 0 }); }
+    if (k >= 1) { m.jump = null; m.jz = 0; G.shake = Math.max(G.shake, m.c.gwima ? 30 : 14); SFX.slam(); dust(m.x, m.y, 14); burst(m.x, m.y - 40, 24, ["#c08bff", "#fff", "#3a0d4f"], 420, 0.6); if (m.c.gwima) { addQuake(m.x, m.y, 220, 0); for (let i = 0; i < 8; i++) { const a = i * TAU / 8; addQuake(m.x + Math.cos(a) * 380, m.y + Math.sin(a) * 260, 120, 0.3 + (i % 2) * 0.15); } } }
     return true;
   }
   function startStage() {
@@ -2157,8 +2189,8 @@
       SFX.swoosh();
     } else if (c.saja === "slam") {
       // Abby: pounds the stage, a shockwave rolls out
-      G.rings.push({ x: m.x, y: m.y, r: 60, sp: 560, life: 1.3, delay: 0 }); G.shake = Math.max(G.shake, 12); SFX.slam();
-      for (const g of girls()) if (d2(m.x, m.y, g.x, g.y) < 190 * 190) hurtTarget(g, m.x, m.y);
+      addQuake(m.x, m.y, 200, 0); G.shake = Math.max(G.shake, 12);
+      for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + Math.random() * 0.5; addQuake(m.x + Math.cos(a) * 300, m.y + Math.sin(a) * 200, 100, 0.25 + Math.random() * 0.2); }
     } else if (c.saja === "phase") {
       // Mystery: three ghost orbs, then he fades away
       for (let i = -1; i <= 1; i++) { const a = Math.atan2(uy, ux) + i * 0.25; G.foes.push({ type: "orb", x: m.x + Math.cos(a) * 60, y: m.y + Math.sin(a) * 40, vx: Math.cos(a) * 620, vy: Math.sin(a) * 620, life: 2.2 }); }
@@ -2196,7 +2228,7 @@
         m.st = "atk"; m.t = 0;
         const k = m.cyc % 3;
         if (k === 1) { for (let i = -3; i <= 3; i++) { const a = Math.atan2(uy, ux) + i * 0.16; G.foes.push({ type: "fire", x: m.x + Math.cos(a) * 120, y: m.y + 40, vx: Math.cos(a) * 560, vy: Math.sin(a) * 560, life: 2.6 }); } play("fire"); }
-        else if (k === 2) { G.rings.push({ x: m.x, y: m.y, r: 150, sp: 520, life: 1.8, delay: 0 }, { x: m.x, y: m.y, r: 150, sp: 520, life: 1.8, delay: 0.6 }); SFX.slam(); G.shake = 14; }
+        else if (k === 2) { for (const g of girls()) addQuake(g.x, g.y, 160, 1.0); for (let i = 0; i < 5; i++) { const a = Math.random() * TAU; addQuake(m.x + Math.cos(a) * rnd(250, 600), m.y + Math.sin(a) * rnd(160, 380), 130, rnd(0.6, 1.3)); } SFX.slam(); G.shake = 14; }
         else if (G.mons.filter((b) => b.alive && b.kind === "bat").length < 8) {
           for (let i = 0; i < 4; i++) { const a = Math.random() * TAU, b = spawnMon("bat", m.x + Math.cos(a) * 260, m.y + 120 + Math.sin(a) * 140); b.summoned = true; burst(b.x, b.y - b.hgt, 12, ["#ff3d7f", "#fff"], 220, 0.5); }
           SFX.roar();
@@ -2273,29 +2305,149 @@
       if (B.dropY >= 0 && B.t > 0.5) { if (!B.landed) { B.landed = true; SFX.slam(); G.shake = 20; dust(B.x, B.y, 20); } if (B.t > 1.2) { B.st = "walk"; B.t = 0; } }
       return;
     }
+    const style = (G.lvl.boss && G.lvl.boss.style) || "king";
     if (B.st === "walk") {
       if (Math.abs(dx) > 30) B.dir = Math.sign(dx);
       const sp = fast ? 210 : 150;
       if (d > 230) { B.x += dx / d * sp * dt; B.y += dy / d * sp * dt; }
-      if ((d < 380 && B.t > 0.6) || B.t > 3.2) { B.st = "prep"; B.t = 0; B.ix = B.x + B.dir * 150; B.iy = B.y + 10; SFX.roar(); }
+      if ((d < 420 && B.t > 0.6) || B.t > 3.0) bossPrep(B, style, T, dx / d, dy / d, fast);
     } else if (B.st === "prep") {
-      if (B.t > (fast ? 0.75 : 1.05)) { B.st = "slam"; B.t = 0; slam(B, fast); }
+      if (B.t > (fast ? 0.6 : 0.9)) bossAct(B, T, fast);
+    } else if (B.st === "leap") {
+      // the spider queen's pounce: an arc onto the cracking ground she aimed at
+      const k = clamp(B.t / 0.9, 0, 1);
+      B.x = B.lx0 + (B.ix - B.lx0) * k; B.y = B.ly0 + (B.iy - B.ly0) * k; B.jz = Math.sin(Math.PI * k) * 420;
+      if (k >= 1) { B.jz = 0; B.st = "slam"; B.t = 0; G.shake = Math.max(G.shake, 18); dust(B.x, B.y, 18); }
+    } else if (B.st === "dash") {
+      // the bone knight's charge: straight ahead, shield first, until the wall or time is up
+      B.x += B.ax * 980 * dt; B.y += B.ay * 980 * dt; if (Math.random() < 0.6) dust(B.x, B.y, 2);
+      for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 150 * 150) hurtTarget(g, B.x, B.y);
+      if (B.t > 0.85 || Math.hypot(B.x - A.x, B.y - A.y) > A.r - 170) { B.st = "slam"; B.t = 0; crossQuake(B.x, B.y, fast ? 8 : 4); SFX.slam(); G.shake = Math.max(G.shake, 16); }
     } else if (B.st === "slam") {
-      if (B.t < 0.25) for (const g of girls()) if (d2(g.x, g.y, B.ix, B.iy) < 250 * 250) hurtTarget(g, B.ix, B.iy);
-      if (B.t > 0.9) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0) summonBats(B); }
+      if (B.t > 0.9) { B.st = "rest"; B.t = 0; B.cycle++; if (B.cycle % 3 === 0 && style !== "furrow") summonBats(B); }
     } else if (B.st === "rest") {
-      if (B.t > (fast ? 0.7 : 1.1)) { B.st = "walk"; B.t = 0; }
+      if (B.t > (fast ? 0.6 : 1.0)) { B.st = "walk"; B.t = 0; }
     }
     const [ax, ay] = norm(B.x - A.x, B.y - A.y), ad = Math.hypot(B.x - A.x, B.y - A.y);
     if (ad > A.r - 150) { B.x = A.x + ax * (A.r - 150); B.y = A.y + ay * (A.r - 150); }
     // body contact
-    for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 120 * 120) hurtTarget(g, B.x, B.y);
+    if (!(B.jz > 60)) for (const g of girls()) if (d2(g.x, g.y, B.x, B.y) < 120 * 120) hurtTarget(g, B.x, B.y);
   }
-  // the slam sends shockwave rings out across the plaza (two in a row once he is angry)
-  function slam(B, fast) {
-    SFX.slam(); G.shake = 24; dust(B.ix, B.iy, 26);
-    G.rings.push({ x: B.ix, y: B.iy, r: 60, sp: 470, life: 1.7, delay: 0 });
-    if (fast) G.rings.push({ x: B.ix, y: B.iy, r: 60, sp: 470, life: 1.7, delay: 0.5 });
+  // each boss winds up its own move (B.move), aimed where the girl stands now
+  const BMOVES = ["furrow", "crows", "leap", "spit", "charge", "meteor", "bombs"];
+  function bossPrep(B, style, T, ux, uy, fast) {
+    B.st = "prep"; B.t = 0; B.ax = ux; B.ay = uy; SFX.roar();
+    const c = B.cycle;
+    B.move = style === "furrow" ? (c % 3 === 2 ? "crows" : "furrow") : style === "spider" ? (c % 2 ? "spit" : "leap") : style === "knight" ? "charge" : (c % 2 ? "bombs" : "meteor");
+    if (B.move === "leap") {
+      const A = G.arena, [nx, ny] = norm(T.x - A.x, T.y - A.y), r = Math.min(Math.hypot(T.x - A.x, T.y - A.y), A.r - 200);
+      B.ix = A.x + nx * r; B.iy = A.y + ny * r; addQuake(B.ix, B.iy, 210, (fast ? 0.6 : 0.9) + 0.9);
+    }
+  }
+  function bossAct(B, T, fast) {
+    const A = G.arena; B.t = 0; B.st = "slam";
+    if (B.move === "furrow") {
+      // the rake tears a line of cracks along the ground toward her, bursting one after another
+      SFX.slam(); G.shake = Math.max(G.shake, 12);
+      for (const da of fast ? [-0.42, 0, 0.42] : [0]) {
+        const a = Math.atan2(B.ay, B.ax) + da, ux = Math.cos(a), uy = Math.sin(a);
+        for (let i = 0; i < 8; i++) {
+          const x = B.x + ux * (130 + i * 115), y = B.y + uy * (130 + i * 115);
+          if (Math.hypot(x - A.x, y - A.y) > A.r - 60) break;
+          addQuake(x, y, 100, 0.3 + i * 0.11);
+        }
+      }
+    } else if (B.move === "crows") summonBats(B);
+    else if (B.move === "leap") { B.st = "leap"; B.lx0 = B.x; B.ly0 = B.y; if (Math.abs(B.ix - B.x) > 30) B.dir = Math.sign(B.ix - B.x); }
+    else if (B.move === "spit") {
+      const a0 = Math.atan2(T.y - B.y, T.x - B.x), n = fast ? 5 : 3;
+      for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.28; G.foes.push({ type: "webball", x: B.x + Math.cos(a) * 120, y: B.y + Math.sin(a) * 60, vx: Math.cos(a) * 700, vy: Math.sin(a) * 700, life: 1.6 }); }
+      play("web");
+    } else if (B.move === "charge") { B.st = "dash"; SFX.swoosh(); }
+    else if (B.move === "meteor") {
+      // the ground splits open under each girl and around the plaza
+      SFX.slam(); G.shake = Math.max(G.shake, 20);
+      for (const g of girls()) addQuake(g.x, g.y, 150, 1.1);
+      for (let i = 0; i < (fast ? 6 : 3); i++) { const a = Math.random() * TAU, r = Math.sqrt(Math.random()) * (A.r - 220); addQuake(A.x + Math.cos(a) * r, A.y + Math.sin(a) * r * 0.9, 130, rnd(0.8, 1.5)); }
+    } else if (B.move === "bombs") {
+      // flaming pumpkin bombs lobbed at her and around her
+      const gs = girls(), n = fast ? 5 : 3;
+      for (let i = 0; i < n; i++) {
+        const g = gs[i % gs.length], a = Math.random() * TAU, r = i < gs.length ? 0 : rnd(140, 320);
+        const x = clamp(g.x + Math.cos(a) * r, A.x - A.r + 150, A.x + A.r - 150), y = clamp(g.y + Math.sin(a) * r, A.y - A.r + 150, A.y + A.r - 150);
+        addQuake(x, y, 140, 0.9 + i * 0.18, "bomb", B.x + B.dir * 80, B.y - 40);
+      }
+      play("fire");
+    }
+  }
+  function crossQuake(x, y, dirs) {
+    for (let j = 0; j < dirs; j++) {
+      const a = j * TAU / dirs + Math.PI / 4 * (dirs === 4 ? 0 : 0);
+      for (let i = 0; i < 3; i++) addQuake(x + Math.cos(a) * (150 + i * 130), y + Math.sin(a) * (150 + i * 130), 95, 0.25 + i * 0.15);
+    }
+    addQuake(x, y, 140, 0.15);
+  }
+  // ---------------------------------------------------------------- quakes: the ground cracks, glows, then bursts open
+  // k: "crack" (the ground opens under it) or "bomb" (lobbed from sx, sy, lands when t reaches w)
+  function addQuake(x, y, r, w, k = "crack", sx = 0, sy = 0) {
+    const q = { id: G.nextId++, x, y, r, w, t: 0, k, sx, sy, done: false };
+    G.quakes.push(q); return q;
+  }
+  function updateQuakes(dt, hurt) {
+    for (const q of G.quakes) {
+      q.t += dt;
+      if (!q.done && q.t >= q.w) { q.done = true; quakeBoom(q); }
+      if (hurt && q.done && q.t < q.w + 0.22)
+        for (const g of girls()) { const ex = g.x - q.x, ey = (g.y - q.y) / 0.62; if (ex * ex + ey * ey < q.r * q.r) hurtTarget(g, q.x, q.y); }
+    }
+    G.quakes = G.quakes.filter((q) => q.t < q.w + 2.2);
+  }
+  function quakeBoom(q) {
+    const near = d2(q.x, q.y, P.x, P.y) < 1600 * 1600; if (!near) return;
+    SFX.slam(); G.shake = Math.max(G.shake, q.r > 140 ? 18 : 10);
+    G.parts.push({ type: "qboom", x: q.x, y: q.y, r: q.r, life: 0.6, max: 0.6, bomb: q.k === "bomb" });
+    dust(q.x, q.y, 10);
+    for (let i = 0; i < Math.round(q.r / 22) && G.parts.length < 470; i++) {
+      const a = Math.random() * TAU, v = rnd(120, 360);
+      G.parts.push({ type: "rock", x: q.x + Math.cos(a) * q.r * 0.3, y: q.y + Math.sin(a) * q.r * 0.2, z: 20, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: rnd(500, 950), rot: rnd(0, 6), vr: rnd(-9, 9),
+        name: Math.random() < 0.5 ? "qk_rock1" : "qk_rock2", sc: rnd(0.45, 0.9) * q.r / 120, life: 2, max: 2 });
+    }
+    burst(q.x, q.y - 40, 18, q.k === "bomb" ? ["#ffb347", "#ff6a2a", "#fff4c2"] : ["#ffb347", "#ff7a2a", "#ffd34d"], 420, 0.6);
+  }
+  // draw a sprite scaled to a width (px in the world)
+  function sprW(name, x, y, w, a = 1, rot = 0, sy = 1) { const f = FR[name]; if (f) spr(f, x, y, false, w / (f.w * f.s), a, rot, sy); return !!f; }
+  // ground layer: the cracks opening, the warning glow, the crater left behind
+  function drawQuakes() {
+    for (const q of G.quakes) {
+      const w = q.r * 2.3;
+      if (!q.done) {
+        const k = clamp(q.t / Math.max(0.01, q.w), 0, 1), pulse = 0.5 + 0.5 * Math.sin(G.t * 18);
+        ctx.save(); ctx.globalAlpha = (0.12 + 0.14 * pulse) * Math.min(1, k * 3 + 0.3); ctx.fillStyle = "#ff3a1a"; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r, q.r * 0.62, 0, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 0.55; ctx.strokeStyle = "#ffb060"; ctx.lineWidth = 4; ctx.setLineDash([18, 12]); ctx.stroke(); ctx.restore();
+        if (q.k === "crack") {
+          const nm = k < 0.4 ? "qk_crack1" : k < 0.75 ? "qk_crack2" : "qk_crack3";
+          sprW(nm, q.x, q.y, w * (0.45 + 0.55 * k), Math.min(1, k * 4));
+          glow(q.x, q.y - 10, q.r * (0.6 + 0.6 * k), "255,120,40", 0.25 + 0.35 * k * pulse);
+        } else {
+          // the bomb's landing mark shrinks onto the spot
+          ctx.save(); ctx.strokeStyle = "rgba(255,230,150,.8)"; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * (1.6 - 0.6 * k), q.r * 0.62 * (1.6 - 0.6 * k), 0, 0, TAU); ctx.stroke(); ctx.restore();
+        }
+      } else {
+        const a = clamp(1 - (q.t - q.w) / 2.2, 0, 1);
+        sprW("qk_crater", q.x, q.y, w * 0.9, Math.min(1, a * 1.6));
+        glow(q.x, q.y - 10, q.r * 0.9, "255,110,30", 0.4 * a * a);
+      }
+    }
+  }
+  // air layer: pumpkin bombs in flight
+  function drawQuakesAir() {
+    for (const q of G.quakes) {
+      if (q.k !== "bomb" || q.done) continue;
+      const k = clamp(q.t / q.w, 0, 1), x = q.sx + (q.x - q.sx) * k, y = q.sy + (q.y - q.sy) * k, z = 200 * (1 - k) + Math.sin(Math.PI * k) * 230;
+      shadow(x, y, 40, 14, 0.3);
+      glow(x, y - z, 90, "255,150,50", 0.5);
+      if (!sprW("qk_bomb", x, y - z, 150, 1, G.t * 7)) { ctx.fillStyle = "#ff8a2a"; ctx.beginPath(); ctx.arc(x, y - z, 40, 0, TAU); ctx.fill(); }
+    }
   }
   function updateRings(dt, hurt) {
     for (const w of G.rings) {
@@ -2324,6 +2476,7 @@
       B.alive = false; B.die = 0; SFX.boom(); G.shake = 26;
       burst(B.x, B.y - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4);
       for (const m of G.mons) if (m.alive) killMon(m, false);
+      G.quakes = G.quakes.filter((q) => q.done);
     }
   }
   function winGame() {
@@ -2430,6 +2583,11 @@
     for (const p of G.parts) {
       p.life -= dt;
       if (p.type === "ring") { p.r += p.vr * dt; continue; }
+      if (p.type === "rock") {
+        p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vz -= 2200 * dt; p.rot += p.vr * dt;
+        if (p.z < 0) { p.life = 0; if (G.parts.length < 450) dust(p.x, p.y, 1); }
+        continue;
+      }
       p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt;
       if (p.g) p.vy += p.g * dt;
       if (p.type === "dust") { p.vx *= 0.92; p.vy *= 0.92; p.r += 20 * dt; }
@@ -2503,12 +2661,12 @@
       f.x += f.vx * dt; f.y += f.vy * dt; f.life -= dt;
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
       if (f.type === "web") { f.vx *= Math.pow(0.5, dt); f.vy *= Math.pow(0.5, dt); }
-      for (const g of girls()) if (f.life > 0 && d2(f.x, f.y, g.x, g.y) < 60 * 60) { f.life = 0; hurtTarget(g, f.x, f.y, f.type === "web" || f.type === "heart"); }
+      for (const g of girls()) if (f.life > 0 && d2(f.x, f.y, g.x, g.y) < 70 * 70) { f.life = 0; hurtTarget(g, f.x, f.y, f.type === "web" || f.type === "heart" || f.type === "webball"); if (f.type === "webball") { hurtTarget(g, f.x, f.y); burst(f.x, f.y - 80, 16, ["#fff", "#d9b8ff", "#9b5cff"], 260, 0.5); } }
       // the girl's bolts pop fireballs
       for (const s of G.shots) if (s.life > 0 && f.life > 0 && d2(s.x, s.y, f.x, f.y) < 50 * 50) { s.life = 0; f.life = 0; burst(f.x, f.y - 90, 10, ["#9dff6a", "#fff"], 200, 0.4); play("hit"); }
     }
     G.foes = G.foes.filter((f) => f.life > 0);
-    updateRings(dt, true);
+    updateRings(dt, true); updateQuakes(dt, true);
     // portal / arena
     if (G.portal) {
       G.portal.t += dt;
@@ -2755,16 +2913,17 @@
     const B = G.boss, art = (G.lvl.boss && G.lvl.boss.art) || "boss";
     let pose = "stand";
     if (!B.alive) pose = B.die < 0.4 ? "hurt" : "dead";
-    else if (B.st === "prep") pose = "prep";
+    else if (B.st === "prep" || B.st === "dash") pose = "prep";
+    else if (B.st === "leap") pose = B.t < 0.45 ? "prep" : "slam";
     else if (B.st === "slam") pose = B.t < 0.7 ? "slam" : "stand";
     else if (B.hurtPose > 0) pose = "hurt";
     // the Pumpkin King's frames are named by pose; the mini bosses' come from one sheet, one row each
     const name = art === "boss" ? "boss_" + pose : `${art}_w${["stand", "prep", "slam", "hurt", "dead"].indexOf(pose)}`;
     const f = FR[name], flip = B.dir < 0; if (!f) return;
-    let y = B.y + (B.dropY || 0), sy = 1;
+    let y = B.y + (B.dropY || 0) - (B.jz || 0), sy = 1;
     if (B.alive && B.st === "walk") y -= Math.abs(Math.sin(B.t * 6)) * 10;
     if (B.alive && B.st !== "enter") sy = 1 + Math.sin(G.t * 2) * 0.012;
-    shadow(B.x, B.y + 3, 150 * (B.dropY < -200 ? 0.6 : 1), 32, 0.35);
+    shadow(B.x, B.y + 3, 150 * (B.dropY < -200 || B.jz > 200 ? 0.6 : 1), 32, 0.35);
     if (B.alive && B.st === "prep") glow(B.x, B.y - 220, 300, "255,90,40", 0.25 + 0.15 * Math.sin(G.t * 20));
     if (B.alive) glow(B.x + (flip ? -1 : 1) * 30, y - 380, 110, "255,170,60", 0.3);
     else glow(B.x, B.y - 60, 200, "255,220,140", 0.35 * clamp(1 - B.die / 2, 0, 1));
@@ -2982,8 +3141,10 @@
   }
   function drawRings() {
     const B = G.boss;
-    if (B && B.alive && B.st === "prep" && B.ix !== undefined) {
-      ctx.save(); ctx.globalAlpha = 0.18 + 0.12 * Math.sin(G.t * 22); ctx.fillStyle = "#ff3a2a"; ctx.beginPath(); ctx.arc(B.ix, B.iy, 250, 0, TAU); ctx.fill(); ctx.restore();
+    drawQuakes();
+    if (B && B.alive && B.st === "prep" && B.move === "charge") {
+      ctx.save(); ctx.translate(B.x, B.y); ctx.rotate(Math.atan2(B.ay, B.ax)); ctx.globalAlpha = 0.16 + 0.12 * Math.sin(G.t * 22); ctx.fillStyle = "#ff3a2a"; ctx.fillRect(0, -90, 840, 180);
+      ctx.globalAlpha = 0.7; ctx.strokeStyle = "#ffb060"; ctx.lineWidth = 5; ctx.setLineDash([22, 14]); ctx.strokeRect(0, -90, 840, 180); ctx.restore();
     }
     ctx.save(); ctx.globalCompositeOperation = "lighter";
     for (const w of G.rings) {
@@ -3120,6 +3281,15 @@
         if (sp) { ctx.globalAlpha = 1; fx(sp, p.x, p.y, p.r * (sp === "fx_flame" ? 0.13 : 0.11) * (0.6 + a * 0.6), a, sp === "fx_twinkle" ? p.life * 3 : 0); continue; }
         ctx.globalAlpha = a; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.5 + a * 0.5), 0, TAU); ctx.fill();
       }
+      else if (p.type === "rock") { ctx.globalAlpha = 1; shadow(p.x, p.y, 16 * p.sc, 6 * p.sc, 0.25); if (!sprW(p.name, p.x, p.y - p.z, 70 * p.sc, 1, p.rot)) { ctx.fillStyle = "#6b5a4a"; ctx.beginPath(); ctx.arc(p.x, p.y - p.z, 14 * p.sc, 0, TAU); ctx.fill(); } }
+      else if (p.type === "qboom") {
+        // the burst: painted eruption frames when there are some, light and flame otherwise
+        ctx.globalAlpha = 1; const k = 1 - a, i = Math.min(3, Math.floor(k * 4));
+        glow(p.x, p.y - p.r * 0.5, p.r * (1.4 + k), p.bomb ? "255,160,60" : "255,120,40", 0.9 * a);
+        const bf = FR["qk_boom" + i], b2 = FR.qk_boom2;
+        if (bf && b2) { const m = p.r * 2.4 / (b2.w * b2.s); ctx.save(); ctx.globalCompositeOperation = "lighter"; spr(bf, p.x, p.y + p.r * 0.25 - bf.h * bf.s * m / 2, false, m, Math.min(1, a * 2.5)); ctx.restore(); }
+        else { fx("fx_flame", p.x, p.y - p.r * (0.5 + k * 0.6), p.r / 45 * (0.7 + k), a); fx("fx_rays", p.x, p.y - p.r * 0.4, p.r / 110 * (0.6 + k), a * 0.8, k); }
+      }
       else if (p.type === "dust") { ctx.globalAlpha = 1; spr("fx_smoke", p.x, p.y, p.x % 2 > 1, p.r / 34, a * 0.55); }
       else if (p.type === "fx") { ctx.globalAlpha = 1; fx(p.name, p.x, p.y, p.sc * (1 + (1 - a) * (p.grow || 0.6)), a, p.rot || 0, !!p.flip); }
       else if (p.type === "ring") { ctx.globalAlpha = a; ctx.strokeStyle = `rgba(${p.col},1)`; ctx.lineWidth = 26 * a + 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke(); }
@@ -3230,6 +3400,7 @@
       if (f.type === "fire") { shadow(f.x, f.y, 22, 7, 0.2); glow(f.x, f.y - 90, 70, "130,255,90", 0.4); fxDir("fx_witchfire", f.x - Math.sign(f.vx) * 20, f.y - 90, f.vx, f.vy, 1, 1); }
       else if (f.type === "orb") { glow(f.x, f.y - 100, 80, "190,110,255", 0.7); fx("fx_twinkle", f.x, f.y - 100, 0.6, 1, G.t * 6); }
       else if (f.type === "heart") { glow(f.x, f.y - 100, 70, "255,110,190", 0.6); fx("fx_heart", f.x, f.y - 100, 1.1, 1, Math.sin(G.t * 8) * 0.3); }
+      else if (f.type === "webball") { shadow(f.x, f.y, 26, 9, 0.25); glow(f.x, f.y - 80, 80, "180,110,255", 0.5); if (!sprW("qk_webball", f.x, f.y - 80, 160, 1, G.t * 5)) drawWeb(f.x, f.y - 60, 30, 0.9); }
       else drawWeb(f.x, f.y - 60, 26, 0.9);
     }
     for (const s of G.shots) {
@@ -3239,6 +3410,7 @@
     }
     for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc);
     drawGwimaGone();
+    drawQuakesAir();
     drawParts(L, R, T, B);
     drawCineFx(L, T);
     drawCombo(L, T);
@@ -3467,9 +3639,9 @@
   // One iPad hosts: it runs the whole world (monsters, drops, gems, chests, boss) and treats the other girl as a second
   // target. The guest runs only its own girl, mirrors the host's world from the host's presence,
   // and reports its spell hits, ultimate and revive back as room events. Each camera follows its own girl.
-  const FTYPES = ["fire", "web", "orb", "heart"];
+  const FTYPES = ["fire", "web", "orb", "heart", "webball"];
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back"];
-  const BST = ["enter", "walk", "prep", "slam", "rest"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
+  const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
     sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
   let Q = null;   // the other girl, as last reported in their presence
@@ -3720,7 +3892,8 @@
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max, m.jz | 0]),
-      b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0] : 0,
+      b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100)] : 0,
+      q: G.quakes.map((q) => [q.id, q.x | 0, q.y | 0, q.r | 0, Math.round(q.t * 20), Math.round(q.w * 20), q.k === "bomb" ? 1 : 0, q.sx | 0, q.sy | 0]),
       d: G.drops.map((d) => [d.id, DTYPES.indexOf(d.type), d.x | 0, d.y | 0, d.z | 0, Math.round(d.life * 10)]),
       g: G.gems.filter(near).slice(-90).map((g) => [g.id, g.x | 0, g.y | 0, g.v]),
       f: G.foes.map((f) => [FTYPES.indexOf(f.type), f.x | 0, f.y | 0, f.vx | 0, f.vy | 0]),
@@ -3804,7 +3977,7 @@
     }
     // boss
     if (Array.isArray(w.b) && G.arena) {
-      const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy] = w.b.map(num);
+      const [x, y, dir, si, hp, t10, bits, dropY, alive, ix, iy, jz, bmax, mv, ax, ay] = w.b.map(num);
       if (!G.boss) {
         G.boss = { x, y, tx: x, ty: y, dir: -1, hp, max: 70, st: "enter", t: 0, flash: 0, hurtPose: 0, alive: true, die: 0, dropY };
         const BD = G.lvl.boss || { name: "Trùm", tip: "" };
@@ -3814,6 +3987,7 @@
       if (st === "slam" && B.st !== "slam") { SFX.slam(); G.shake = 24; dust(ix, iy, 26); }
       if (st === "enter" && dropY >= 0 && B.dropY < 0) { SFX.slam(); G.shake = 20; }
       B.tx = x; B.ty = y; B.dir = dir < 0 ? -1 : 1; B.st = st; B.t = t10 / 10; B.hp = hp; B.dropY = dropY; B.ix = ix; B.iy = iy;
+      B.jz = jz; if (bmax > 0) B.max = bmax; B.move = BMOVES[mv]; B.ax = ax / 100; B.ay = ay / 100;
       if (bits & 1) B.flash = 0.12; B.hurtPose = bits & 2 ? 0.1 : 0;
       B.slow = bits & 4 ? 1 : 0; B.burn = bits & 8 ? 1 : 0; B.poison = bits & 16 ? 1 : 0;
       if (!alive && B.alive) { B.alive = false; B.die = 0; SFX.boom(); G.shake = 26; burst(B.x, B.y - 200, 60, ["#ffd34d", "#ff8a3d", "#fff4c2", "#ff9ad5"], 700, 1.4); }
@@ -3849,6 +4023,17 @@
       G.cine.lock = !!w.cn[4]; G.cine.spawned = !!w.cn[2]; G.cine.wave = clamp(Math.floor(num(w.cn[3])), -1, 3);
       G.cine.focus = w.cn[5] || w.cn[6] ? [num(w.cn[5]), num(w.cn[6])] : null;
     }
+    // quakes: new ones join, known ones keep their own clock (it is close enough) so each bursts once here too
+    if (Array.isArray(w.q)) {
+      const have = new Map(G.quakes.map((q) => [q.id, q]));
+      for (const a of w.q) {
+        if (!Array.isArray(a)) continue;
+        const id = num(a[0]); if (have.has(id)) continue;
+        const q = { id, x: num(a[1]), y: num(a[2]), r: clamp(num(a[3]), 20, 400), t: num(a[4]) / 20, w: num(a[5]) / 20, k: a[6] ? "bomb" : "crack", sx: num(a[7]), sy: num(a[8]), done: false };
+        if (q.t >= q.w) q.done = true;
+        G.quakes.push(q);
+      }
+    }
     G.rings = (Array.isArray(w.v) ? w.v : []).filter(Array.isArray).map((a) => ({ x: num(a[0]), y: num(a[1]), r: num(a[2]), life: num(a[3]) / 10, delay: num(a[4]) / 10, sp: 470 }));
     // items, chests, cages, gate, score
     const flags = (s, list, onOpen) => { if (typeof s === "string") list.forEach((o, i) => { const v = s[i] === "1"; if (v && !(o.got || o.open) && onOpen) onOpen(o); if ("got" in o) o.got = v; else o.open = v; }); };
@@ -3881,7 +4066,7 @@
       f.x += f.vx * dt; f.y += f.vy * dt;
       if (f.type === "fire" && Math.random() < 0.7) G.parts.push({ type: "dot", x: f.x, y: f.y - 90, vx: rnd(-30, 30), vy: rnd(-30, 30), life: 0.35, max: 0.35, r: rnd(4, 9), col: Math.random() < 0.5 ? "#9dff6a" : "#e6ffb0" });
     }
-    updateRings(dt, false);
+    updateRings(dt, false); updateQuakes(dt, false);
     for (const c of G.chests) c.t += dt;
     if (G.portal) {
       G.portal.t += dt;
