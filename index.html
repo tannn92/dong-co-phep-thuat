@@ -259,7 +259,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.1627", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261025.1643", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3257,8 +3257,15 @@
     if (d.lamp) glow(d.x + (d.flip ? -1 : 1) * 48 * d.m, d.y - 160 * d.m, 130, "255,200,110", 0.42 * (0.9 + 0.1 * Math.sin(G.t * 6 + d.x)));
   }
   // ground layer: things lying flat or hovering low, drawn under everyone
+  // each level's boss floor is its own painted picture, fetched when that level is built
+  function arenaFloor() {
+    const k = "arena" + (G.level + 1);
+    if (!(k in IMG)) { IMG[k] = null; loadImg(`assets/${k}.webp`).then((i) => (IMG[k] = i)).catch(() => {}); }
+    return IMG[k];
+  }
   function drawArena() {
     const A = G.arena; if (!A || G.lvl.stage) return;
+    const fl = arenaFloor(); if (fl) { const rr = A.r + 40; ctx.drawImage(fl, A.x - rr, A.y - rr, rr * 2, rr * 2); }
     fx("fx_circle_g", A.x, A.y, 1.6, G.boss ? 0.18 : 0.1, G.t * 0.05);
     if (!A.open) {
       // a sealed barrier of light around the plaza
