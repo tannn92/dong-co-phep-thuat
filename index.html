@@ -269,7 +269,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.1803", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261025.1830", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1254,7 +1254,7 @@
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
   const WAND = { g: [[78, -32], [111, -40], [112, -38], [103, -42], [79, -60]], s: [[85, -51], [140, -49], [155, -50], [120, -60], [40, 0]] };
   // the walking-cast drawings (wand in her right hand, so facing left is its own picture, front and back never mirrored)
-  const WAND_WC = { g: { wc: [60, -64], wcL: [-68, -59], d0: [-19, -53], d4: [43, -75] } };
+  const WAND_WC = { g: { wc: [60, -64], wcL: [-68, -59], d0: [-19, -53], d4: [43, -75] }, s: { wc: [81, -72], wcL: [-77, -77], d0: [-31, -70], d4: [59, -111] } };
   function wandTip(hk, face, flip, fn) {
     const W2 = WAND_WC[hk];
     if (W2 && fn) {
