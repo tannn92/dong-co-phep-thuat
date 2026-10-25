@@ -276,7 +276,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.2016", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261025.2113", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -579,7 +579,8 @@
     gwima:        { hp: 240, en: 0, spd: 0, prep: 0.9, atk: 0.6, cd: 2.4, gwima: true, heavy: true, fin: true, undying: true },
     // the finale's second half: Rumi under Gwi Ma's curse, then Gwi Ma's last form, the Toad Warrior (see the stage section)
     rumi_demon:   { hp: 210, en: 20, spd: 250, prep: 0.45, atk: 0.4, cd: 1.5, rumi: true, heavy: true, fin: true, undying: true, name: "Rumi Quỷ", r: 64 },
-    gwima_toad:   { hp: 360, en: 20, spd: 150, prep: 0.8, atk: 0.6, cd: 1.6, toad: true, heavy: true, fin: true, name: "Chiến Binh Cóc Lửa", r: 150 },
+    // (two stages: in armour until half health, then the bare flame body; see updateToad)
+    gwima_toad:   { hp: 360, en: 20, spd: 150, prep: 0.8, atk: 0.6, cd: 1.6, toad: true, heavy: true, fin: true, undying: true, name: "Chiến Binh Cóc Lửa", r: 150 },
   };
   const SAJA = ["saja_mystery", "saja_abby", "saja_jinu", "saja_baby", "saja_romance"];
   // elemental spells from monster drops: fire burns fast, poison drains slowly, ice slows. While one is held the auto-attack also fires faster.
@@ -1474,6 +1475,7 @@
     if (m.shield) { m.flash = 0.06; if (!dot && Math.random() < 0.3) burst(fx, fy - 120, 4, ["#ff6ec7", "#fff"], 160, 0.3); return; }
     m.hp -= dmg; m.flash = 0.12;
     if (m.hp <= 0 && m.c.undying) { m.hp = 0; return; }   // the finale's foes do not fall at once: the film takes over (updateCine)
+    if (m.armor && m.hp < m.max / 2) { m.hp = Math.floor(m.max / 2); return; }   // the Toad Warrior's armour holds until the film breaks it
     if (m.hp <= 0) return killMon(m, true, by);
     if (dot) return;
     play("hit");
@@ -2154,7 +2156,7 @@
   // the curse lifts from each in turn (OUT_LIFT + 0.45 s each), each boy says thank you (OUT_THANKS), then everyone cheers
   // (since the Toad Warrior: the girls and HUNTR/X sing him into a ring of light until OUT_BOOM, then the boys as before)
   const OUT_BOOM = 4.8, OUT_DEMON = 5.6, OUT_LIFT = 7.3, OUT_THANKS = 10.1, OUT_CHEER = 13.3, OUT_END = 18;
-  const CPH = ["intro", "fight", "outro", "curse", "save", "morph"], BOYX = [-560, -280, 0, 280, 560];
+  const CPH = ["intro", "fight", "outro", "curse", "save", "morph", "crack"], BOYX = [-560, -280, 0, 280, 560];
   // turns: two, two, Jinu (Gwi Ma throws fire from his throne), then Gwi Ma himself, then Demon Rumi, then the Toad Warrior
   const WAVES = [["saja_mystery", "saja_romance"], ["saja_abby", "saja_baby"], ["saja_jinu"], ["gwima"], ["rumi_demon"], ["gwima_toad"]];
   const SR = { x0: -1750, x1: 1750, y0: -1190, y1: 1150 };   // the walkable stage area, relative to the arena centre
@@ -2278,6 +2280,7 @@
         else if (c.wave === 3 && !left) startFilm("curse");
         else if (c.wave === 4 && !left) startFilm("save");
         else if (c.wave === 5 && !left) startFilm("outro");
+        else if (c.wave === 5) { const T = G.mons.find((m) => m.alive && m.c.toad); if (T && T.armor && T.hp <= T.max / 2) startFilm("crack"); }
       }
       const g = gwimaMon(); if (g) { c.gx = g.x; c.gy = g.y; }
     } else if (c.ph === "outro") {
@@ -2610,14 +2613,19 @@
   const CU_PULL = 0.7, CU_BEAM = 2.4, CU_HALF = 4.6, CU_FLASH = 6.2, CU_BACK = 7.0, CU_TALK = 7.6, CU_END = 10.4;
   const SV_RUN = 1.3, SV_TALK = 3.1, SV_HUG = 5.8, SV_FLASH = 7.9, SV_THANK = 8.5, SV_APART = 10.9, SV_END = 12.6;
   const MO_TALK = 0.6, MO_SPIN = 2.8, MO_FLASH = 6.8, MO_JUMP = 7.8, MO_END = 9.9;
+  // the armour breaking at half health (film "crack"): cracks spread, the plates burst off at CK_FLASH, the flame body roars
+  const CK_TALK = 0.4, CK_BURST = 2.9, CK_FLASH = 3.2, CK_ROAR = 3.6, CK_END = 6.8;
   const RUMI_AT = [0, -150], TOAD_LAND = [0, -560], SEAL_AT = [0, -900];
   // Gwi Ma's roar: how many come per wave (at most ROAR_CAP of his crowd at once), and who (demons and every map's monsters)
   const ROAR_N = [5, 5, 5, 4, 4, 4], ROAR_CAP = 8;
   const ROAR_KINDS = ["saja_minion", "saja_minion", "zombie", "skeleton", "ghost", "bat", "spider", "witch", "mummy", "vampire"];
   // the last two foes' moves (sent to the partner's page so it shows the same wind-ups)
-  const MOVES5 = ["", "dash", "slash", "blink", "spin", "blades", "furrow", "meteor", "leap", "charge", "bombs", "ring", "summon"];
+  const MOVES5 = ["", "dash", "slash", "blink", "spin", "blades", "furrow", "meteor", "leap", "charge", "bombs", "ring", "summon", "bash", "pound", "sweep", "fdash", "land"];
   const RD_MOVES = ["dash", "slash", "blink", "spin", "dash", "blades"];
-  const TOAD_MOVES = ["furrow", "meteor", "leap", "charge", "bombs", "ring", "furrow", "meteor", "leap", "summon", "charge", "bombs"];
+  // the Toad Warrior: in armour slow, heavy blows (shoulder bash, ground pound, armoured leap, spinning sweep);
+  // the bare flame body after the armour breaks: fast (meteors, fire bombs, flame dashes, flame waves, cracks)
+  const ARMOR_MOVES = ["pound", "bash", "sweep", "leap", "pound", "sweep", "bash", "summon"];
+  const FLAME_MOVES = ["meteor", "fdash", "bombs", "ring", "furrow", "fdash", "meteor", "bombs", "summon", "ring"];
   function roarCrowd(n) {
     const A = G.arena;
     for (let i = 0; i < n; i++) setTimeout(() => {
@@ -2691,7 +2699,7 @@
     } else if (c.ph === "morph") {
       if (at(MO_FLASH)) {
         hideMon(g);
-        const m = spawnMon("gwima_toad", c.gx || A.x, c.gy || A.y + GWIMA_Y); m.face = 0; m.wait = true; m.shield = true; m.summoned = true;
+        const m = spawnMon("gwima_toad", c.gx || A.x, c.gy || A.y + GWIMA_Y); m.face = 0; m.wait = true; m.shield = true; m.summoned = true; m.armor = true;
       }
       const T = G.mons.find((m) => m.alive && m.c.toad);
       if (at(MO_JUMP) && T) startJump(T, A.x + TOAD_LAND[0], A.y + TOAD_LAND[1], 1.4);
@@ -2699,13 +2707,17 @@
         if (T) { T.wait = false; T.shield = false; T.cd = 1.6; }
         c.ph = "fight"; c.wave = 5; c.t = 0; c.lock = false; c.focus = null;
       }
+    } else if (c.ph === "crack") {
+      const T = G.mons.find((m) => m.alive && m.c.toad);
+      if (at(CK_FLASH) && T) { T.armor = false; T.st = "web"; T.t = 0; T.move = ""; T.cyc = 0; }
+      if (c.t >= CK_END) { if (T) { T.st = "walk"; T.t = 0; T.cd = 1.2; } c.ph = "fight"; c.wave = 5; c.t = 0; c.lock = false; c.focus = null; c.cracked = 1; }
     }
   }
   // what both pages do during the films: sounds, banners, sparks, the camera
   function filmLocal(c, dt) {
     const A = G.arena, t = c.t, t0 = c.lt ?? t, at = (x) => t0 < x && t >= x;
     c.lt = t;
-    if (c.wave !== c.seenWave) { c.seenWave = c.wave; if (c.wave === 4) showBanner("Rumi Quỷ!", "Đánh bại Rumi Quỷ để cứu bạn ấy!"); if (c.wave === 5) showBanner("Trận chiến cuối cùng!", "Coi chừng thiên thạch và vết nứt!"); }
+    if (c.wave !== c.seenWave) { c.seenWave = c.wave; if (c.wave === 4) showBanner("Rumi Quỷ!", "Đánh bại Rumi Quỷ để cứu bạn ấy!"); if (c.wave === 5 && !c.cracked) showBanner("Trận chiến cuối cùng!", "Phá vỡ bộ giáp của hắn!"); }
     let zoom = 1, focus = null;
     const R = [c.rx || A.x, c.ry || A.y + RUMI_AT[1]], Gw = [c.gx || A.x, c.gy || A.y + TOAD_LAND[1]];
     if (c.ph === "curse") {
@@ -2762,6 +2774,27 @@
       const T = G.mons.find((m) => m.alive && m.c.toad);
       focus = t < MO_JUMP || !T ? [Gw[0], Gw[1] - 330] : [T.x, T.y - 330 - (T.jz || 0) * 0.4];
       zoom = t < MO_SPIN ? 1.1 : t < MO_FLASH ? 1.1 + 0.15 * (t - MO_SPIN) / (MO_FLASH - MO_SPIN) : 1;
+    } else if (c.ph === "crack") {
+      P.inv = Math.max(P.inv, 0.5);
+      const T = G.mons.find((m) => m.alive && m.c.toad) || { x: Gw[0], y: Gw[1] };
+      if (at(0.05)) { showBanner("Bộ giáp đang vỡ!", "Cố lên, sắp thắng rồi!"); SFX.slam(); G.shake = 18; }
+      if (t > 0.3 && t < CK_BURST && Math.random() < dt * (4 + 10 * t / CK_BURST)) { play("hit"); burst(T.x + rnd(-170, 170), T.y - rnd(120, 520), 10, ["#ffb347", "#ffd34d", "#fff"], 320, 0.5); }
+      if (t < CK_BURST) G.shake = Math.max(G.shake, 3 + 8 * t / CK_BURST);
+      if (at(CK_BURST)) {
+        // the plates burst off and fly away
+        SFX.boom(); G.shake = 34;
+        const bits = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => `armor_bits_d${i >> 2}_w${i & 3}`).filter((n) => FR[n]);
+        for (let i = 0; i < 16; i++) {
+          const a = i / 16 * TAU + rnd(-0.2, 0.2), v = rnd(600, 1100);
+          G.parts.push({ type: "rock", x: T.x + Math.cos(a) * 120, y: T.y + rnd(-20, 20), z: 330 + Math.sin(a) * 200, vx: Math.cos(a) * v, vy: rnd(-160, 260), vz: rnd(600, 1200), rot: rnd(0, 6), vr: rnd(-8, 8),
+            name: bits.length ? bits[i % bits.length] : "qk_rock2", sc: bits.length ? rnd(1.5, 2.3) : rnd(0.8, 1.4), life: 2.6, max: 2.6 });
+        }
+        burst(T.x, T.y - 320, 120, ["#ff6a3d", "#ffd34d", "#fff", "#ff3d9a"], 1000, 1.3);
+        G.parts.push({ type: "ring", x: T.x, y: T.y - 40, r: 80, vr: 2400, life: 0.9, max: 0.9, col: "255,150,60" });
+      }
+      if (at(CK_ROAR)) { SFX.roar(); G.shake = 24; showBanner("Thân lửa thuần!", "Hắn nhanh hơn — coi chừng!"); }
+      focus = [T.x, T.y - 320];
+      zoom = 1.12;
     } else if (c.ph === "outro") {
       if (at(0.05)) showBanner("Cùng hát Bài Ca Ánh Sáng!", "HUNTR/X và các bé phong ấn Gwi Ma");
       if (t < OUT_BOOM && Math.random() < dt * 6) play("bell");
@@ -2873,32 +2906,44 @@
     if (m.jump) { stepJump(m, dt); m.st = "fly"; m.move = ""; return; }
     if (m.st === "fly" && m.move !== "leap") m.st = "walk";
     if (m.wait || (G.cine && G.cine.lock) || m.hp <= 0) { if (m.st !== "fly") m.st = "walk"; return; }
-    const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, fast = m.hp < m.max / 2;
+    // fast: the bare flame body (after the armour broke); the armour makes him slow and heavy
+    const T = targetFor(m.x, m.y), dx = T.x - m.x, dy = T.y - m.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, fast = !m.armor;
     if (m.st === "walk" || m.st === "rest") {
-      if (m.st === "rest" && m.t > (fast ? 0.45 : 0.75)) { m.st = "walk"; m.t = 0; }
+      if (m.st === "rest" && m.t > (fast ? 0.4 : 0.8)) { m.st = "walk"; m.t = 0; }
       if (Math.abs(dx) > 40) m.flip = dx < 0;
-      const sp = c.spd * (fast ? 1.3 : 1);
+      const sp = fast ? 200 : 110;
       if (d > 270 && !T.dead) { m.x += ux * sp * dt; m.y += uy * sp * dt; }
       if (m.st === "walk" && m.cd <= 0 && !T.dead) {
-        m.move = TOAD_MOVES[(m.cyc = (m.cyc || 0) + 1) % TOAD_MOVES.length]; m.t = 0; m.ax = ux; m.ay = uy; SFX.roar();
+        const list = fast ? FLAME_MOVES : ARMOR_MOVES;
+        m.move = list[(m.cyc = (m.cyc || 0) + 1) % list.length]; m.t = 0; m.ax = ux; m.ay = uy; SFX.roar(); m.combo = m.move === "fdash" ? 3 : 1;
         m.st = m.move === "meteor" || m.move === "bombs" || m.move === "summon" ? "web" : "prep";
-        if (m.move === "leap") { m.ix = clamp(T.x, A.x + SR.x0 + 220, A.x + SR.x1 - 220); m.iy = clamp(T.y, A.y + SR.y0 + 300, A.y + SR.y1 - 200); addQuake(m.ix, m.iy, 240, (fast ? 0.6 : 0.85) + 0.9); }
+        if (m.move === "leap") { m.ix = clamp(T.x, A.x + SR.x0 + 220, A.x + SR.x1 - 220); m.iy = clamp(T.y, A.y + SR.y0 + 300, A.y + SR.y1 - 200); addQuake(m.ix, m.iy, 260, 1.0 + 0.9); }
       }
     } else if (m.st === "prep" || m.st === "web") {
-      if (m.move === "charge") { m.ax = ux; m.ay = uy; if (Math.abs(dx) > 40) m.flip = dx < 0; }
-      if (m.t > (fast ? 0.6 : 0.85)) toadAct(m, T, fast);
+      if (m.move === "charge" || m.move === "bash" || m.move === "fdash") { m.ax = ux; m.ay = uy; if (Math.abs(dx) > 40) m.flip = dx < 0; }
+      const wind = m.quick ? 0.25 : fast ? 0.55 : m.move === "sweep" ? 1.15 : 1.0;   // the armoured blows wind up longer: time to run
+      if (m.t > wind) toadAct(m, T, fast);
     } else if (m.st === "fly") {
       // the leap: an arc onto the marked spot, the ground cracks in a star where he lands
       const k = clamp(m.t / 0.9, 0, 1);
       m.x = m.lx0 + (m.ix - m.lx0) * k; m.y = m.ly0 + (m.iy - m.ly0) * k; m.jz = Math.sin(Math.PI * k) * 480;
-      if (k >= 1) { m.jz = 0; m.st = "atk"; m.t = 0; m.move = "land"; crossQuake(m.x, m.y, 8); G.shake = Math.max(G.shake, 24); dust(m.x, m.y, 20); SFX.slam(); }
+      if (k >= 1) {
+        m.jz = 0; m.st = "atk"; m.t = 0; m.move = "land"; crossQuake(m.x, m.y, 8); G.shake = Math.max(G.shake, 26); dust(m.x, m.y, 20); SFX.slam();
+        if (!fast) G.rings.push({ x: m.x, y: m.y, r: 120, sp: 520, life: 2, delay: 0.1 });   // the armoured slam also sends a shockwave
+      }
     } else if (m.st === "atk") {
-      if (m.move === "charge" && m.t < 0.85) {
-        m.x += m.ax * 1050 * dt; m.y += m.ay * 1050 * dt; if (Math.random() < 0.6) dust(m.x, m.y, 2);
-        for (const g of girls()) if (d2(g.x, g.y, m.x, m.y) < 170 * 170) hurtTarget(g, m.x, m.y);
+      // the shoulder bash (armour: slower, wider) and the flame dashes (three quick ones) run straight ahead
+      const run = m.move === "charge" || m.move === "bash" || m.move === "fdash", sp = m.move === "fdash" ? 1400 : m.move === "bash" ? 820 : 1050, dur = m.move === "fdash" ? 0.32 : 0.85;
+      if (run && m.t < dur) {
+        m.x += m.ax * sp * dt; m.y += m.ay * sp * dt; if (Math.random() < 0.6) dust(m.x, m.y, 2);
+        if (m.move === "fdash" && G.parts.length < 430) G.parts.push({ type: "dot", x: m.x + rnd(-60, 60), y: m.y - rnd(60, 420), vx: 0, vy: -60, life: 0.4, max: 0.4, r: rnd(10, 18), col: Math.random() < 0.5 ? "#ff6a3d" : "#ffb347" });
+        for (const g of girls()) if (d2(g.x, g.y, m.x, m.y) < (m.move === "bash" ? 190 : 165) ** 2) hurtTarget(g, m.x, m.y);
         const ex = m.x < A.x + SR.x0 + 200 || m.x > A.x + SR.x1 - 200 || m.y < A.y + SR.y0 + 250 || m.y > A.y + SR.y1 - 160;
-        if (ex || m.t > 0.8) { m.move = "land"; m.t = 0; crossQuake(m.x, m.y, fast ? 8 : 4); SFX.slam(); G.shake = Math.max(G.shake, 18); }
-      } else if (m.t > 0.9) { m.st = "rest"; m.t = 0; m.cd = c.cd * (fast ? 0.6 : 1) * rnd(0.9, 1.2); }
+        if (ex || m.t > dur - 0.05) {
+          if (m.move === "fdash" && --m.combo > 0) { m.st = "prep"; m.t = 0; m.quick = true; }
+          else { m.move = "land"; m.t = 0; m.quick = false; crossQuake(m.x, m.y, fast ? 6 : 4); SFX.slam(); G.shake = Math.max(G.shake, 18); }
+        }
+      } else if (m.t > 0.9) { m.st = "rest"; m.t = 0; m.quick = false; m.cd = c.cd * (fast ? 0.6 : 1.2) * rnd(0.9, 1.2); }
     }
     inStage(m, 170);
     if (!(m.jz > 60)) for (const g of girls()) if (d2(g.x, g.y, m.x, m.y) < 130 * 130) hurtTarget(g, m.x, m.y);
@@ -2921,7 +2966,21 @@
       for (const g of girls()) addQuake(g.x, g.y, 170, 1.4, "meteor");
       for (let i = 0; i < (fast ? 8 : 5); i++) addQuake(A.x + rnd(SR.x0 + 250, SR.x1 - 250), A.y + rnd(-900, SR.y1 - 250), 150, rnd(1.1, 2.2), "meteor");
     } else if (m.move === "leap") { m.st = "fly"; m.lx0 = m.x; m.ly0 = m.y; if (Math.abs(m.ix - m.x) > 30) m.flip = m.ix < m.x; }
-    else if (m.move === "charge") SFX.swoosh();
+    else if (m.move === "charge" || m.move === "bash" || m.move === "fdash") SFX.swoosh();
+    else if (m.move === "pound") {
+      // the armoured ground pound: cracks run out in eight lines all round him
+      SFX.slam(); G.shake = Math.max(G.shake, 20); addQuake(m.x, m.y, 200, 0.15); dust(m.x, m.y, 20);
+      for (let j = 0; j < 8; j++) {
+        const a = j * TAU / 8 + 0.2, ux = Math.cos(a), uy = Math.sin(a);
+        for (let i = 0; i < 6; i++) { const x = m.x + ux * (230 + i * 120), y = m.y + uy * (160 + i * 90); if (!inside(x, y)) break; addQuake(x, y, 95, 0.4 + i * 0.12); }
+      }
+    } else if (m.move === "sweep") {
+      // the spinning sweep of his spiked fists: everything close is hit, a shockwave rolls on
+      for (let i = 0; i < 6; i++) G.parts.push({ type: "slash", x: m.x + Math.cos(i * TAU / 6) * 220, y: m.y + Math.sin(i * TAU / 6) * 140 - 120, vx: 0, vy: 0, rot: i * TAU / 6 + Math.PI / 2, life: 0.5, max: 0.5, sc: 2 });
+      for (const g of girls()) { const ex = (g.x - m.x) / 340, ey = (g.y - m.y) / 230; if (ex * ex + ey * ey < 1) hurtTarget(g, m.x, m.y); }
+      G.rings.push({ x: m.x, y: m.y, r: 200, sp: 480, life: 1.6, delay: 0 });
+      SFX.swoosh(); SFX.slam(); G.shake = Math.max(G.shake, 18);
+    }
     else if (m.move === "bombs") {
       // fireballs lobbed out of his mouth at her and around her
       const gs = girls(), n = fast ? 6 : 4;
@@ -2942,8 +3001,9 @@
     }
   }
   function toadFrame(m) {
-    const k = "gwima_toad_d", c = G.cine;
+    const c = G.cine, k = m.armor && FR.gwima_armor_d0_w0 ? "gwima_armor_d" : "gwima_toad_d";
     if (c && c.ph === "morph") return c.t < MO_JUMP ? k + "1_w1" : k + "0_w0";   // bursting out of the flames, roaring
+    if (c && c.ph === "crack") return m.armor ? k + "1_w3" : k + "1_w1";   // the cracked armour on one knee, then the flame body roaring
     if (m.hp <= 0) return k + "1_w3";
     if (m.st !== "fly" && grimace(m)) return k + "1_w2";
     if (m.st === "prep") return k + "0_w3";
@@ -2961,7 +3021,9 @@
     shadow(m.x, m.y, 190, 42, 0.35);
     if ((m.st === "prep" || m.st === "web") && m.alive) {
       glow(m.x, y - 300, 380, "255,40,40", 0.2 + 0.18 * Math.sin(G.t * 22));
-      if (m.move === "charge") { ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(Math.atan2(m.ay || 0, m.ax || 1)); ctx.globalAlpha = 0.16 + 0.12 * Math.sin(G.t * 22); ctx.fillStyle = "#ff3a2a"; ctx.fillRect(0, -110, 900, 220); ctx.globalAlpha = 0.7; ctx.strokeStyle = "#ffb060"; ctx.lineWidth = 5; ctx.setLineDash([22, 14]); ctx.strokeRect(0, -110, 900, 220); ctx.restore(); }
+      const lane = m.move === "charge" || m.move === "bash" || m.move === "fdash", lw = m.move === "bash" ? 130 : 110, ll = m.move === "fdash" ? 450 : m.move === "bash" ? 760 : 900;
+      if (lane) { ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(Math.atan2(m.ay || 0, m.ax || 1)); ctx.globalAlpha = 0.16 + 0.12 * Math.sin(G.t * 22); ctx.fillStyle = "#ff3a2a"; ctx.fillRect(0, -lw, ll, lw * 2); ctx.globalAlpha = 0.7; ctx.strokeStyle = "#ffb060"; ctx.lineWidth = 5; ctx.setLineDash([22, 14]); ctx.strokeRect(0, -lw, ll, lw * 2); ctx.restore(); }
+      if (m.move === "sweep") { ctx.save(); const k = clamp(m.t / 1.15, 0, 1); ctx.globalAlpha = 0.14 + 0.1 * Math.sin(G.t * 22); ctx.fillStyle = "#ff3a2a"; ctx.beginPath(); ctx.ellipse(m.x, m.y, 340, 230, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.75; ctx.strokeStyle = "#ffb060"; ctx.lineWidth = 6; ctx.setLineDash([22, 14]); ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.ellipse(m.x, m.y, 340 * k, 230 * k, 0, 0, TAU); ctx.stroke(); ctx.restore(); }
     }
     spr(fn, m.x, y, flip, pop);
     if (m.flash > 0) sprFlash(fn, m.x, y, flip, pop, 0.4);
@@ -3142,6 +3204,25 @@
       }
       flash(MO_FLASH, "#ffd9c8", 0.5);
       filmSay(["Các ngươi dám…!", "Ta sẽ hoá thành Chiến Binh Cóc Lửa!"], Gw[0] + 600, Gw[1] - 380, MO_TALK, MO_SPIN, true);
+    } else if (c.ph === "crack") {
+      const T = G.mons.find((m) => m.alive && m.c.toad); if (!T) return;
+      if (t < CK_FLASH) {
+        // glowing cracks spreading over the armour from his chest
+        const k = clamp(t / CK_BURST, 0, 1), cx = T.x, cy = T.y - 330;
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+        for (let i = 0; i < 14; i++) {
+          if (i / 14 > k * 1.3) continue;
+          let x = cx, y = cy; const a0 = i * 2.39;
+          ctx.strokeStyle = `rgba(255,${170 + (i % 3) * 25},90,${0.55 + 0.4 * k})`; ctx.lineWidth = 4 + 5 * k; ctx.beginPath(); ctx.moveTo(x, y);
+          for (let j = 0; j < 5; j++) { const a = a0 + Math.sin(i * 7 + j * 3) * 0.6, l = (40 + 30 * Math.sin(i + j)) * (0.4 + k); x += Math.cos(a) * l; y += Math.sin(a) * l * 1.1; ctx.lineTo(x, y); }
+          ctx.stroke();
+        }
+        ctx.restore();
+        glow(cx, cy, 200 + 260 * k, "255,150,60", 0.2 + 0.45 * k);
+      }
+      flash(CK_FLASH, "#fff0d8", 0.45);
+      filmSay(["Không! Bộ giáp của ta…!"], T.x + 560, T.y - 380, CK_TALK, CK_BURST - 0.1, true);
+      filmSay(["Giờ thì ta sẽ thiêu rụi tất cả!"], T.x + 560, T.y - 380, CK_ROAR + 0.3, CK_END - 0.2, true);
     } else if (c.ph === "outro" && t < OUT_BOOM + 0.6) {
       // the song of light: golden beams from the girls and HUNTR/X into him, notes flowing along, a ring of light closing in
       const tx = Gw[0], ty = Gw[1] - 300, k = clamp((t - 0.8) / 0.8, 0, 1) * clamp((OUT_BOOM + 0.4 - t) / 0.4, 0, 1);
@@ -5444,7 +5525,7 @@
       lv: G.level,
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max, m.jz | 0,
-        m.c.fin ? MOVES5.indexOf(m.move || "") : 0, m.c.fin ? Math.round(Math.atan2(m.ay || 0, m.ax || 1) * 100) : 0]),   // the finale's foes: their move and its aim
+        m.c.fin ? MOVES5.indexOf(m.move || "") : 0, m.c.fin ? Math.round(Math.atan2(m.ay || 0, m.ax || 1) * 100) : 0, m.armor ? 1 : 0]),   // the finale's foes: their move and its aim; the Toad Warrior's armour
       b: B ? [B.x | 0, B.y | 0, B.dir, BST.indexOf(B.st), B.hp, Math.round(B.t * 10), (B.flash > 0 ? 1 : 0) | (B.hurtPose > 0 ? 2 : 0) | sb(B), B.dropY | 0, B.alive ? 1 : 0, B.ix | 0, B.iy | 0, B.jz | 0, B.max, BMOVES.indexOf(B.move), Math.round((B.ax || 0) * 100), Math.round((B.ay || 0) * 100)] : 0,
       qz: G.quiz ? [QPH.indexOf(G.quiz.ph), Math.round(G.quiz.t * 10), G.quiz.T, G.quiz.ok, G.quiz.a, G.quiz.b, G.quiz.op === "+" ? 0 : 1, ...G.quiz.ans, G.quiz.n || 0] : 0,
       bc: G.bcut ? [BCPH.indexOf(G.bcut.ph), Math.round(G.bcut.t * 10)] : 0,
@@ -5525,6 +5606,7 @@
       m.hurt = bits & 1 ? 0.1 : 0; if (bits & 2) m.flash = 0.12;
       m.slow = bits & 4 ? 1 : 0; m.burn = bits & 8 ? 1 : 0; m.poison = bits & 16 ? 1 : 0; m.summoned = !!(bits & 64); m.shield = !!(bits & 256); m.jz = num(a[10]);
       if (m.c.fin && a.length > 12) { m.move = MOVES5[num(a[11])] || ""; const an = num(a[12]) / 100; m.ax = Math.cos(an); m.ay = Math.sin(an); }
+      if (m.c.toad && a.length > 13) m.armor = !!a[13];
       if (m.frz && !(bits & 32)) iceShatter(m.x, m.y - (m.hgt || 90), (m.r || 40) * 3); m.frz = m.frzMax = bits & 32 ? 1 : 0;
     }
     for (const m of G.mons) if (m.alive && !seen.has(m.id)) {
