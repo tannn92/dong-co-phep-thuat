@@ -97,7 +97,7 @@
   #banner.show { opacity: 1; transform: scale(1); }
 
   /* Screens */
-  .ver { margin-top: 1.4em; display: flex; gap: .8em; justify-content: center; align-items: center; font-size: .78em; opacity: .85; }
+  .ver { position: absolute; top: max(1.2vh, env(safe-area-inset-top)); right: max(1.5vw, env(safe-area-inset-right)); display: flex; gap: .8em; justify-content: center; align-items: center; font-size: .78em; opacity: .85; }
   .ver button { font: inherit; font-weight: 700; color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35); border-radius: 99px; padding: .35em 1em; }
   .ver button.new { background: #ff5a9d; border-color: #ffd1e6; opacity: 1; animation: verPulse 1s ease-in-out infinite alternate; }
   @keyframes verPulse { to { transform: scale(1.08); } }
@@ -184,8 +184,8 @@
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <p id="loading">Đang tải hình ảnh…</p>
     <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
-    <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
   </div>
+  <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
 </div>
 
 <div class="screen" id="coopScreen" hidden>
@@ -259,7 +259,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.1614", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261025.1627", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -499,7 +499,7 @@
       deco: [["tree", 3], ["bush", 4], ["mushrooms", 1], ["pumpkin2", 1], ["pumpkin3", 1]],
       gr: { base: "#679c4a", patch: ["#84b75c", "#558a3e", "#76a94f"], blade: ["#93c96a", "#4f8a3a", "#a6d77a"], dot: ["#ffd3f0", "#fff3b0", "#ffffff", "#ff9ec7", "#c9b6ff"], nDot: 70,
         stone: ["#e3d4b4", "#d8c7a3", "#cdb995"], gap: "#9c8a6c", edge: "#6f5d44" } },
-    { name: "Màn 2: Rừng Ma", seed: 2207, path: "loop", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa nhảy vồ và phun tơ!", summon: "spider", style: "spider" }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
+    { name: "Màn 2: Rừng Ma", seed: 2207, path: "bends", arena: true, boss: { art: "mboss_d1", name: "Nhện Chúa Rừng Ma", hp: 40, tip: "Nhện chúa nhảy vồ và phun tơ!", summon: "spider", style: "spider" }, quota: 140, spawn: [0.8, 1.7], camps: 10, pets: ["zoey"],
       kinds: [["spider", 3, 0], ["ghost", 2, 0], ["bat", 2, 0.1], ["mummy", 2, 0.3]],
       deco: [["tree", 4], ["mushrooms", 4], ["bush", 2], ["pumpkin3", 1]],
       gr: { base: "#3f5340", patch: ["#536b4a", "#2f3f34", "#4d4466", "#45405c"], blade: ["#5f7d55", "#2c3a2e", "#6b5f86"], dot: ["#b9a4ff", "#7cf2c6", "#e0b8ff"], nDot: 45,
@@ -521,7 +521,7 @@
       gr: { base: "#241a38", patch: ["#2e2248", "#1d1530", "#3a2a58"], blade: ["#3b2d58", "#2a2044"], dot: ["#ff6ec7", "#7cf2ff", "#ffd34d"], nDot: 24, tiles: true,
         stone: ["#3a2f55", "#332a4c", "#2c2442"], gap: "#18122a", edge: "#120c20" } },
   ];
-  const PATH_W = 270, STEP = 40, ARENA_R = 860, MAX_MONS = 120;
+  const PATH_W = 270, STEP = 40, ARENA_R = 860, MAX_MONS = 120, PLAZA_R = 400;
   // each level brings a stronger breed of the same monsters, tinted so it reads as new: hp multiplier, speed, hue.
   // Health also grows with the girls' level, so the monsters never turn into paper.
   const TIERS = [
@@ -635,7 +635,7 @@
 
   // ---------------------------------------------------------------- game state
   const G = { mode: "title", level: 0, t: 0, lt: 0, frame: 0, stars: 0, hearts: 5, energy: 0, camX: 0, camY: 0, shake: 0, fade: 0, fadeDir: 0, onFade: null,
-    mons: [], parts: [], shots: [], pshots: [], foes: [], items: [], drops: [], gems: [], rings: [], quakes: [], chests: [], cages: [], deco: [], lamps: [],
+    mons: [], parts: [], shots: [], pshots: [], foes: [], items: [], drops: [], gems: [], rings: [], quakes: [], plazas: [], chests: [], cages: [], deco: [], lamps: [],
     portal: null, arena: null, boss: null, ult: null, nextId: 1, lvl: null, kills: 0, lvKills: 0, spawnAcc: 0, surgeT: 30, arenaLock: false, won: false, path: null };
   const P = { x: 0, y: 0, vx: 0, vy: 0, z: 0, face: 0, flip: false, moving: false, dist: 0, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0, dead: false, winT: 0,
     elem: null, elemT: 0, lv: 1, xp: 0, prog: 0, pets: [] };
@@ -658,6 +658,9 @@
     if (shape === "river") {
       const n = 8, half = WORLD * 0.38, ph = R() < 0.5 ? 0 : Math.PI;
       for (let i = 0; i < n; i++) { const t = i / (n - 1); cps.push(rot(-half + 2 * half * t, Math.sin(t * Math.PI * 2.5 + ph) * 1500 * amp * (i && i < n - 1 ? 1 : 0.4))); }
+    } else if (shape === "bends") {
+      const half = WORLD * 0.4, side = R() < 0.5 ? 1 : -1, vs = [-1500, 900, 2500, 1700, -700, -2500, -1500, 700];
+      for (let i = 0; i < vs.length; i++) cps.push(rot(-half + 2 * half * i / (vs.length - 1), side * vs[i] * Math.min(1.25, amp)));
     } else if (shape === "loop") {
       const half = WORLD * 0.38, r = 1250 * Math.min(1.4, amp), side = R() < 0.5 ? 1 : -1;
       cps.push(rot(-half, -600 * side), rot(-half * 0.55, 500 * side), rot(-r * 1.1, 0));
@@ -780,6 +783,8 @@
     if (!L.arena) G.portal = { x: path.x[N - 1], y: path.y[N - 1], open: false, t: 0 };
     // treasure chests, star trails, the pet cage, lanterns
     const offAt = (s, side, off) => { const i = clamp(Math.round(s / STEP), 0, endI), [dx, dy] = pathDir(i); return [path.x[i] - dy * side * off, path.y[i] + dx * side * off]; };
+    G.plazas = [];
+    for (const k of L.pets || []) if (isAlly(k)) { const [x, y] = offAt(PETS[k].at * path.len, 1, 0); G.plazas.push({ x, y, r: PLAZA_R, kind: k }); }
     G.chests = [];
     for (const f of [0.14, 0.3, 0.46, 0.62, 0.78, 0.92]) {
       if ((L.pets || []).some((k) => Math.abs(f - PETS[k].at) < 0.06)) continue;
@@ -793,7 +798,7 @@
     const gap = 0.8 * path.len / (L.camps + 2);
     for (let sd = 0.1 * path.len; sd < 0.92 * path.len && G.camps.length < L.camps; ) {
       const [x, y] = offAt(sd, RC() < 0.5 ? -1 : 1, PATH_W * 0.2 + RC() * 120);
-      if (G.camps.some((c) => d2(c.x, c.y, x, y) < (CAMP_R * 2.2) ** 2)) { sd += 160; continue; }
+      if (G.camps.some((c) => d2(c.x, c.y, x, y) < (CAMP_R * 2.2) ** 2) || G.plazas.some((c) => d2(c.x, c.y, x, y) < (CAMP_R * 2.4) ** 2)) { sd += 160; continue; }
       const f = sd / path.len, ks = L.kinds.filter((a) => a[2] <= f * 0.6 + 0.001), k = G.camps.length;
       G.camps.push({ x, y, n: Math.round(12 + 12 * f + 2 * i), elite: k % 2 === 1, boss: ks[Math.floor(RC() * ks.length)][0], st: 0, left: 0, t: 0 });
       sd += gap;
@@ -803,8 +808,13 @@
     G.cages = [];
     // a cage only when its sister plays (in co-op always, so both pages build the same level)
     for (const k of L.pets || []) {
-      const [x, y] = offAt(PETS[k].at * path.len, R() < 0.5 ? -1 : 1, PATH_W / 2 + 70), own = PETS[k].owner === hero || isAlly(k);
-      if (NET.role || (own && !P.pets.includes(k))) G.cages.push({ kind: k, x, y, open: false, t: 0 });
+      let [x, y] = offAt(PETS[k].at * path.len, R() < 0.5 ? -1 : 1, PATH_W / 2 + 70); const own = PETS[k].owner === hero || isAlly(k);
+      const pz = G.plazas.find((z) => z.kind === k); if (pz) { x = pz.x; y = pz.y; }
+      if (NET.role || (own && !P.pets.includes(k))) {
+        G.cages.push({ kind: k, x, y, open: false, t: 0, big: !!pz });
+        // her jailers: a camp all round the cage
+        if (pz) G.camps.push({ x, y, n: 16 + 3 * i, elite: true, boss: L.kinds[Math.min(L.kinds.length - 1, 1)][0], st: 0, left: 0, t: 0, cage: k });
+      }
     }
     G.items = [];
     for (let s = 500; s < path.len - 300; s += 380 + R() * 160) {
@@ -824,6 +834,10 @@
         if (Math.abs(off) > PATH_W / 2 - 22) continue;
         G.stones.push({ x: path.x[s] - dy * off + dx * (R() - 0.5) * 10, y: path.y[s] + dx * off + dy * (R() - 0.5) * 10, rx: 21 + R() * 6, ry: 16 + R() * 5, rot: ang + (R() - 0.5) * 0.5, c: Math.floor(R() * 3) });
       }
+    }
+    for (const A of G.plazas) for (let rr = 60; rr < A.r - 30; rr += 62) {
+      const n = Math.max(4, Math.floor(TAU * rr / 74)), o = R() * TAU;
+      for (let k = 0; k < n; k++) { const a = o + k / n * TAU; G.stones.push({ x: A.x + Math.cos(a) * rr, y: A.y + Math.sin(a) * rr, rx: 28 + R() * 4, ry: 22 + R() * 3, rot: a + Math.PI / 2, c: Math.floor(R() * 3) }); }
     }
     if (G.arena) {
       const A = G.arena;
@@ -850,6 +864,7 @@
       if (x < 120 || y < 120 || x > WORLD - 120 || y > WORLD - 120) return false;
       if (nearestSample(x, y, PATH_W / 2 + 90).i >= 0) return false;
       if (G.arena && d2(x, y, G.arena.x, G.arena.y) < (G.arena.r + 160) ** 2) return false;
+      for (const z of G.plazas) if (d2(x, y, z.x, z.y) < (z.r + 140) ** 2) return false;
       for (const k of keepOut) if (d2(x, y, k.x, k.y) < 260 * 260) return false;
       const gap = name === "tree" ? 170 : 95;
       for (const d of decoNear(x, y, gap)) if (d2(x, y, d.x, d.y) < gap * gap) return false;
@@ -962,11 +977,17 @@
       g.stroke();
     };
     const A = G.arena, arenaHere = A && A.x + A.r + 60 > x0 && A.x - A.r - 60 < x0 + S && A.y + A.r + 60 > y0 && A.y - A.r - 60 < y0 + S;
-    const disc = (r, col, a) => { if (!arenaHere) return; g.globalAlpha = a; g.fillStyle = col; g.beginPath(); g.arc(A.x, A.y, r, 0, TAU); g.fill(); };
-    if (runs.length || arenaHere) {
-      strokeRuns(PATH_W + 70, "#000", 0.13); disc(A ? A.r + 50 : 0, "#000", 0.15);
-      strokeRuns(PATH_W + 26, T.edge, 1); disc(A ? A.r + 22 : 0, T.edge, 1);
-      strokeRuns(PATH_W, T.gap, 1); disc(A ? A.r : 0, T.gap, 1);
+    const pzs = (G.plazas || []).filter((z) => z.x + z.r + 60 > x0 && z.x - z.r - 60 < x0 + S && z.y + z.r + 60 > y0 && z.y - z.r - 60 < y0 + S);
+    const disc = (d, col, a) => {
+      g.globalAlpha = a; g.fillStyle = col; g.beginPath();
+      if (arenaHere) { g.moveTo(A.x + A.r + d, A.y); g.arc(A.x, A.y, A.r + d, 0, TAU); }
+      for (const z of pzs) { g.moveTo(z.x + z.r + d, z.y); g.arc(z.x, z.y, z.r + d, 0, TAU); }
+      g.fill();
+    };
+    if (runs.length || arenaHere || pzs.length) {
+      strokeRuns(PATH_W + 70, "#000", 0.13); disc(50, "#000", 0.15);
+      strokeRuns(PATH_W + 26, T.edge, 1); disc(22, T.edge, 1);
+      strokeRuns(PATH_W, T.gap, 1); disc(0, T.gap, 1);
       g.globalAlpha = 1;
       for (let ci = 0; ci < 3; ci++) {
         g.fillStyle = T.stone[ci]; g.beginPath();
@@ -1681,6 +1702,97 @@
   }
   function openCageFx(c) {
     SFX.unlock(); burst(c.x, c.y - 80, 30, ["#fff4c2", "#ffd34d", PETS[c.kind].col], 420, 0.8);
+    if (isAlly(c.kind) && c.big) startRescue(c);
+  }
+  // ---------------------------------------------------------------- the rescue scene: the camera closes in on the cage,
+  // she breaks out, wipes out her jailers with her ultimate, thanks the girls, then joins them. The world waits meanwhile.
+  const RS_OUT = 0.9, RS_ULT = 1.7, RS_HIT = 2.5, RS_THANK = 3.6, RS_END = 6.0;
+  function startRescue(c) {
+    if (G.rescue) return;
+    const qNear = Q && NET.role && !Q.dead && d2(Q.x, Q.y, c.x, c.y) < d2(P.x, P.y, c.x, c.y);
+    G.rescue = { kind: c.kind, x: c.x, y: c.y, t: 0, by: qNear ? HEROES[Q.hero].name : HD().name, hit: false };
+    P.vx = P.vy = 0;
+  }
+  function updateRescue(dt) {
+    const r = G.rescue, D = PETS[r.kind], t0 = r.t; r.t += dt;
+    const at = (x) => t0 < x && r.t >= x;
+    P.inv = Math.max(P.inv, 1.5); P.moving = false;
+    if (at(0.25)) { SFX.slam(); G.shake = 14; for (let i = 0; i < 14; i++) G.parts.push({ type: "rock", x: r.x, y: r.y - 40, z: rnd(60, 200), vx: rnd(-420, 420), vy: rnd(-200, 260), vz: rnd(300, 800), rot: rnd(0, 6), vr: rnd(-10, 10), name: "qk_rock2", sc: rnd(0.3, 0.6), life: 2, max: 2 }); burst(r.x, r.y - 150, 50, [D.col, "#fff", "#ffd34d"], 620, 1); }
+    if (at(RS_OUT)) showBanner(D.name + " được tự do!", "");
+    if (at(RS_ULT)) { SFX.charge(); }
+    if (at(RS_HIT)) {
+      // her ultimate: every monster round the cage is gone
+      SFX.boom(); G.shake = 26;
+      G.parts.push({ type: "ring", x: r.x, y: r.y - 40, r: 60, vr: 2600, life: 0.9, max: 0.9, col: D.rgb });
+      if (NET.role !== "guest") for (const m of G.mons) if (m.alive && !m.c.heavy && d2(m.x, m.y, r.x, r.y) < 1500 * 1500) killMon(m, false);
+      for (const cp of G.camps) if (cp.cage === r.kind) cp.left = Math.min(cp.left, 0);
+    }
+    if (at(RS_THANK)) { SFX.level && SFX.level(); $("banner").classList.remove("show"); }
+    if (r.t >= RS_END) {
+      G.rescue = null;
+      // she steps into the team right where she stood
+      for (const e of [...PETE, ...QPETE]) if (e.kind === r.kind) { e.x = r.x + 40; e.y = r.y + 30; }
+      showBanner(D.name + " đi cùng các bé!", D.tip);
+    }
+  }
+  const rsEase = (t) => t * t * (3 - 2 * t);
+  const rescueZoom = () => { const r = G.rescue; if (!r) return 1; const k = Math.min(rsEase(clamp(r.t / 0.7, 0, 1)), 1 - rsEase(clamp((r.t - (RS_END - 0.6)) / 0.6, 0, 1))); return 1 + 0.55 * k; };
+  // drawn over the scene: her, her ultimate, her thanks
+  function drawRescue() {
+    const r = G.rescue; if (!r) return;
+    const D = PETS[r.kind], t = r.t, out = clamp((t - 0.25) / (RS_OUT - 0.25), 0, 1);
+    const x = r.x, y = r.y + 70 * rsEase(out);
+    // the girl inside: dimmed in the cage, then bright as she steps out
+    glow(x, y - 150, 260, D.rgb, 0.35 + 0.4 * out);
+    const ult = t >= RS_ULT && t < RS_THANK, k = clamp((t - RS_ULT) / (RS_THANK - RS_ULT), 0, 1);
+    let lift = 0;
+    if (ult) lift = Math.sin(Math.min(1, k * 1.6) * Math.PI) * (D.style === "sweep" ? 60 : 140);
+    drawAlly({ kind: r.kind, x, y: y - lift, face: 0, flip: false, moving: false, i: 0, dist: 0, at: ult ? (k * 1.6 % 1) * petAtkLen(r.kind) : -1 }, D);
+    if (t >= RS_ULT && t < RS_HIT + 0.6) {
+      const a = clamp(1 - (t - RS_HIT) / 0.6, 0, 1) * clamp((t - RS_ULT) / 0.3, 0, 1);
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      if (D.style === "knives") {
+        // a storm of glowing knives spinning out in rings
+        for (let ring = 0; ring < 3; ring++) for (let i = 0; i < 14; i++) {
+          const an = i / 14 * TAU + ring * 0.22 + (t - RS_ULT) * (ring % 2 ? -2 : 2), rr = 120 + ((t - RS_ULT) * 900 + ring * 260) % 1300;
+          drawKnife(x + Math.cos(an) * rr, y - 80 + Math.sin(an) * rr * 0.62, an, a);
+        }
+      } else if (D.style === "sweep") {
+        // the glaive whirls round and round, wider each turn
+        for (let i = 0; i < 4; i++) {
+          const rr = 200 + i * 260 + (t - RS_ULT) * 300, a0 = (t - RS_ULT) * 9 + i * 1.3;
+          ctx.save(); ctx.translate(x, y - 60); ctx.scale(1, 0.62); ctx.lineCap = "round";
+          ctx.strokeStyle = `rgba(${D.rgb},${0.8 * a})`; ctx.lineWidth = 60; ctx.beginPath(); ctx.arc(0, 0, rr, a0, a0 + 2.6); ctx.stroke();
+          ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`; ctx.lineWidth = 14; ctx.stroke(); ctx.restore();
+        }
+      } else {
+        // sword cuts flashing across the whole clearing
+        for (let i = 0; i < 7; i++) {
+          const ph = clamp((t - RS_ULT - i * 0.1) / 0.35, 0, 1); if (ph <= 0) continue;
+          const an = i * 2.4 + 0.4, len = 1300, cx = x + Math.cos(an * 1.7) * 160, cy = y - 60 + Math.sin(an * 1.3) * 100;
+          const ex = Math.cos(an) * len / 2, ey = Math.sin(an) * len / 2 * 0.62, f = (1 - Math.abs(ph * 2 - 1));
+          ctx.strokeStyle = `rgba(${D.rgb},${0.85 * a * f + 0.15 * a})`; ctx.lineWidth = 46 * f + 6; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(cx - ex * ph, cy - ey * ph); ctx.lineTo(cx + ex * ph, cy + ey * ph); ctx.stroke();
+          ctx.strokeStyle = `rgba(255,255,255,${a * f})`; ctx.lineWidth = 12 * f + 2; ctx.stroke();
+        }
+      }
+      ctx.restore();
+      if (t >= RS_HIT && t < RS_HIT + 0.35) { ctx.save(); ctx.globalAlpha = 0.5 * (1 - (t - RS_HIT) / 0.35); ctx.fillStyle = "#fff"; ctx.fillRect(G.camX - 200, G.camY - 200, VW + 400, VH + 400); ctx.restore(); }
+    }
+    if (t >= RS_THANK) {
+      const k2 = clamp((t - RS_THANK) / 0.3, 0, 1), names = Q && NET.role ? HEROES.g.name + " và " + HEROES.s.name : r.by;
+      bubble("Cảm ơn " + names + " nhé!", "Từ giờ mình đi cùng các bé!", x, y - 330, k2);
+    }
+  }
+  function bubble(l1, l2, x, y, k) {
+    ctx.save(); ctx.globalAlpha = k; ctx.translate(x, y); ctx.scale(0.8 + 0.2 * k, 0.8 + 0.2 * k);
+    ctx.font = "800 44px Grandstander, system-ui"; const w = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width * 0.8) + 70;
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(60,30,80,.5)"; ctx.lineWidth = 5;
+    rrect(ctx, -w / 2, -110, w, 130, 34); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-26, 18); ctx.lineTo(0, 60); ctx.lineTo(26, 18); ctx.fill();
+    ctx.textAlign = "center"; ctx.fillStyle = "#4a2160"; ctx.fillText(l1, 0, -48);
+    ctx.font = "700 34px Grandstander, system-ui"; ctx.fillStyle = "#8a4fb0"; ctx.fillText(l2, 0, -6);
+    ctx.restore();
   }
   function rescuePet(kind) {
     if (kind === "cat") SFX.meow();
@@ -2615,6 +2727,15 @@
       if (G.fadeDir > 0 && G.fade >= 1) { const f = G.onFade; G.onFade = null; G.fadeDir = -1; f && f(); }
       else if (G.fadeDir < 0 && G.fade <= 0) G.fadeDir = 0;
     }
+    if (G.rescue && G.mode === "play") {
+      netFrame(dt); updateRescue(dt);
+      for (const m of G.mons) if (!m.alive) m.die += dt;
+      G.mons = G.mons.filter((m) => m.alive || m.die < 0.6);
+      const r = G.rescue, tx = clamp(r ? r.x - VW / 2 : G.camX, 0, WORLD - VW), ty = clamp(r ? r.y - 180 - VH / 2 : G.camY, 0, WORLD - VH), k = 1 - Math.pow(0.02, dt);
+      G.camX = lerp(G.camX, tx, k); G.camY = lerp(G.camY, ty, k); G.shake = Math.max(0, G.shake - 40 * dt);
+      updateParts(dt);
+      return;
+    }
     if (API.autopilot && G.energy >= 100 && (aliveCount() > 14 || (G.boss && G.boss.alive && G.boss.st !== "enter") || G.mons.some((m) => m.alive && m.c.heavy && !m.shield))) IN.ultPressed = true;
     if (IN.ultPressed) { IN.ultPressed = false; startUlt(); }
     updateHero(dt);
@@ -3045,6 +3166,7 @@
   }
   function drawPet(p) {
     const D = PETS[p.kind];
+    if (G.rescue && G.rescue.kind === p.kind) return;
     if (!D.art && G.cine && G.cine.ph === "outro") p = { ...p, dist: G.t * 300, moving: true };
     if (D.art && dirN(`${D.art}_d${p.face}_w`)) return drawAlly(p, D);
     const pre = `pet_${p.kind}_d${p.face}_w`, n = dirN(pre);
@@ -3090,6 +3212,17 @@
   }
   function drawCage(c) {
     const D = PETS[c.kind];
+    if (c.big) {
+      const cg = FR.cage_big, co = FR.cage_big_open;
+      shadow(c.x, c.y, 130, 30);
+      if (!c.open) {
+        glow(c.x, c.y - 200, 260, D.rgb, 0.35 + 0.12 * Math.sin(G.t * 3));
+        drawAlly({ kind: c.kind, x: c.x, y: c.y - 14, face: 0, flip: false, moving: false, i: 0, dist: 0, at: -1 }, D);
+        if (cg) spr(cg, c.x, c.y); else spr(PROPS.cage, c.x, c.y, false, 1.7);
+        label("Cứu " + D.name + "!", c.x, c.y - (cg ? cg.ay * cg.s : 420) - 30, 44);
+      } else if (co) spr(co, c.x, c.y); else spr(PROPS.cageOpen, c.x, c.y, false, 1.7, 0.85);
+      return;
+    }
     shadow(c.x, c.y, 70, 16);
     if (!c.open) {
       glow(c.x, c.y - 100, 160, D.rgb, 0.35 + 0.12 * Math.sin(G.t * 3));
@@ -3347,7 +3480,9 @@
     if (resDirty) { const r = clamp(SCALE * DPR * 0.75, 0.35, 0.9); if (Math.abs(r - chunkRes) > 0.04) { chunkRes = r; chunkCache.clear(); } resDirty = false; }
     const sc = SCALE * DPR, offX = (W - VW * sc) / 2, offY = (H - VH * sc) / 2;
     const shx = G.shake ? rnd(-G.shake, G.shake) : 0, shy = G.shake ? rnd(-G.shake, G.shake) : 0;
-    ctx.setTransform(sc, 0, 0, sc, offX + (shx - G.camX) * sc, offY + (shy - G.camY) * sc);
+    // zoomed in (the rescue scene) around the middle of the view
+    const zm = rescueZoom(), zs = sc * zm;
+    ctx.setTransform(zs, 0, 0, zs, offX + (VW / 2 - (G.camX + VW / 2 - shx) * zm) * sc, offY + (VH / 2 - (G.camY + VH / 2 - shy) * zm) * sc);
     const L = G.camX, R = G.camX + VW, T = G.camY, B = G.camY + VH;
     // ground chunks (a couple of new ones painted per frame)
     chunkBudget = 2;
@@ -3411,6 +3546,7 @@
     for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc);
     drawGwimaGone();
     drawQuakesAir();
+    drawRescue();
     drawParts(L, R, T, B);
     drawCineFx(L, T);
     drawCombo(L, T);
@@ -3492,6 +3628,7 @@
   }
   let bannerTimer = 0;
   function showBanner(text, small) {
+    if (G.rescue && G.rescue.t > RS_OUT + 0.05) return;   // the rescue scene speaks for itself
     const b = $("banner"); b.innerHTML = ""; b.append(text);
     if (small) { const s = document.createElement("small"); s.textContent = small; b.append(s); }
     b.classList.add("show"); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove("show"), 1900);
