@@ -1051,9 +1051,12 @@
   }
   function heroDown() {
     if (P.dead) return;
-    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = 1.5; P.vx = P.vy = 0;
-    showBanner("Bé mệt rồi!", "Ngồi nghỉ một chút rồi đứng dậy");
+    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; P.vx = P.vy = 0; SFX.hurt();
+    showBanner("Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
   }
+  // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
+  const FAINT_T = 10, RESCUE_R = 280;
+  const rescuing = () => !!(Q && NET.role && !Q.dead && d2(Q.x, Q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
     P.dead = false; P.hurtT = 0; P.inv = 2.5; G.hearts = 5; renderHearts(); SFX.heal();
@@ -1073,7 +1076,7 @@
   }
   function updateHero(dt) {
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
-    if (P.dead) { P.moving = false; if ((G.reviveT -= dt) <= 0) reviveHero(); return; }
+    if (P.dead) { P.moving = false; P.helped = rescuing(); if ((G.reviveT -= dt * (P.helped ? 5 : 1)) <= 0) reviveHero(); return; }
     if (G.ult || P.winT || (G.cine && G.cine.lock)) { P.vx = P.vy = 0; P.moving = false; return; }
     const [ax, ay] = readMove(), sp = 360 * (P.slowT > 0 ? 0.55 : 1);
     if (P.hurtT > 0) { P.vx *= Math.pow(0.01, dt); P.vy *= Math.pow(0.01, dt); }
@@ -1966,6 +1969,7 @@
     if (ph === "intro") showBanner("Gwi Ma đã bắt Saja Boys!", "Cả nhóm hãy xem kìa…");
     else if (ph === "outro") {
       showBanner("Gwi Ma đang tan rã!", "");
+      if (P.dead) { P.dead = false; G.hearts = 5; renderHearts(); }
       P.winT = 99; P.vx = P.vy = 0; P.x = A.x + (NET.role === "guest" ? 120 : -120); P.y = A.y - 520; P.face = 4;
       // everyone in a row in front of the boys
       PETE.forEach((p, i) => { const k = i + 1, side = k % 2 ? 1 : -1; p.x = P.x + side * (150 + Math.floor((k - 1) / 2) * 150); p.y = A.y - 520 + 30 + (k % 3) * 20; p.face = 0; p.flip = false; p.at = -1; p.st = "follow"; });
@@ -2342,11 +2346,18 @@
     for (const m of G.mons) {
       if (!m.alive || offStage(m) || (!all && !(Math.abs(m.x - cx) < hw && Math.abs(m.y - cy) < hh))) continue;
       // a combo takes a fifth of a demon's health, Gwi Ma needs about five combos
-      if (m.c.heavy) damageMon(m, Math.ceil(m.max * (m.c.gwima ? (all ? 0.15 : 0.035) : (all ? 0.2 : 0.06))), m.x, m.y, true, "p");
+      if (m.c.heavy) damageMon(m, ultCap(m, Math.ceil(m.max * (m.c.gwima ? (all ? 0.15 : 0.035) : (all ? 0.2 : 0.06))), m.c.gwima ? 0.25 : 0.5), m.x, m.y, true, "p");
       else killMon(m, false);
     }
     G.foes = G.foes.filter((f) => !(Math.abs(f.x - cx) < hw && Math.abs(f.y - cy) < hh));
-    const B = G.boss; if (B && B.alive && Math.abs(B.x - cx) < hw + 100 && Math.abs(B.y - cy) < hh + 100) damageBoss(14 * mult, B.x, B.y, false, true);
+    const B = G.boss; if (B && B.alive && Math.abs(B.x - cx) < hw + 100 && Math.abs(B.y - cy) < hh + 100) damageBoss(ultCap(B, Math.ceil(B.max * (all ? 0.35 : 0.12)), 0.5), B.x, B.y, false, true);
+  }
+  // both girls' ultimates landing close together (within 3 s) never take more than `frac` of a boss's health between them
+  // (counted as all health lost since the first of them, so bolts in between are included)
+  function ultCap(o, dmg, frac) {
+    if (!(G.t - (o.ultT ?? -99) < 3)) o.ultHp0 = o.hp;
+    o.ultT = G.t;
+    return Math.max(0, Math.min(dmg, Math.floor(o.max * frac) - (o.ultHp0 - o.hp)));
   }
   // the combo: Zoey, Mira, Rumi and the pets join in around the girls, one big burst of light
   function comboUlt(send) {
@@ -2777,14 +2788,36 @@
     const [fn, flip] = P.fn = heroFrame({ hk: hero, skin: mySkin(), face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, hurtT: P.hurtT, dead: P.dead, winT: P.winT });
     const blink = P.inv > 0 && !P.dead && !G.ult && Math.floor(G.t * 16) % 2 === 0;
     if (P.elem && !G.ult) glow(P.x, P.y - 100, 150, ELEM[P.elem].rgb, 0.16 + 0.06 * Math.sin(G.t * 5));
-    if (P.dead) {
-      // resting: a soft circle of light while she gets her breath back
-      const k = 1 - clamp(G.reviveT / 1.5, 0, 1);
-      groundCircle(hero === "s" ? "fx_circle_s" : "fx_circle_g", P.x, P.y, 0.45 + 0.25 * k, 0.5 + 0.4 * k, G.t);
-    }
+    if (P.dead) return drawFainted(hero, P.x, P.y, 1 - clamp(G.reviveT / FAINT_T, 0, 1), P.helped, Q && NET.role ? Q : null);
     drawHeroSprite(hero, G.ult ? fr(mySkin() + "_jump", hero + "_jump") : fn, P.x, P.y, P.z, flip, blink ? 0.45 : 1, G.ult ? G.ult.t : 0, stepPose(P, P.moving && !G.ult ? P.dist : -1));
     if (P.castT > 0.15 && !G.ult && fn.includes("_cast_")) { const [wx, wy] = wandTip(hero, P.face, flip); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
     if (P.slowT > 0) drawWeb(P.x, P.y - 70, 40, Math.min(1, P.slowT));
+  }
+  // a fainted girl: lying on the ground with stars circling her head, a ring filling up until she wakes;
+  // when her friend stands close, sparkles flow from the friend to her and the ring fills five times faster
+  function drawFainted(hk, x, y, k, helped, friend) {
+    const f = FR[hk + "_hurt"] || FR[hk + "_stand"]; if (!f) return;
+    const M = CHAR_M * sideK(hk, hk + "_hurt"), h = f.h * f.s * M, head = [x - h * 0.42, y - 34];
+    shadow(x, y, h * 0.55, 18, 0.35);
+    spr(f, x + h * 0.5, y - 10, false, M, 1, -Math.PI / 2);
+    // dizzy: stars and swirls going round above her head
+    for (let i = 0; i < 4; i++) {
+      const a = G.t * 4 + i * TAU / 4, sx = head[0] + Math.cos(a) * 85, sy = head[1] - 90 + Math.sin(a) * 28;
+      glow(sx, sy, 40, "255,230,120", 0.6); fx("fx_twinkle", sx, sy, 1.0, 1, G.t * 6);
+    }
+    ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 6;
+    for (const dx of [-20, 20]) { ctx.beginPath(); for (let t = 0; t < 2.8 * Math.PI; t += 0.25) { const r = 3 + t * 3, a = t - G.t * 8; ctx.lineTo(head[0] + dx + Math.cos(a) * r, head[1] - 22 + Math.sin(a) * r); } ctx.stroke(); }
+    ctx.restore();
+    // the waking ring
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.5);
+    ctx.lineWidth = 30; ctx.strokeStyle = "rgba(0,0,0,.45)"; ctx.beginPath(); ctx.arc(0, 0, h * 0.62, 0, TAU); ctx.stroke();
+    ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = helped ? "rgba(124,242,198,.95)" : "rgba(255,211,77,.9)";
+    ctx.beginPath(); ctx.arc(0, 0, h * 0.62, -Math.PI / 2, -Math.PI / 2 + TAU * k); ctx.stroke();
+    ctx.restore();
+    if (helped && friend) {
+      label("Đang cứu!", x, y - h * 0.5 - 60, 40, "#7cf2c6");
+      if (Math.random() < 0.6 && G.parts.length < 420) { const t = Math.random(); G.parts.push({ type: "dot", x: friend.x + (x - friend.x) * t, y: friend.y - 120 + (y - 60 - friend.y + 120) * t, vx: (x - friend.x) * 1.5, vy: (y - friend.y) * 1.5, life: 0.5, max: 0.5, r: rnd(5, 9), col: "#7cf2c6" }); }
+    }
   }
   function drawPartner() {
     const H = HEROES[Q.hero], topY = Q.y - (Q.hero === "s" ? 250 : 215);
@@ -2793,7 +2826,8 @@
     const mv = Q.lx === undefined ? 0 : Math.hypot(Q.x - Q.lx, Q.y - Q.ly); Q.lx = Q.x; Q.ly = Q.y;
     Q.wd = (Q.wd || 0) + (mv < 60 ? mv : 0); Q.still = mv > 0.5 ? 0 : (Q.still || 0) + 1;
     const qWalk = Q.ultT > 0 || Q.dead || Q.still > 6 ? -1 : Q.wd;
-    if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? fr(Q.skin + "_jump", Q.hero + "_jump") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.flip, Q.inv && !Q.dead && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
+    if (Q.dead) drawFainted(Q.hero, Q.x, Q.y, Q.rev || 0, Q.helped, P);
+    else if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? fr(Q.skin + "_jump", Q.hero + "_jump") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.flip, Q.inv && !Q.dead && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
     if (Q.slow) drawWeb(Q.x, Q.y - 70, 40, 1);
     // name tag and hearts
     label(H.name, Q.x, topY, 32, "#fff");
@@ -3650,7 +3684,7 @@
   function girlState() {
     const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0);
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn && P.fn[0]) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, mySkin(), P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
-      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0)])];
+      PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0];
   }
   function worldState() {
     const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
@@ -3693,6 +3727,7 @@
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, 5);
     Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];   // their pets (shown following them)
     Q.lv = clamp(Math.floor(num(gl[13])) || 1, 1, MAX_LV);
+    Q.rev = clamp(num(gl[15]) / 100, 0, 1); Q.helped = !!gl[16];
     Q.hostInv -= dt;
   }
 
@@ -3921,7 +3956,7 @@
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadPets(); renderHeroes(); },
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc }),
-    heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet,
+    heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, startBoss,
     spawnMon: (kind, x, y) => spawnMon(kind, x === undefined ? P.x + 400 : x, y === undefined ? P.y : y),
     killAll: () => { for (const m of G.mons) if (m.alive) killMon(m, true, "p"); },
     openGate: () => { G.lvKills = Math.max(G.lvKills, G.quota); checkGate(); },
