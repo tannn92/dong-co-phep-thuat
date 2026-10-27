@@ -276,7 +276,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261025.2113", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261027.0928", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3388,9 +3388,10 @@
   function makeSum(cfg) {
     let a, b, r, carry = false;
     const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-    if (cfg.lim > 10) {
-      // within 20: mostly with carrying / borrowing (7 + 8, 13 − 9), sometimes without (12 + 6, 17 − 4)
-      carry = Math.random() < 0.78;
+    // 80% of all questions carry / borrow (7 + 8, 13 − 9), on every level (Dad, 2026-10-27); the rest stay within the level's limit
+    carry = Math.random() < 0.8;
+    if (carry || cfg.lim > 10) {
+      // within 20: with carrying / borrowing, or (on the 20 levels) without (12 + 6, 17 − 4)
       if (cfg.op === "+") {
         if (carry) { a = R(2, 9); b = R(Math.max(2, 11 - a), 9); }
         else { a = R(10, 18); b = R(1, 19 - a); if (Math.random() < 0.3) [a, b] = [b, a]; }
@@ -3409,13 +3410,13 @@
     }
     // three wrong answers close to the right one
     const ans = [r], near = [1, -1, 2, -2, 3, -3, 4].sort(() => Math.random() - 0.5);
-    for (const d of near) { const v = r + d; if (ans.length < 4 && v >= 0 && v <= cfg.lim && !ans.includes(v)) ans.push(v); }
+    for (const d of near) { const v = r + d; if (ans.length < 4 && v >= 0 && v <= (carry ? Math.max(cfg.lim, 20) : cfg.lim) && !ans.includes(v)) ans.push(v); }
     for (let v = 0; ans.length < 4; v++) if (!ans.includes(v)) ans.push(v);
     ans.sort(() => Math.random() - 0.5);
     return { a, b, op: cfg.op, ans, ok: ans.indexOf(r), carry };
   }
   // seconds per question: one number, or [without, with] carrying / borrowing
-  const quizT = (cfg, q) => (Array.isArray(cfg.T) ? cfg.T[q.carry ? 1 : 0] : cfg.T);
+  const quizT = (cfg, q) => (Array.isArray(cfg.T) ? cfg.T[q.carry ? 1 : 0] : q.carry ? Math.max(7, cfg.T * 2) : cfg.T);   // a carry question on a 10 level gets 7 s
   function startQuiz(B) {
     const cfg = G.lvl.boss.quiz, q = makeSum(cfg);
     B.st = "quiz"; B.t = 0; B.jz = 0;
