@@ -276,7 +276,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261027.0928", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261028.2155", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -299,6 +299,33 @@
     document.addEventListener("visibilitychange", () => { if (!document.hidden && G.mode === "title") check(false); });
   }
   initVersion();
+  const CHARACTER_REDRAW = new Set();
+  async function loadCharacterRedraw() {
+    // A separate atlas keeps game2's shared assets intact. Missing/incomplete delivery keeps old art.
+    try {
+      const response = await fetch("character-assets/atlas.json", { cache: "no-cache" });
+      if (!response.ok) return;
+      const meta = await response.json();
+      const poses = ["wr0","wr1","wr2","wl0","wl1","wl2", ...["wd","wu","cd","cu"].flatMap(p => [0,1,2,3].map(i => p+i)),
+        ...["cr","cl"].flatMap(p => [0,1,2].map(i => p+i)), "stand","faint","cheer","ult"];
+      if (meta.version !== 1 || !Array.isArray(meta.sheets) || !meta.sheets.length || !meta.frames || !meta.aliases) return;
+      if (!meta.sheets.every(n => /^characters_\d+\.webp$/.test(n))) return;
+      for (const c of ["g","s"]) for (const p of poses) if (!meta.frames[c+"_new_"+p]) return;
+      const images = await Promise.all(meta.sheets.map(n => loadImg("character-assets/"+n+"?v="+encodeURIComponent(meta.hash))));
+      const fresh = {};
+      for (const [name,f] of Object.entries(meta.frames)) {
+        if (!/^[gs]_new_/.test(name) || !Array.isArray(f) || f.length !== 8 || !f.every(Number.isFinite)) return;
+        const im = images[f[0]];
+        if (!im || f[1]<0 || f[2]<0 || f[3]<=0 || f[4]<=0 || f[5]<=0 || f[1]+f[3]>im.width || f[2]+f[4]>im.height) return;
+        fresh[name]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7],redraw:true,name};
+      }
+      for (const [name,source] of Object.entries(meta.aliases)) {
+        if (!/^[gs]_/.test(name) || !fresh[source]) return;
+        fresh[name]=fresh[source];
+      }
+      Object.assign(FR,fresh); CHARACTER_REDRAW.add("g"); CHARACTER_REDRAW.add("s");
+    } catch (e) { /* Old pictures remain usable if an optional sheet failed to load. */ }
+  }
   async function loadAssets() {
     // the atlas is checked with the server every time; its sheets carry a hash of it so a new pack is never mixed with old pictures
     const txt = await (await fetch("assets/atlas.json", { cache: "no-cache" })).text();
@@ -306,6 +333,7 @@
     let hv = 0; for (let i = 0; i < txt.length; i += 7) hv = (hv * 31 + txt.charCodeAt(i)) | 0;
     const sheets = await Promise.all(META.sheets.map((s) => loadImg("assets/" + s + "?v=" + (hv >>> 0).toString(36))));
     for (const [n, f] of Object.entries(META.frames)) FR[n] = { img: sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
+    await loadCharacterRedraw();
     const bgs = await Promise.all([1, 2, 3, 4].map((i) => loadImg(`assets/bg${i}.jpg`)));
     bgs.forEach((b, i) => (IMG["bg" + (i + 1)] = b));
     FR.potion_energy = recolor("potion", "#ffc21a");
@@ -336,6 +364,10 @@
   function spr(f, x, y, flip = false, m = 1, alpha = 1, rot = 0, sy = 1) {
     if (typeof f === "string") f = FR[f];
     if (!f) return;
+    if (f.redraw && flip) {
+      const left = f.name.replace(/_wr(\d)$/, "_wl$1").replace(/_cr(\d)$/, "_cl$1");
+      f = FR[left] || f; flip = false; // separately painted left hand, never mirror a girl
+    }
     const k = f.s * m;
     ctx.save();
     ctx.translate(x, y);
@@ -1280,10 +1312,10 @@
   function wandTip(hk, face, flip, fn) {
     const W2 = WAND_WC[hk];
     if (W2 && fn) {
-      if (fn.includes("_wcL")) return W2.wcL;
-      if (fn.includes("_wc")) return [W2.wc[0] * (flip ? -1 : 1), W2.wc[1]];
-      if (fn.includes("_cast_d0")) return W2.d0;
-      if (fn.includes("_cast_d4")) return W2.d4;
+      if ((fn.includes("_wcL") || fn.includes("_new_cl"))) return W2.wcL;
+      if ((fn.includes("_wc") || fn.includes("_new_cr"))) return [W2.wc[0] * (flip ? -1 : 1), W2.wc[1]];
+      if ((fn.includes("_cast_d0") || fn.includes("_new_cd"))) return W2.d0;
+      if ((fn.includes("_cast_d4") || fn.includes("_new_cu"))) return W2.d4;
     }
     const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip && face !== 0 && face !== 4 ? -1 : 1), w[1]];
   }
@@ -1291,7 +1323,7 @@
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
-    const castShown = P.fn && /_cast_|_wc/.test(P.fn[0]);
+    const castShown = P.fn && /_cast_|_wc|_new_c[rldu]/.test(P.fn[0]);
     const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.fn[1], P.fn[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
     const x = P.x + wx, y = P.y + wy;
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
@@ -3823,8 +3855,8 @@
   }
   // where her wand tip is from her feet, in the side casting pose at size m
   function cbTip(hk, skin, m, flip) {
-    const f = FR[fr(skin + "_cast", hk + "_cast")]; if (!f) return [0, -200 * m];
-    const [u, v] = CB_TIP[hk] || CB_TIP.g, k = f.s * CHAR_M * (SIDE_K[hk] || 1) * m;
+    const fn = fr(skin + "_cast", hk + "_cast"), f = FR[fn]; if (!f) return [0, -200 * m];
+    const [u, v] = CB_TIP[hk] || CB_TIP.g, k = f.s * CHAR_M * sideK(hk, fn) * m;
     return [(u * f.w - f.ax) * k * (flip ? -1 : 1), (v * f.h - f.ay) * k];
   }
   // her place in the scene at time t: [x, y, size, frame, mirrored]; Mochi on the left, Matcha on the right, facing in
@@ -3938,7 +3970,7 @@
     ctx.restore();
     // the girls
     if (t < CB_END) for (const g of girls2) {
-      const [x, y, m, pose, fl] = cbPose(C, g, t), M = CHAR_M * (SIDE_K[g.hk] || 1) * m, fn = fr(g.skin + "_" + pose, g.hk + "_" + pose);
+      const [x, y, m, pose, fl] = cbPose(C, g, t), fn = fr(g.skin + "_" + pose, g.hk + "_" + pose), M = CHAR_M * sideK(g.hk, fn) * m;
       const lift = t < CB_MEET ? ss(0, 0.3, t) : t > CB_BACK ? 1 - ss(CB_END - 0.2, CB_END, t) : 1;
       shadow(g.x, g.y, 46 * (1 - 0.6 * lift), 12, 0.3 * (1 - lift * 0.8));
       glow(x, y - 170 * m, 220 * m, HEROES[g.hk].rgb, 0.45 * lift);
@@ -4266,6 +4298,17 @@
   const SIDE_STEPS = [1, 0, 3, 0];
   function heroFrame(o) {
     const sk = o.skin, base = o.hk;
+    if (CHARACTER_REDRAW.has(base) && (!sk || sk === base)) {
+      const side=o.face>=1 && o.face<=3, cast=o.castT>0;
+      const step=[0,1,2,1][Math.floor((o.dist||0)/SIDE_CYCLE*4)%4];
+      let pose;
+      if(o.winT) pose="cheer";
+      else if(o.dead) pose="faint";
+      else if(side) pose=(cast?"c":"w")+(o.flip?"l":"r")+(o.moving?step:1);
+      else if(!o.moving && !cast && o.face===0) pose="stand";
+      else pose=(cast?"c":"w")+(o.face===4?"u":"d")+(o.moving?Math.floor((o.dist||0)/DIR_CYCLE*4)%4:0);
+      return [base+"_new_"+pose,false];
+    }
     if (o.winT) return [fr(sk + "_win", base + "_win"), o.flip];
     if (o.dead) return [fr(sk + "_sit", base + "_sit", sk + "_hurt", base + "_hurt"), o.flip];
     if (o.hurtT > 0) return [fr(`${sk}_d${o.face}_hurt`, `${base}_d${o.face}_hurt`, sk + "_hurt", base + "_hurt"), o.flip];
@@ -4437,7 +4480,7 @@
   // the side-view poses (hurt, resting, win, ultimate) are slimmer than the chibi 8-direction art: scaled up so
   // she looks the same size (ratio of body areas, measured from the atlas)
   const SIDE_K = { g: 1.12, s: 1.0 };
-  const sideK = (hk, fn) => (/_d\d_/.test(fn) ? 1 : SIDE_K[hk] || 1);
+  const sideK = (hk, fn) => (FR[fn] && FR[fn].redraw ? 1 : /_d\d_/.test(fn) ? 1 : SIDE_K[hk] || 1);
   function drawHeroSprite(hk, fn, x, y, z, flip, alpha, ultT, step) {
     const M = CHAR_M * sideK(hk, typeof fn === "string" ? fn : "");
     if (ultT > 0) {
@@ -4529,7 +4572,7 @@
     if (P.dead) return drawFainted(hero, P.x, P.y, 1 - clamp(G.reviveT / FAINT_T, 0, 1), P.helped, Q && NET.role ? Q : null);
     drawHeroSprite(hero, G.ult ? fr(mySkin() + "_jump", hero + "_jump") : fn, P.x, P.y, P.z, flip, blink ? 0.45 : 1, G.ult ? G.ult.t : 0, stepPose(P, P.moving && !G.ult ? P.dist : -1));
     if (aura) drawAura(P.elem, P.x, P.y, P.elemT, 2);
-    if (P.castT > 0.15 && !G.ult && /_cast_|_wc/.test(fn)) { const [wx, wy] = wandTip(hero, P.face, flip, fn); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
+    if (P.castT > 0.15 && !G.ult && /_cast_|_wc|_new_c[rldu]/.test(fn)) { const [wx, wy] = wandTip(hero, P.face, flip, fn); glow(P.x + wx, P.y + wy - BOLT_Z, 55, P.elem ? ELEM[P.elem].rgb : HD().rgb, 0.55); }
     if (P.slowT > 0) drawWeb(P.x, P.y - 70, 40, Math.min(1, P.slowT));
   }
   // a fainted girl: lying on the ground with stars circling her head, a ring filling up until she wakes;
@@ -4537,13 +4580,14 @@
   // where her eyes are in her hurt pose (fractions of the frame), for the dizzy swirls
   const HURT_EYES = { g: [[0.43, 0.219], [0.53, 0.2]], s: [[0.42, 0.285], [0.55, 0.27]] };
   function drawFainted(hk, x, y, k, helped, friend) {
-    const f = FR[hk + "_hurt"] || FR[hk + "_stand"]; if (!f) return;
+    const painted = CHARACTER_REDRAW.has(hk);
+    const f = FR[hk + (painted ? "_new_faint" : "_hurt")] || FR[hk + "_stand"]; if (!f) return;
     const M = CHAR_M * sideK(hk, hk + "_hurt"), kk = f.s * M, h = f.h * kk, axw = x + h * 0.5, ayw = y - 10;
     shadow(x, y, h * 0.55, 18, 0.35);
-    spr(f, axw, ayw, false, M, 1, -Math.PI / 2);
+    if (painted) spr(f, x, y, false, M); else spr(f, axw, ayw, false, M, 1, -Math.PI / 2);
     // dizzy: a spiral turning on each eye (the frame is turned a quarter left: (dx, dy) -> (dy, -dx))
     ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.shadowColor = "rgba(60,0,90,.8)"; ctx.shadowBlur = 5;
-    for (const [ex, ey] of HURT_EYES[hk] || HURT_EYES.g) {
+    for (const [ex, ey] of painted ? [] : HURT_EYES[hk] || HURT_EYES.g) {
       const dx = (ex * f.w - f.ax) * kk, dy = (ey * f.h - f.ay) * kk, cx = axw + dy, cy = ayw - dx;
       ctx.beginPath(); for (let t = 0; t < 3 * Math.PI; t += 0.25) { const r = 1 + t * 0.95, a = t - G.t * 9; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } ctx.stroke();
     }
