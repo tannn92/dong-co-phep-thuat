@@ -243,6 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
+<script src="wardrobe.js"></script>
 <script>
 (() => {
   "use strict";
@@ -276,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.1549", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.1644", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -363,6 +364,7 @@
     for (const [n, f] of Object.entries(META.frames)) FR[n] = { img: sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
     await loadCharacterRedraw();
     await loadTeamRedraw();
+    await loadWardrobeCatalog();
     const bgs = await Promise.all([1, 2, 3, 4].map((i) => loadImg(`assets/bg${i}.jpg`)));
     bgs.forEach((b, i) => (IMG["bg" + (i + 1)] = b));
     FR.potion_energy = recolor("potion", "#ffc21a");
@@ -682,15 +684,19 @@
   const HD = () => HEROES[hero];
   // outfits: every sister can wear any of them; each is its own small atlas (assets/skins/<hero><id>.*), loaded on demand
   let OUTFITS = [];                       // [{ id, name, heroes: "gs" }], from assets/skins/index.json
-  // switched off for now: both girls play in their own costume and the wardrobe is skipped
+  // Legacy skin picker stays off; the unified painted wardrobe opens per level.
   const OUTFITS_ON = false;
   const outfit = { g: "", s: "" };        // chosen outfit id per sister ("" = her own costume)
   if (OUTFITS_ON) try { for (const k of "gs") outfit[k] = localStorage.getItem("dcpt3-outfit-" + k) || ""; } catch (e) {}
   const SKIN = {};                        // loaded outfit atlases: sid -> { tip, rcTip, rcN } or a pending promise
-  const skinOf = (h, o) => (o && OUTFITS.some((x) => x.id === o && x.heroes.includes(h)) ? h + o : h);
+  const skinOf = (h, o) => WARD.byId.has(o) && wardEntry(o).char===h ? wardSid(o) : (o && OUTFITS.some((x) => x.id === o && x.heroes.includes(h)) ? h + o : h);
   const mySkin = () => skinOf(hero, outfit[hero]);
   const mySkinFor = (h) => skinOf(h, outfit[h]);
   function loadSkin(sid) {
+    if(WARD.bySid.has(sid)){
+      if((WARD.retryAt?.get(sid)||0)>Date.now())return Promise.resolve();
+      return wardLoad(WARD.bySid.get(sid).id).catch(()=>{(WARD.retryAt||(WARD.retryAt=new Map())).set(sid,Date.now()+5000);});
+    }
     if (sid.length < 2 || SKIN[sid]) return Promise.resolve(SKIN[sid]);
     const p = (async () => {
       const [meta, img] = await Promise.all([fetch(`assets/skins/${sid}.json`).then((r) => r.json()), loadImg(`assets/skins/${sid}.webp`)]);
@@ -701,6 +707,93 @@
     })().catch(() => { delete SKIN[sid]; });
     SKIN[sid] = p; return p;
   }
+  // One cosmetic wardrobe, shared by every map. Gameplay stats never depend on it.
+  const WARD = { catalog: [], byId: new Map(), bySid: new Map(), meta: null, images: new Map(), loading: new Map(), loaded: new Set(), owned: {g:new Set(),s:new Set()}, open:false, epoch:0, ready:false, partnerReady:false, bought:new Set(), pending:null, ui:null, run:0, seenStarts:new Set() };
+  const wardSid = id => id.replace('.', 'sksp-');
+  const wardEntry = id => WARD.byId.get(id);
+  const wardOwned = id => !id || !!(wardEntry(id) && WARD.owned[wardEntry(id).char].has(id));
+  function wardSave(c) { try { localStorage.setItem('dcpt3-wardrobe-owned-'+c,JSON.stringify([...WARD.owned[c]]));localStorage.setItem('dcpt3-wardrobe-outfit-'+c,outfit[c]); } catch(e) {} }
+  async function loadWardrobeCatalog() {
+    try {
+      const r=await fetch('wardrobe-assets/atlas.json',{cache:'no-cache'});if(!r.ok)throw Error('catalog');const m=await r.json();
+      if(m.version!==1||!Array.isArray(m.catalog)||!Array.isArray(m.sheets)||!m.frames)throw Error('catalog');
+      WARD.meta=m;
+      WARD.catalog=m.catalog.filter(o=>/^[gs]\.[a-z0-9-]+$/.test(o.id)&&o.char===o.id[0]&&o.price===10&&m.frames[o.id+'.stand']);
+      for(const o of WARD.catalog){WARD.byId.set(o.id,o);WARD.bySid.set(wardSid(o.id),o);}
+      for(const c of 'gs')try{const v=JSON.parse(localStorage.getItem('dcpt3-wardrobe-owned-'+c)||'[]');if(Array.isArray(v))for(const id of v)if(wardEntry(id)?.char===c)WARD.owned[c].add(id);const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c&&wardOwned(chosen)?chosen:'';}catch(e){}
+    } catch(e) { WARD.catalog=[]; } // Original clothes always remain playable.
+  }
+  async function wardLoad(id) {
+    if(!id)return FR[hero+'_new_stand']||FR[hero+'_stand'];
+    const o=wardEntry(id);if(!o)throw Error('Không tìm thấy bộ đồ');const sid=wardSid(id);
+    if(WARD.loaded.has(sid))return FR[sid+'_stand'];
+    if(WARD.loading.has(id))return WARD.loading.get(id);
+    const task=(async()=>{
+      const m=WARD.meta, entries=Object.entries(m.frames).filter(([n])=>n.startsWith(id+'.'));
+      const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
+      if(required.some(p=>!m.frames[id+'.'+p]))throw Error('Bộ đồ chưa đủ hình');
+      await Promise.all([...new Set(entries.map(([,f])=>f[0]))].map(async i=>{
+        if(!WARD.images.has(i)){const file=m.sheets[i];if(!/^atlas4_\d+\.webp$/.test(file))throw Error('Tên ảnh không hợp lệ');const promise=loadImg('wardrobe-assets/'+file+'?v='+encodeURIComponent(m.hash));WARD.images.set(i,promise);try{await promise;}catch(e){WARD.images.delete(i);throw e;}}
+        await WARD.images.get(i);
+      }));
+      const stand=m.frames[id+'.stand'],base=FR[o.char+'_new_stand']||FR[o.char+'_stand'],factor=base.h*base.s/(stand[4]*stand[5]),fresh={};
+      for(const [n,f] of entries){const img=await WARD.images.get(f[0]);if(f.length!==8||!f.every(Number.isFinite)||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]<=0||f[1]+f[3]>img.width||f[2]+f[4]>img.height)throw Error('Hình trang phục bị lỗi');fresh[sid+'_'+n.slice(id.length+1)]={name:sid+'_'+n.slice(id.length+1),img,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5]*factor,ax:f[6],ay:f[7],redraw:true,wardrobe:true};}
+      for(const [alias,pose] of Object.entries({jump:'ult',light:'ult',sit:'faint',hurt:'stand',win:'cheer',cast:'cr1'}))fresh[sid+'_'+alias]=fresh[sid+'_'+pose];
+      Object.assign(FR,fresh);WARD.loaded.add(sid);SKIN[sid]={wardrobe:true};return FR[sid+'_stand'];
+    })();WARD.loading.set(id,task);try{return await task;}finally{WARD.loading.delete(id);}
+  }
+  function wardRefresh(){const key=[WARD.epoch,G.stars,outfit[hero],WARD.ready,WARD.partnerReady,NET.role,WARD.pending?.id,[...WARD.owned[hero]].join(',')].join('|');if(key===WARD.uiKey)return;WARD.uiKey=key;WARD.ui?.refresh();WARD.ui?.setReadyState({self:WARD.ready,partner:WARD.partnerReady,coop:!!NET.role});}
+  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,owned:wardOwned,equipped:()=>outfit[hero],load:wardLoad,buy:wardBuy,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,background:'wardrobe-assets/background.webp'});}
+  function wardOpen(fromNet=false,epoch=null){
+    if(epoch!==null&&WARD.open&&WARD.epoch===epoch)return;
+    WARD.epoch=epoch===null?WARD.epoch+1:epoch;WARD.open=true;WARD.ready=false;WARD.partnerReady=false;G.mode='shop';P.vx=P.vy=0;P.moving=false;
+    for(const k of Object.keys(keys))keys[k]=false;
+    wardInitUI();WARD.ui?.open();WARD.uiKey='';wardRefresh();
+  }
+  function wardClose(){WARD.open=false;WARD.ui?.close();if(G.mode==='shop')G.mode='play';}
+  function wardCancel(){WARD.open=false;WARD.ready=false;WARD.ui?.close();if(WARD.pending){clearTimeout(WARD.pending.timer);WARD.pending.resolve(false);WARD.pending=null;}}
+  async function wardWear(id){
+    if(!WARD.open||id&&(!wardOwned(id)||wardEntry(id)?.char!==hero))return false;
+    const epoch=WARD.epoch,run=WARD.run,c=hero,token=WARD.wearToken=(WARD.wearToken||0)+1;await wardLoad(id);if(!WARD.open||epoch!==WARD.epoch||run!==WARD.run||c!==hero||token!==WARD.wearToken)return false;
+    outfit[hero]=id;WARD.ready=false;wardSave(hero);wardRefresh();return true;
+  }
+  async function wardBuy(id){
+    const o=wardEntry(id);if(!WARD.open||!o||o.char!==hero)return false;if(wardOwned(id))return true;
+    if(NET.role==='guest'){
+      if(WARD.pending||G.stars<10)return false;
+      return new Promise(resolve=>{const request=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);const timer=setTimeout(()=>{if(WARD.pending?.request===request){WARD.pending=null;resolve(false);wardRefresh();}},8000);WARD.pending={id,request,resolve,timer};netEmit('wardrobe',{op:'buy',id,request,epoch:WARD.epoch,run:WARD.run});});
+    }
+    if(G.stars<10)return false;G.stars-=10;WARD.owned[hero].add(id);wardSave(hero);updateHud();wardRefresh();return true;
+  }
+  function wardReady(){if(!WARD.open||WARD.pending||WARD.loading.has(outfit[hero]))return;WARD.ready=true;wardRefresh();if(!NET.role||NET.role==='host'&&WARD.partnerReady)wardClose();}
+  function wardNet(d){
+    if(NET.role==='host'&&d.op==='buy'){
+      const o=wardEntry(d.id),remote=NET.pp?.gl?.[7]||NET.pp?.co?.hero;
+      const valid=WARD.open&&d.run===WARD.run&&d.epoch===WARD.epoch&&o&&o.char===remote&&o.char!==hero&&typeof d.request==='string'&&d.request.length<100;
+      const paid=valid&&WARD.bought.has(o.id),ok=!!(valid&&(paid||G.stars>=10));
+      if(ok&&!paid){G.stars-=10;WARD.bought.add(o.id);updateHud();wardRefresh();}
+      netEmit('wardrobe',{op:'ack',id:d.id,request:d.request,ok,stars:G.stars,epoch:WARD.epoch,run:WARD.run});
+    }else if(NET.role==='guest'&&d.op==='ack'&&d.run===WARD.run&&d.epoch===WARD.epoch&&WARD.pending&&d.request===WARD.pending.request&&d.id===WARD.pending.id){
+      const p=WARD.pending;clearTimeout(p.timer);WARD.pending=null;G.stars=Math.max(0,Number(d.stars)||0);if(d.ok&&wardEntry(d.id)?.char===hero){WARD.owned[hero].add(d.id);wardSave(hero);}p.resolve(!!d.ok);wardRefresh();
+    }
+  }
+  function wardSync(){
+    if(!NET.role)return;
+    if(NET.role==='host'){
+      const w=NET.pp?.ward;WARD.partnerReady=!!(w&&w.run===WARD.run&&w.epoch===WARD.epoch&&w.ready&&w.lv===G.level);
+      if(WARD.open&&WARD.ready&&WARD.partnerReady)wardClose();
+    }else{
+      const w=NET.pp?.w,shop=w?.ward;
+      if(shop&&shop.run===WARD.run&&w.lv===G.level){
+        if(shop.open&&(!WARD.open||shop.epoch!==WARD.epoch))wardOpen(true,shop.epoch);
+        if(!shop.open&&WARD.open&&shop.epoch===WARD.epoch)wardClose();
+        WARD.partnerReady=!!shop.ready;
+        if(WARD.open){G.stars=Math.max(0,Number(w.st)||0);}
+      }
+    }
+    if(WARD.open)wardRefresh();
+  }
+
   // first frame name that exists
   const fr = (...names) => names.find((n) => FR[n]) || names[names.length - 1];
   const WALK_N = { zombie: 10, skeleton: 10, mummy: 10, vampire: 12, witch: 12, spider: 10, ghost: 12, bat: 8 };
@@ -1341,6 +1434,7 @@
   function wandTip(hk, face, flip, fn) {
     const W2 = WAND_WC[hk];
     if (W2 && fn) {
+      if(FR[fn]?.wardrobe){const p=fn.slice(fn.lastIndexOf("_")+1,fn.lastIndexOf("_")+3);if(p==='cl')return W2.wcL;if(p==='cr')return W2.wc;if(p==='cd')return W2.d0;if(p==='cu')return W2.d4;}
       if ((fn.includes("_wcL") || fn.includes("_new_cl"))) return W2.wcL;
       if ((fn.includes("_wc") || fn.includes("_new_cr"))) return [W2.wc[0] * (flip ? -1 : 1), W2.wc[1]];
       if ((fn.includes("_cast_d0") || fn.includes("_new_cd"))) return W2.d0;
@@ -1352,7 +1446,7 @@
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
-    const shotPose = P.fireFn || P.fn, castShown = shotPose && /_cast_|_wc|_new_c[rldu]/.test(shotPose[0]);
+    const shotPose = P.fireFn || P.fn, castShown = shotPose && /_cast_|_wc|_new_c[rldu]|sksp-[^_]+_c[rldu]/.test(shotPose[0]);
     const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, shotPose[1], shotPose[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
     const x = P.x + wx, y = P.y + wy;
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
@@ -4207,7 +4301,7 @@
     const next = G.level + 1;
     progress = Math.max(progress, next + 1);
     try { localStorage.setItem("dcpt3-progress", String(progress)); } catch (e) {}
-    setTimeout(() => fadeTo(() => { buildLevel(next); showBanner(LEVELS[next].name.split(": ")[1], LEVELS[next].name.split(": ")[0]); }), 1100);
+    setTimeout(() => fadeTo(() => { buildLevel(next); wardOpen(); showBanner(LEVELS[next].name.split(": ")[1], LEVELS[next].name.split(": ")[0]); }), 1100);
   }
   function fadeTo(fn) { G.onFade = fn; G.fadeDir = 1; }
 
@@ -4334,6 +4428,11 @@
     // moving; this changes only the picture, never the live shooting timer.
     if (o.moving && !o.aim) o = { ...o, castT: 0 };
     const sk = o.skin, base = o.hk;
+    if(WARD.loaded.has(sk)){
+      const side=o.face>=1&&o.face<=3,cast=o.castT>0,step=[0,1,2,1][Math.floor((o.dist||0)/SIDE_CYCLE*4)%4];
+      const pose=o.winT?'cheer':o.dead?'faint':side?(cast?'c':'w')+(o.flip?'l':'r')+(o.moving?step:1):!o.moving&&!cast&&o.face===0?'stand':(cast?'c':'w')+(o.face===4?'u':'d')+(o.moving?Math.floor((o.dist||0)/DIR_CYCLE*4)%4:1);
+      return [sk+'_'+pose,false];
+    }
     if (CHARACTER_REDRAW.has(base) && (!sk || sk === base)) {
       const side=o.face>=1 && o.face<=3, cast=o.castT>0;
       const step=[0,1,2,1][Math.floor((o.dist||0)/SIDE_CYCLE*4)%4];
@@ -4527,7 +4626,7 @@
       shadow(x, y, 46, 12, 0.25);
       glow(x, y - z - 100, 260, hk === "s" ? "170,255,170" : "255,200,236", 0.55 * lt);
       ctx.save(); ctx.translate(x, y - z); ctx.scale(Math.abs(sx) < 0.08 ? 0.08 * Math.sign(sx || 1) : sx, 1);
-      spr(fn, 0, 0, flip, M, 1 - lt); spr(hk + "_light", 0, 0, flip, M, lt);
+      spr(fn, 0, 0, flip, M, 1 - lt); spr(FR[fn]?.wardrobe ? fn.slice(0,fn.lastIndexOf("_"))+"_light" : hk + "_light", 0, 0, flip, M, lt);
       ctx.restore(); return;
     }
     const [lift, rock, sq] = step || [0, 0, 1];
@@ -4620,8 +4719,9 @@
   // where her eyes are in her hurt pose (fractions of the frame), for the dizzy swirls
   const HURT_EYES = { g: [[0.43, 0.219], [0.53, 0.2]], s: [[0.42, 0.285], [0.55, 0.27]] };
   function drawFainted(hk, x, y, k, helped, friend) {
-    const painted = CHARACTER_REDRAW.has(hk);
-    const f = FR[hk + (painted ? "_new_faint" : "_hurt")] || FR[hk + "_stand"]; if (!f) return;
+    const skin = hk===hero ? mySkin() : Q?.hero===hk ? Q.skin : hk;
+    const painted = WARD.loaded.has(skin)||CHARACTER_REDRAW.has(hk);
+    const f = FR[skin+"_faint"] || FR[hk + (painted ? "_new_faint" : "_hurt")] || FR[hk + "_stand"]; if (!f) return;
     const M = CHAR_M * sideK(hk, hk + "_hurt"), kk = f.s * M, h = f.h * kk, axw = x + h * 0.5, ayw = y - 10;
     shadow(x, y, h * 0.55, 18, 0.35);
     if (painted) spr(f, x, y, false, M); else spr(f, axw, ayw, false, M, 1, -Math.PI / 2);
@@ -5335,6 +5435,7 @@
   });
   $("wardBack").addEventListener("click", () => { $("wardScreen").hidden = true; $("titleScreen").hidden = false; });
   function toTitle() {
+    wardCancel();
     if (NET.role) leaveCoop();
     if (G.mode !== "title" && G.lvl) selLv = G.level;   // back home: the level she was on is picked
     G.mode = "title"; $("quiz").hidden = true; renderLevels(); renderHeroes();
@@ -5344,7 +5445,8 @@
   function startGame(i) {
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
     initAudio();
-    Object.assign(G, { stars: 0, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
+    wardCancel();WARD.epoch=0;WARD.run=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);WARD.bought.clear();
+    Object.assign(G, { stars: 10, hearts: 5, energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
     // her pet: rescued on the way from Màn 1, already with her when she starts further on
     P.pets = i > 0 ? Object.keys(PETS).filter((k) => PETS[k].owner === hero || (isAlly(k) && PETS[k].lvl < i)) : [];
@@ -5353,6 +5455,7 @@
     for (const id of ["titleScreen", "winScreen", "pauseScreen", "wardScreen", "bossbar"]) $(id).hidden = true;
     $("hud").hidden = false; $("controls").hidden = false;
     showBanner(LEVELS[i].name.split(": ")[1], LEVELS[i].name.split(": ")[0]);
+    wardOpen();
   }
   $("startBtn").addEventListener("click", () => (OUTFITS_ON ? openWardrobe(() => startGame(selLv)) : startGame(selLv)));
 
@@ -5386,7 +5489,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout", "say"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout", "say", "wardrobe"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -5505,7 +5608,7 @@
     startGame(selLv);
     sendStart();
   }
-  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level }); }
+  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level, run: WARD.run }); }
   function leaveCoop() {
     if (NET.room) NET.room.presence({ co: null, gl: null, sh: null, w: null }).catch(() => {});
     NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null; QPETE = []; NET.hq.length = 0; NET.sq.length = 0; NET.fq.length = 0;
@@ -5515,7 +5618,7 @@
     const wasGuest = NET.role === "guest", msg = lost ? "Mất kết nối với bạn kia" : "Bạn kia đã rời phòng";
     leaveCoop();
     if (wasGuest && G.mode !== "title") { toTitle(); showBanner(msg, "Vào phòng lại nhé"); }
-    else showBanner(msg, "Bé chơi tiếp một mình");
+    else {WARD.partnerReady=false;WARD.ready=false;wardRefresh();showBanner(msg, "Bé chơi tiếp một mình");}
   }
   function onNet(msg) {
     const d = msg.data && typeof msg.data === "object" ? msg.data : {};
@@ -5523,14 +5626,18 @@
     if (msg.topic === "start") {
       const ok = d.to === NET.me && ((NET.co && NET.co.role === "join" && NET.co.host === msg.peer) || (NET.role === "guest" && NET.partner === msg.peer));
       if (!ok) return;
+      if(d.run){const key=msg.peer+':'+d.run;if(WARD.seenStarts.has(key)||NET.role==="guest"&&d.run===WARD.run)return;WARD.seenStarts.add(key);if(WARD.seenStarts.size>100)WARD.seenStarts.delete(WARD.seenStarts.values().next().value);}
       NET.role = "guest"; NET.partner = msg.peer; NET.applied = null; Q = null; NET.quietT = 0;
       const p = NET.room.peers().find((p) => p.peer === msg.peer); NET.pp = p ? p.presence : null;
       setCo({ role: "play", with: msg.peer, hero });
       $("coopScreen").hidden = true;
       startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1));
+      if(d.run)WARD.run=d.run;
       return;
     }
     if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
+    if(msg.topic==="wardrobe"){wardNet(d);return;}
+    if(WARD.open)return;
     if (msg.topic === "shots") {   // partner's bolts: only for show, her own page reports what they hit
       const k = d.k === "s" ? "s" : "g", H = HEROES[k];
       for (const b of Array.isArray(d.s) ? d.s.slice(0, 40) : []) {
@@ -5597,7 +5704,7 @@
     NET.sendT = 1 / 20;
     if (NET.hq.length) netEmit("hits", { h: NET.hq.splice(0, 120) });
     if (NET.sq.length || NET.fq.length) netEmit("shots", { k: hero, s: NET.sq.splice(0), f: NET.fq.splice(0) });
-    const patch = { gl: girlState(), hb: (NET.hb = (NET.hb + 1) % 1e6 || 1) };   // heartbeat: changes every send
+    const patch = { ward:{run:WARD.run,epoch:WARD.epoch,ready:WARD.ready,lv:G.level}, gl: girlState(), hb: (NET.hb = (NET.hb + 1) % 1e6 || 1) };   // heartbeat: changes every send
     if (NET.role === "host") patch.w = worldState();
     NET.room.presence(patch).catch(() => {});
   }
@@ -5611,7 +5718,7 @@
     const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0) | (o.frz > 0 ? 32 : 0);
     const bitsOf = (a) => a.map((o) => (o.got || o.open ? 1 : 0)).join("");
     return {
-      lv: G.level,
+      lv: G.level, ward:{run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready},
       m: G.mons.filter((m) => m.alive).map((m) => [m.id, MKINDS.indexOf(m.kind), m.x | 0, m.y | 0, m.face + (m.flip ? 8 : 0), MST.indexOf(m.st), m.hp,
         (m.hurt > 0 ? 1 : 0) | (m.flash > 0 ? 2 : 0) | sb(m) | (m.summoned ? 64 : 0) | (m.elite ? 128 : 0) | (m.shield ? 256 : 0), Math.round(m.t * 10), m.max, m.jz | 0,
         m.c.fin ? MOVES5.indexOf(m.move || "") : 0, m.c.fin ? Math.round(Math.atan2(m.ay || 0, m.ax || 1) * 100) : 0, m.armor ? 1 : 0]),   // the finale's foes: their move and its aim; the Toad Warrior's armour
@@ -5643,7 +5750,7 @@
     Q.x = Math.abs(x - Q.x) > 500 ? x : Q.x + (x - Q.x) * k; Q.y = Math.abs(y - Q.y) > 500 ? y : Q.y + (y - Q.y) * k;
     Q.vx = num(gl[10]); Q.vy = num(gl[11]);
     Q.face = clamp(Math.floor(num(gl[2])), 0, 4); Q.hero = gl[7] === "s" ? "s" : "g";
-    Q.skin = typeof gl[9] === "string" && /^[gs](\d\d)?$/.test(gl[9]) && gl[9][0] === Q.hero ? gl[9] : Q.hero;
+    Q.skin = typeof gl[9] === "string" && (/^[gs](\d\d)?$/.test(gl[9])||WARD.bySid.has(gl[9])) && gl[9][0] === Q.hero ? gl[9] : Q.hero;
     if (Q.skin.length > 1 && !SKIN[Q.skin]) loadSkin(Q.skin);
     // until the partner's outfit has loaded, show her own costume in the same pose
     const fn = typeof gl[3] === "string" ? gl[3] : "", base = Q.hero + fn.slice(fn.indexOf("_"));
@@ -5659,10 +5766,11 @@
   // ---- guest: mirror the host's world
   function applySnapshot() {
     const w = NET.pp && NET.pp.w;
-    if (!w || typeof w !== "object" || w === NET.applied) return;
+    if (!w || typeof w !== "object" || w === NET.applied || w.ward&&w.ward.run!==WARD.run) return;
     NET.applied = w;
     const lv = clamp(Math.floor(num(w.lv)), 0, LEVELS.length - 1);
     if (lv !== G.level) {
+      if(w.ward?.open){progress=Math.max(progress,lv+1);try{localStorage.setItem("dcpt3-progress",String(progress));}catch(e){}buildLevel(lv);NET.lvBusy=false;NET.applied=null;wardOpen(true,w.ward.epoch);return;}
       if (!NET.lvBusy) {
         NET.lvBusy = true; P.winT = 1.6; P.vx = P.vy = 0; SFX.portal();
         progress = Math.max(progress, lv + 1);
@@ -5881,6 +5989,8 @@
     const dt = Math.min(0.033, (now - last) / 1000); last = now;
     if (!ready) return;
     try {
+      if(G.mode==='shop'){netFrame(dt);if(NET.role==='guest')applySnapshot();}
+      wardSync();
       if (G.mode === "play" && !API.hold) update(dt);
       else if (G.mode === "title" && G.lvl) {
         // the title screen drifts slowly along the first level's path
@@ -5910,6 +6020,7 @@
   // test hooks for automated checks. __dcpt3.autopilot = true makes this girl walk the path on her own.
   const API = window.__dcpt3 = {
     G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
+    wardrobe:{open:wardOpen,close:wardClose,buy:wardBuy,wear:wardWear,ready:wardReady,load:wardLoad,owned:wardOwned,catalog:()=>WARD.catalog,state:()=>({run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready,partnerReady:WARD.partnerReady,coins:G.stars,equipped:outfit[hero]}),sync:wardSync},
     autopilot: false,
     getQ: () => Q,
     setHero: (k) => { hero = k === "s" ? "s" : "g"; loadPets(); renderHeroes(); },
