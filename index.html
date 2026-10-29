@@ -276,7 +276,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261029.1157", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261029.1549", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1352,8 +1352,8 @@
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
-    const castShown = P.fn && /_cast_|_wc|_new_c[rldu]/.test(P.fn[0]);
-    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, P.fn[1], P.fn[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
+    const shotPose = P.fireFn || P.fn, castShown = shotPose && /_cast_|_wc|_new_c[rldu]/.test(shotPose[0]);
+    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, shotPose[1], shotPose[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
     const x = P.x + wx, y = P.y + wy;
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
     G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
@@ -4330,6 +4330,9 @@
   const SIDE_CYCLE = 260;  // ... and per side-view walk cycle (two steps)
   const SIDE_STEPS = [1, 0, 3, 0];
   function heroFrame(o) {
+    // Casting sheets repeat the same legs. Keep the distance-driven gait while
+    // moving; this changes only the picture, never the live shooting timer.
+    if (o.moving && !o.aim) o = { ...o, castT: 0 };
     const sk = o.skin, base = o.hk;
     if (CHARACTER_REDRAW.has(base) && (!sk || sk === base)) {
       const side=o.face>=1 && o.face<=3, cast=o.castT>0;
@@ -4600,7 +4603,9 @@
   }
   function drawHero() {
     if (G.mode === "title") return;
-    const [fn, flip] = P.fn = heroFrame({ hk: hero, skin: mySkin(), face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, hurtT: P.hurtT, dead: P.dead, winT: P.winT });
+    const poseState = { hk: hero, skin: mySkin(), face: P.face, flip: P.flip, moving: P.moving, dist: P.dist, castT: P.castT, hurtT: P.hurtT, dead: P.dead, winT: P.winT };
+    P.fireFn = heroFrame({ ...poseState, aim: true });
+    const [fn, flip] = P.fn = heroFrame(poseState);
     const blink = P.inv > 0 && !P.dead && !G.ult && Math.floor(G.t * 16) % 2 === 0;
     const aura = P.elem && !G.ult && !P.dead;
     if (aura) drawAura(P.elem, P.x, P.y, P.elemT, 1);
