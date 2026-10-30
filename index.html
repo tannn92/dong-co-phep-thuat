@@ -243,7 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261030.1036"></script>
+<script src="wardrobe.js?v=261030.1041"></script>
 <script>
 (() => {
   "use strict";
@@ -277,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261030.1036", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261030.1041", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -1314,18 +1314,12 @@
     burst(P.x, P.y - 110, 10, ["#ff9ab8", "#fff"], 260, 0.5);
     if (G.hearts <= 0) heroDown();
   }
-  function heroDown() {
-    if (P.dead) return;
-    // Matcha only rests briefly, standing up; she never enters the faint/rescue state.
-    if (hero === "s") {
-      if (P.tiredT > 0) return;
-      P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
-      P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
-      showBanner("Matcha hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
-      return;
-    }
-    P.dead = true; G.hearts = 0; renderHearts(); G.reviveT = FAINT_T; P.vx = P.vy = 0; SFX.hurt();
-    showBanner("Bé bị ngất rồi!", Q && NET.role ? "Bạn kia lại gần để cứu nhanh nhé" : "Chờ vòng tròn quay hết là bé tỉnh lại");
+  function heroDown(why) {
+    // The girls only rest briefly. Fainting and rescue belong to NPCs.
+    if (P.tiredT > 0) return;
+    P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
+    P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
+    showBanner((hero === "s" ? "Matcha" : "Mochi") + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
