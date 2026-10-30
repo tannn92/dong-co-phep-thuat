@@ -243,7 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261030.1041"></script>
+<script src="wardrobe.js?v=261030.1720"></script>
 <script>
 (() => {
   "use strict";
@@ -277,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261030.1041", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261030.1720", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -327,6 +327,24 @@
       Object.assign(FR,fresh); CHARACTER_REDRAW.add("g"); CHARACTER_REDRAW.add("s");
     } catch (e) { /* Old pictures remain usable if an optional sheet failed to load. */ }
   }
+  async function namAtlas(outfit='base') {
+    const url='nam-assets/'+outfit+'/',res=await fetch(url+'atlas.json'),meta=await res.json();
+    const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
+    if(meta.version!==1 || !meta.sheets?.every(n=>/^nam_\d+\.webp$/.test(n)) || required.some(p=>!meta.frames[p]))throw Error('Incomplete Nấm atlas');
+    const imgs=await Promise.all(meta.sheets.map(n=>loadImg(url+n+'?v='+meta.hash))),fresh={},prefix=outfit==='base'?'n_new':'nsksp-'+outfit;
+    for(const [pose,f] of Object.entries(meta.frames)){
+      const im=imgs[f[0]];if(!im||f.length!==8||!f.every(Number.isFinite)||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]<=0||f[1]+f[3]>im.width||f[2]+f[4]>im.height)throw Error('Invalid Nấm frame');
+      const name=prefix+'_'+pose;fresh[name]={name,img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7],redraw:true,wardrobe:outfit!=='base'};
+    }
+    const target=outfit==='base'?'n':prefix;
+    for(const pose of required)fresh[target+'_'+pose]=fresh[prefix+'_'+pose];
+    for(const [alias,pose] of Object.entries({jump:'ult',light:'ult',cast:'cr1',win:'cheer',sit:'faint',hurt:'stand'}))fresh[target+'_'+alias]=fresh[prefix+'_'+pose];
+    Object.assign(FR,fresh);if(outfit==='base')CHARACTER_REDRAW.add('n');else{WARD.loaded.add(prefix);SKIN[prefix]={wardrobe:true};}
+    return FR[prefix+'_stand'];
+  }
+  async function loadNam(){
+    try{await namAtlas();const m=await (await fetch('nam-assets/fx.json')).json();const im=await loadImg('nam-assets/fx.webp?'+m.hash);for(const [name,f] of Object.entries(m.frames))FR[name]={img:im,sx:f[0],sy:f[1],w:f[2],h:f[3],s:f[4],ax:f[5],ay:f[6]};}catch(e){for(const name of Object.keys(FR))if(name.startsWith('n_')||name.startsWith('fx_nam_'))delete FR[name];CHARACTER_REDRAW.delete('n');if(hero==='n')hero='g';}
+  }
   async function loadTeamRedraw() {
     // Commit only a complete, validated delivery; a failed request retains every old frame.
     try {
@@ -363,6 +381,7 @@
     const sheets = await Promise.all(META.sheets.map((s) => loadImg("assets/" + s + "?v=" + (hv >>> 0).toString(36))));
     for (const [n, f] of Object.entries(META.frames)) FR[n] = { img: sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
     await loadCharacterRedraw();
+    await loadNam();
     await loadTeamRedraw();
     await loadWardrobeCatalog();
     const bgs = await Promise.all([1, 2, 3, 4].map((i) => loadImg(`assets/bg${i}.jpg`)));
@@ -660,6 +679,8 @@
     g: { name: "Mochi", rgb: "255,120,200", cols: ["#ffb3e0", "#ff9ad5", "#ffd3f0"], cd: 0.34, minCd: 0.12, dmg: 1, range: 680, bolt: 1500, bounce: 0, r: 30 },
     s: { name: "Matcha", rgb: "140,255,140", cols: ["#b8ffb0", "#f0fff0", "#7be04a"], cd: 0.6, minCd: 0.28, dmg: 2, range: 800, bolt: 1150, bounce: 2, r: 42 },
   };
+  HEROES.n = { ...HEROES.s, name:"Nấm", rgb:"255,184,90", cols:["#ffd28a","#ffb85a","#dcb7ff"] };
+  const validHero = k => typeof k === 'string' && Object.hasOwn(HEROES,k) ? k : 'g';
   // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
   // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
@@ -680,14 +701,14 @@
   const levelDmg = () => 1 + 0.6 * Math.min(G.level || 0, 4);
   const petDmg = (lv) => Math.round((3 + Math.floor(lv * 0.8)) * levelDmg());
   let hero = "g";
-  try { if (localStorage.getItem("dcpt3-hero") === "s") hero = "s"; } catch (e) {}
+  try { hero = validHero(localStorage.getItem("dcpt3-hero")); } catch (e) {}
   const HD = () => HEROES[hero];
   // outfits: every sister can wear any of them; each is its own small atlas (assets/skins/<hero><id>.*), loaded on demand
   let OUTFITS = [];                       // [{ id, name, heroes: "gs" }], from assets/skins/index.json
   // Legacy skin picker stays off; the unified painted wardrobe opens per level.
   const OUTFITS_ON = false;
-  const outfit = { g: "", s: "" };        // chosen outfit id per sister ("" = her own costume)
-  if (OUTFITS_ON) try { for (const k of "gs") outfit[k] = localStorage.getItem("dcpt3-outfit-" + k) || ""; } catch (e) {}
+  const outfit = { g: "", s: "", n: "" };        // chosen outfit id per sister ("" = her own costume)
+  if (OUTFITS_ON) try { for (const k of "gsn") outfit[k] = localStorage.getItem("dcpt3-outfit-" + k) || ""; } catch (e) {}
   const SKIN = {};                        // loaded outfit atlases: sid -> { tip, rcTip, rcN } or a pending promise
   const skinOf = (h, o) => WARD.byId.has(o) && wardEntry(o).char===h ? wardSid(o) : (o && OUTFITS.some((x) => x.id === o && x.heroes.includes(h)) ? h + o : h);
   const mySkin = () => skinOf(hero, outfit[hero]);
@@ -708,7 +729,7 @@
     SKIN[sid] = p; return p;
   }
   // One cosmetic wardrobe, shared by every map. Gameplay stats never depend on it.
-  const WARD = { catalog: [], byId: new Map(), bySid: new Map(), meta: null, images: new Map(), loading: new Map(), loaded: new Set(), owned: {g:new Set(),s:new Set()}, open:false, epoch:0, ready:false, partnerReady:false, bought:new Set(), pending:null, ui:null, run:0, seenStarts:new Set() };
+  const WARD = { catalog: [], byId: new Map(), bySid: new Map(), meta: null, images: new Map(), loading: new Map(), loaded: new Set(), owned: {g:new Set(),s:new Set(),n:new Set()}, open:false, epoch:0, ready:false, partnerReady:false, bought:new Set(), pending:null, ui:null, run:0, seenStarts:new Set() };
   const wardSid = id => id.replace('.', 'sksp-');
   const wardEntry = id => WARD.byId.get(id);
   const wardOwned = id => !id || !!(wardEntry(id) && WARD.owned[wardEntry(id).char].has(id));
@@ -719,8 +740,9 @@
       if(m.version!==1||!Array.isArray(m.catalog)||!Array.isArray(m.sheets)||!m.frames)throw Error('catalog');
       WARD.meta=m;
       WARD.catalog=m.catalog.filter(o=>/^[gs]\.[a-z0-9-]+$/.test(o.id)&&o.char===o.id[0]&&o.price===10&&m.frames[o.id+'.stand']);
+      try{const nm=await(await fetch('nam-assets/catalog.json')).json();for(const o of nm.catalog||[])if(/^n\.[a-z0-9-]+$/.test(o.id)&&o.char==='n'&&o.price===10)WARD.catalog.push({...o,nam:true});}catch(e){}
       for(const o of WARD.catalog){WARD.byId.set(o.id,o);WARD.bySid.set(wardSid(o.id),o);}
-      for(const c of 'gs')try{const v=JSON.parse(localStorage.getItem('dcpt3-wardrobe-owned-'+c)||'[]');if(Array.isArray(v))for(const id of v)if(wardEntry(id)?.char===c)WARD.owned[c].add(id);const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c&&wardOwned(chosen)?chosen:'';}catch(e){}
+      for(const c of 'gsn')try{const v=JSON.parse(localStorage.getItem('dcpt3-wardrobe-owned-'+c)||'[]');if(Array.isArray(v))for(const id of v)if(wardEntry(id)?.char===c)WARD.owned[c].add(id);const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c&&wardOwned(chosen)?chosen:'';}catch(e){}
     } catch(e) { WARD.catalog=[]; } // Original clothes always remain playable.
   }
   async function wardLoad(id) {
@@ -729,6 +751,7 @@
     if(WARD.loaded.has(sid))return FR[sid+'_stand'];
     if(WARD.loading.has(id))return WARD.loading.get(id);
     const task=(async()=>{
+      if(o.nam)return namAtlas(id.slice(2));
       const m=WARD.meta, entries=Object.entries(m.frames).filter(([n])=>n.startsWith(id+'.'));
       const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
       if(required.some(p=>!m.frames[id+'.'+p]))throw Error('Bộ đồ chưa đủ hình');
@@ -1319,7 +1342,7 @@
     if (P.tiredT > 0) return;
     P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
     P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
-    showBanner((hero === "s" ? "Matcha" : "Mochi") + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
+    showBanner(HD().name + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
@@ -1386,13 +1409,13 @@
     return {
       cd: Math.max(H.minCd, H.cd * Math.pow(0.93, lv - 1)) * (elem ? 0.8 : 1),
       // later levels' monsters are much tougher, so every level also multiplies the girls' damage
-      dmg: Math.round((H.dmg + (hk === "s" ? Math.floor(lv / 3) : Math.floor(lv / 6))) * levelDmg()),
+      dmg: Math.round((H.dmg + (hk !== "g" ? Math.floor(lv / 3) : Math.floor(lv / 6))) * levelDmg()),
       range: H.range + Math.min(12, lv - 1) * 30,
-      n: hk === "s" ? 1 + (lv >= 10) : gn,   // Mochi starts with two hearts
-      bounce: H.bounce + (hk === "s" ? Math.floor(lv / 3) : 0),
-      speed: H.bolt, r: H.r + (hk === "s" ? (lv - 1) * 2.5 : 0),
+      n: hk !== "g" ? 1 + (lv >= 10) : gn,   // Mochi starts with two hearts
+      bounce: H.bounce + (hk !== "g" ? Math.floor(lv / 3) : 0),
+      speed: H.bolt, r: H.r + (hk !== "g" ? (lv - 1) * 2.5 : 0),
       // how big her bolts are drawn: Matcha's grow a little with her level; Mochi's hearts get smaller the more fly at once
-      sc: hk === "s" ? 1 + (lv - 1) * 0.03 : clamp(1.1 - 0.065 * gn, 0.55, 1),
+      sc: hk !== "g" ? 1 + (lv - 1) * 0.03 : clamp(1.1 - 0.065 * gn, 0.55, 1),
       kb: hk === "g" ? 140 + 12 * (lv - 1) : 40 + 9 * (lv - 1),   // knock-back push, grows with her level; Mochi's hearts push hard from the start
     };
   }
@@ -1433,9 +1456,11 @@
   // the bolt flies at BOLT_Z above the ground, so y here is ground-level (tip height - BOLT_Z)
   const WAND = { g: [[78, -32], [111, -40], [112, -38], [103, -42], [79, -60]], s: [[85, -51], [140, -49], [155, -50], [120, -60], [40, 0]] };
   // the walking-cast drawings (wand in her right hand, so facing left is its own picture, front and back never mirrored)
+  WAND.n = WAND.g;
   const WAND_WC = { g: { wc: [60, -64], wcL: [-68, -59], d0: [-19, -53], d4: [43, -75] }, s: { wc: [81, -72], wcL: [-77, -77], d0: [-31, -70], d4: [59, -111] } };
+  WAND_WC.n = WAND_WC.g;
   function wandTip(hk, face, flip, fn) {
-    const W2 = WAND_WC[hk];
+    const W2 = WAND_WC[hk] || WAND_WC.g;
     if (W2 && fn) {
       if(FR[fn]?.wardrobe){const p=fn.slice(fn.lastIndexOf("_")+1,fn.lastIndexOf("_")+3);if(p==='cl')return W2.wcL;if(p==='cr')return W2.wc;if(p==='cd')return W2.d0;if(p==='cu')return W2.d4;}
       if ((fn.includes("_wcL") || fn.includes("_new_cl"))) return W2.wcL;
@@ -1473,7 +1498,7 @@
         if (!m.alive || offStage(m) || (s.hit && s.hit.has(m.id))) continue;
         const rr = s.r + m.r; if (d2(s.x, s.y, m.x, m.y) > rr * rr) continue;
         // Matcha's serpent bites bosses harder (its bounce does little against a lone big target)
-        hitMon(m, s.hk === "s" && m.c.heavy ? Math.round(s.dmg * 1.6) : s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
+        hitMon(m, s.hk !== "g" && m.c.heavy ? Math.round(s.dmg * 1.6) : s.dmg, s.elem, s.x, s.y, s.kb); hitFx(s.x, s.y - BOLT_Z, s.hk);
         if (s.bounce > 0) bounceShot(s, m); else s.life = 0;
       }
       const B = G.boss;
@@ -1511,12 +1536,13 @@
     updateXpHud();
   }
   function levelUp() {
-    const lv = P.lv, s = hero === "s";
+    const lv = P.lv, s = hero !== "g";
     const a = heroStats(hero, lv - 1, null), b = heroStats(hero, lv, null);
     let msg = lv % 2 ? "Bắn xa hơn" : "Bắn nhanh hơn";
     if (b.n > a.n) msg = s ? "Thêm một con rắn phép!" : "Thêm một tia trái tim!";
     else if (b.bounce > a.bounce) msg = "Rắn nảy qua thêm quái";
     else if (b.dmg > a.dmg) msg = s ? "Rắn to và mạnh hơn" : "Trái tim mạnh hơn";
+    if(hero === "n") msg = msg.replace(/con rắn phép/g,"tia bào tử").replace(/Rắn/g,"Nấm phép");
     showBanner("Lên cấp " + lv + "!", msg); SFX.level();
     burst(P.x, P.y - 110, 36, ["#7cf2c6", "#fff4c2", "#ffd34d", ...HD().cols], 460, 0.9);
     G.parts.push({ type: "ring", x: P.x, y: P.y - 40, r: 30, vr: 900, life: 0.7, max: 0.7, col: "124,242,198" });
@@ -3550,7 +3576,7 @@
     let a, b, r, carry = false;
     const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
     // 80% of all questions carry / borrow (7 + 8, 13 − 9), on every level (Dad, 2026-10-27); the rest stay within the level's limit
-    carry = Math.random() < 0.8;
+    carry = Math.random() < (hero === "g" || (NET.role && Q?.hero === "g") ? 0.1 : 0.8);
     if (carry || cfg.lim > 10) {
       // within 20: with carrying / borrowing, or (on the 20 levels) without (12 + 6, 17 − 4)
       if (cfg.op === "+") {
@@ -3882,6 +3908,16 @@
       startBossCut("die");
     }
   }
+  function victoryPortrait(participants) {
+    const c=document.createElement('canvas');c.width=1200;c.height=800;
+    const ctx=c.getContext('2d');ctx.drawImage(IMG.bg1,0,0,1200,800);
+    const frames=participants.map(p=>FR[p.skin+'_cheer']||FR[p.hk+'_cheer']);
+    const maxHeight=Math.max(...frames.map(f=>f.h*f.s)),scale=570/maxHeight;
+    frames.forEach((f,i)=>{const k=f.s*scale,x=participants.length===1?600:390+i*420;
+      ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,x-f.ax*k,740-f.ay*k,f.w*k,f.h*k);
+    });
+    return c.toDataURL('image/png');
+  }
   function winGame() {
     G.won = true; P.winT = 99; SFX.win();
     $("againBtn").hidden = NET.role === "guest";
@@ -3891,9 +3927,9 @@
       $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv} và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
       G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
       // the family picture: both sisters if they played together, else the one who played (with her pet in the middle)
-      const pic = $("winPic"), who = Q && NET.role ? "gs" : hero;
+      const pic = $("winPic"), who = Q && NET.role ? [hero,Q.hero].sort().join("") : hero;
       pic.onerror = () => { pic.hidden = true; }; pic.onload = () => { pic.hidden = false; };
-      pic.src = `assets/fin_${who}.jpg`;
+      pic.src = who.includes("n") ? victoryPortrait([{hk:hero,skin:mySkin()},...(Q&&NET.role?[{hk:Q.hero,skin:Q.skin||Q.hero}]:[])]) : `assets/fin_${who}.jpg`;
     }, 2200);
   }
 
@@ -3913,7 +3949,7 @@
     P.z = 150 * ss(0, 0.6, U.t) - 150 * ss(2.0, 2.5, U.t);
     if (U.t > 0.2 && U.t < 1.6) for (let i = 0; i < 3; i++) {
       const a = Math.random() * TAU, r = rnd(180, 320);
-      G.parts.push({ type: "dot", x: P.x + Math.cos(a) * r, y: P.y - P.z - 100 + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.2, vy: -Math.sin(a) * r * 2.2, life: 0.42, max: 0.42, r: rnd(4, 9), col: hero === "s" ? ["#fff4c2", "#b8ffb0", "#7be04a"][i % 3] : ["#fff4c2", "#ffd34d", "#ffb3e0"][i % 3] });
+      G.parts.push({ type: "dot", x: P.x + Math.cos(a) * r, y: P.y - P.z - 100 + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.2, vy: -Math.sin(a) * r * 2.2, life: 0.42, max: 0.42, r: rnd(4, 9), col: hero === "n" ? ["#ffb85a", "#fff1b8", "#cba5ff"][i % 3] : hero === "s" ? ["#fff4c2", "#b8ffb0", "#7be04a"][i % 3] : ["#fff4c2", "#ffd34d", "#ffb3e0"][i % 3] });
     }
     if (!U.fired && U.t > 1.5) {
       U.fired = true; SFX.boom(); G.shake = 28;
@@ -3985,13 +4021,14 @@
   }
   // where her wand tip is from her feet, in the side casting pose at size m
   function cbTip(hk, skin, m, flip) {
-    const fn = fr(skin + "_cast", hk + "_cast"), f = FR[fn]; if (!f) return [0, -200 * m];
-    const [u, v] = CB_TIP[hk] || CB_TIP.g, k = f.s * CHAR_M * sideK(hk, fn) * m;
-    return [(u * f.w - f.ax) * k * (flip ? -1 : 1), (v * f.h - f.ay) * k];
+    const painted=!!FR[skin+"_"+(flip?"cl1":"cr1")]?.redraw,pose=painted?(flip?"cl1":"cr1"):"cast";
+    const fn = fr(skin + "_"+pose, hk + "_"+pose), f = FR[fn]; if (!f) return [0, -200 * m];
+    const [u, v] = painted ? [flip?.12:.88,.3] : CB_TIP[hk] || CB_TIP.g, k = f.s * CHAR_M * sideK(hk, fn) * m;
+    return [(u * f.w - f.ax) * k * (flip && !painted ? -1 : 1), (v * f.h - f.ay) * k];
   }
   // her place in the scene at time t: [x, y, size, frame, mirrored]; Mochi on the left, Matcha on the right, facing in
   function cbPose(C, g, t) {
-    const left = g.hk === "g", flip = !left, ox = C.cx, oy = C.cy - 80;
+    const left = g.hk === [hero,Q?.hero].sort()[0], flip = !left, ox = C.cx, oy = C.cy - 80;
     const [tx, ty] = cbTip(g.hk, g.skin, CB_K, flip), sx = ox + (left ? -CB_D : CB_D) - tx, sy = oy + 20 - ty;
     const bob = Math.sin(t * 5 + (left ? 0 : 2)) * 9;
     if (t < CB_MEET) {
@@ -4014,17 +4051,17 @@
     // they meet: a sparkle as each takes her place
     if (at(CB_MEET)) for (const g of girls2) {
       const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, g.skin, m, fl);
-      for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; C.parts.push({ x: x + tx, y: y + ty, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, life: 0.5, max: 0.5, sp: g.hk === "g" ? cbN("fx_duo_heart", "fx_heart") : cbN("fx_duo_spark_g", "fx_hit_s"), sc: 0.5, rot: a, drag: 0.02 }); }
+      for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; C.parts.push({ x: x + tx, y: y + ty, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, life: 0.5, max: 0.5, sp: g.hk === "n" ? "fx_nam_bloom" : g.hk === "g" ? cbN("fx_duo_heart", "fx_heart") : cbN("fx_duo_spark_g", "fx_hit_s"), sc: 0.5, rot: a, drag: 0.02 }); }
     }
     // the trails behind them as they fly in and back
     if ((t > 0.1 && t < CB_MEET) || t > CB_BACK) for (const g of girls2) {
       const [x, y, m] = cbPose(C, g, t);
-      if (Math.random() < dt * 40) for (let i = 0; i < 2; i++) C.parts.push({ back: true, x: x + rnd(-50, 50) * m, y: y - rnd(70, 190) * m, vx: rnd(-60, 60), vy: rnd(-40, 60), life: 0.5, max: 0.5, sp: g.hk === "g" ? (i ? "fx_heart" : cbN("fx_duo_star_p", "fx_twinkle")) : (i ? cbN("fx_duo_leaf", "fx_hit_s") : cbN("fx_duo_spark_g", "fx_twinkle")), sc: rnd(0.4, 0.75), rot: rnd(0, 6), vr: rnd(-4, 4), drag: 0.2 });
+      if (Math.random() < dt * 40) for (let i = 0; i < 2; i++) C.parts.push({ back: true, x: x + rnd(-50, 50) * m, y: y - rnd(70, 190) * m, vx: rnd(-60, 60), vy: rnd(-40, 60), life: 0.5, max: 0.5, sp: g.hk === "n" ? "fx_nam_bloom" : g.hk === "g" ? (i ? "fx_heart" : cbN("fx_duo_star_p", "fx_twinkle")) : (i ? cbN("fx_duo_leaf", "fx_hit_s") : cbN("fx_duo_spark_g", "fx_twinkle")), sc: rnd(0.4, 0.75), rot: rnd(0, 6), vr: rnd(-4, 4), drag: 0.2 });
     }
     // pouring their magic into the orb: hearts and pink sparks from the wand, leaves and green flames from the staff, spiralling in
     if (t > CB_MEET + 0.08 && t < CB_BOOM - 0.08) for (const g of girls2) {
       const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, g.skin, m, fl), pink = g.hk === "g";
-      const set = pink ? [cbN("fx_duo_heart", "fx_heart"), "fx_heart", cbN("fx_duo_star_p", "fx_twinkle"), cbN("fx_duo_petal", "fx_heart")] : [cbN("fx_duo_leaf", "fx_hit_s"), cbN("fx_duo_spark_g", "fx_twinkle"), cbN("fx_duo_wisp", "fx_hit_s"), cbN("fx_duo_moon", "fx_twinkle")];
+      const set = g.hk === "n" ? ["fx_nam_bolt", "fx_nam_bud", "fx_nam_bloom", "fx_nam_spores"] : pink ? [cbN("fx_duo_heart", "fx_heart"), "fx_heart", cbN("fx_duo_star_p", "fx_twinkle"), cbN("fx_duo_petal", "fx_heart")] : [cbN("fx_duo_leaf", "fx_hit_s"), cbN("fx_duo_spark_g", "fx_twinkle"), cbN("fx_duo_wisp", "fx_hit_s"), cbN("fx_duo_moon", "fx_twinkle")];
       for (let i = 0; i < 3; i++) C.parts.push({ in: true, x0: x + tx, y0: y + ty + rnd(-30, 30), k: 0, dur: rnd(0.38, 0.6), curl: (pink ? 1 : -1) * rnd(1.2, 2.4), sp: set[(Math.random() * set.length) | 0], sc: rnd(0.45, 0.9), rot: rnd(0, 6), vr: rnd(-6, 6), life: 1, max: 1 });
       if (Math.random() < dt * 9) C.parts.push({ bolt: true, x0: x + tx, y0: y + ty, k: 0, dur: 0.3, hk: g.hk, life: 1, max: 1 });
     }
@@ -4033,6 +4070,7 @@
       SFX.boom(); SFX.boom(); SFX.level && SFX.level(); G.shake = 48;
       if (C.hit) { G.ultClock = C.t0; try { C.hit(); } finally { G.ultClock = null; } C.hit = null; }
       const set = [cbN("fx_duo_heart", "fx_heart"), "fx_heart", cbN("fx_duo_star_p", "fx_twinkle"), cbN("fx_duo_petal", "fx_heart"), cbN("fx_duo_leaf", "fx_hit_s"), cbN("fx_duo_spark_g", "fx_twinkle"), cbN("fx_duo_wisp", "fx_hit_s"), cbN("fx_duo_moon", "fx_twinkle"), cbN("fx_duo_light", "fx_twinkle")];
+      if (girls2.some(g => g.hk === "n")) set.push("fx_nam_bolt", "fx_nam_bloom", "fx_nam_spores");
       for (let i = 0; i < 110; i++) {
         const a = Math.random() * TAU, v = rnd(700, 2300);
         C.parts.push({ back: true, x: ox + Math.cos(a) * 40, y: oy + Math.sin(a) * 40, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.8, g: 260, life: rnd(0.9, 1.5), max: 1.5, sp: set[i % set.length], sc: rnd(0.6, 1.5), rot: rnd(0, 6), vr: rnd(-5, 5), drag: 0.25 });
@@ -4049,7 +4087,7 @@
     if (C.parts.length > 420) C.parts.splice(0, C.parts.length - 420);
     if (t >= CB_END) {
       G.combo = null; G.ultLast = null;
-      for (const g of girls2) burst(g.x, g.y - 60, 16, g.hk === "g" ? ["#ffb3e0", "#fff4c2", "#ff9ad5"] : ["#b8ffb0", "#f0fff0", "#7be04a"], 300, 0.6);
+      for (const g of girls2) burst(g.x, g.y - 60, 16, g.hk === "n" ? ["#ffc078", "#d5b0ff", "#fff1bd"] : g.hk === "g" ? ["#ffb3e0", "#fff4c2", "#ff9ad5"] : ["#b8ffb0", "#f0fff0", "#7be04a"], 300, 0.6);
       P.inv = Math.max(P.inv, 1.2);
     }
   }
@@ -4061,8 +4099,8 @@
     const dim = ss(0, 0.35, t) * (1 - ss(CB_BOOM + 0.35, CB_END - 0.1, t));
     if (dim > 0) {
       ctx.save(); ctx.globalAlpha = 0.8 * dim; ctx.fillStyle = "#140a24"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2); ctx.restore();
-      glow(ox - 620, oy + 40, 900, "255,90,190", 0.32 * dim);
-      glow(ox + 620, oy + 40, 900, "90,240,120", 0.28 * dim);
+      glow(ox - 620, oy + 40, 900, HEROES[[hero,Q.hero].sort()[0]].rgb, 0.32 * dim);
+      glow(ox + 620, oy + 40, 900, HEROES[[hero,Q.hero].sort()[1]].rgb, 0.28 * dim);
     }
     // the seal behind the orb: her heart circle and her emerald circle turning against each other
     const ch = ss(CB_MEET - 0.2, CB_BOOM - 0.1, t) * (1 - ss(CB_BOOM, CB_BOOM + 0.3, t));
@@ -4079,7 +4117,7 @@
       const [x, y, m, , fl] = cbPose(C, g, t), [tx, ty] = cbTip(g.hk, g.skin, m, fl), bx = x + tx, by = y + ty, rgb = HEROES[g.hk].rgb;
       for (let i = 0; i <= 8; i++) { const k = i / 8; glow(lerp(bx, ox, k), lerp(by, oy, k), 70 + 30 * Math.sin(t * 20 + i), rgb, 0.4 * beam); }
       glow(bx, by, 120, rgb, 0.8 * beam);
-      fx(g.hk === "g" ? cbN("fx_duo_star_p", "fx_twinkle") : cbN("fx_duo_spark_g", "fx_twinkle"), bx, by, 1.0 + 0.2 * Math.sin(t * 25), beam, t * 4);
+      fx(g.hk === "n" ? "fx_nam_bloom" : g.hk === "g" ? cbN("fx_duo_star_p", "fx_twinkle") : cbN("fx_duo_spark_g", "fx_twinkle"), bx, by, 1.0 + 0.2 * Math.sin(t * 25), beam, t * 4);
     }
     // the burst over the whole screen (behind the girls, who stay in front cheering)
     if (q >= 0) {
@@ -4100,11 +4138,11 @@
     ctx.restore();
     // the girls
     if (t < CB_END) for (const g of girls2) {
-      const [x, y, m, pose, fl] = cbPose(C, g, t), fn = fr(g.skin + "_" + pose, g.hk + "_" + pose), M = CHAR_M * sideK(g.hk, fn) * m;
+      const [x, y, m, pose, fl] = cbPose(C, g, t), painted=CHARACTER_REDRAW.has(g.hk)||WARD.loaded.has(g.skin), p=painted&&pose==="cast"?(fl?"cl1":"cr1"):pose, fn = fr(g.skin + "_" + p, g.hk + "_" + p), M = CHAR_M * sideK(g.hk, fn) * m;
       const lift = t < CB_MEET ? ss(0, 0.3, t) : t > CB_BACK ? 1 - ss(CB_END - 0.2, CB_END, t) : 1;
       shadow(g.x, g.y, 46 * (1 - 0.6 * lift), 12, 0.3 * (1 - lift * 0.8));
       glow(x, y - 170 * m, 220 * m, HEROES[g.hk].rgb, 0.45 * lift);
-      spr(fn, x, y, fl, M, 1);
+      spr(fn, x, y, painted?false:fl, M, 1);
     }
     // the magic pouring in
     ctx.save(); ctx.globalCompositeOperation = "lighter";
@@ -4112,7 +4150,7 @@
       if (p.bolt) {
         const e = p.k * p.k, g = girls2.find((g) => g.hk === p.hk); if (!g) continue;
         const x = lerp(p.x0, ox, e), y = lerp(p.y0, oy, e);
-        spr(p.hk === "s" ? "fx_bolt_s" : "fx_bolt_g", x, y, p.x0 > ox, 0.9, Math.min(1, (1 - p.k) * 4), 0);
+        spr(p.hk === "n" ? "fx_nam_bolt" : p.hk === "s" ? "fx_bolt_s" : "fx_bolt_g", x, y, p.x0 > ox, 0.9, Math.min(1, (1 - p.k) * 4), 0);
         continue;
       }
       if (p.in) {
@@ -4144,7 +4182,7 @@
       const gr = ctx.createLinearGradient(-w, 0, w, 0); gr.addColorStop(0, "#ff7ccf"); gr.addColorStop(0.5, "#fff4c2"); gr.addColorStop(1, "#7cf27a");
       ctx.lineWidth = 8; ctx.strokeStyle = "#fff"; ctx.strokeText(txt, 0, 0); ctx.fillStyle = gr; ctx.fillText(txt, 0, 0);
       ctx.font = "800 56px Grandstander, system-ui"; ctx.lineWidth = 12; ctx.strokeStyle = "rgba(40,10,60,.85)";
-      const sub = HEROES.g.name + " + " + HEROES.s.name; ctx.strokeText(sub, 0, 100); ctx.fillStyle = "#fff"; ctx.fillText(sub, 0, 100);
+      const sub = cbGirls(C).map(g=>HEROES[g.hk].name).sort().join(" + "); ctx.strokeText(sub, 0, 100); ctx.fillStyle = "#fff"; ctx.fillText(sub, 0, 100);
       ctx.restore();
     }
     // the flash as it bursts
@@ -4981,6 +5019,17 @@
     const env = ss(0, 0.45, t) * (1 - ss(2.1, 2.55, t)), span = VW * 0.92, ox = cx - span / 2, vs = VH * 0.74, oy = cy - vs / 2 + 80;
     const at = (i, a, b) => [ox + ((i * 0.618034 + a) % 1) * span, oy + ((i * 0.754877 + b) % 1) * vs];
     const fz = 150 * ss(0, 0.6, t) - 150 * ss(2.0, 2.5, t);
+    if (hk === "n") {
+      if(layer===0){groundCircle("fx_nam_ring",x,y,1.3*env,.8*env);glow(x,y-fz-100,300,"255,184,90",.35*env);return;}
+      for(let i=0;i<9;i++){
+        const [mx,my]=at(i,.17,.25),age=t-i*.055;
+        if(age<=0)continue;
+        const growth=ss(0,.7,age),name=age<.25?'fx_nam_bud':age<.5?'fx_nam_grow':'fx_nam_mature';
+        spr(name,mx,my-Math.sin(Math.PI*ss(1.4,1.85,t))*120,false,(.55+.5*growth)*env,env);
+        if(t>1.45)fx('fx_nam_bloom',mx,my-100,ss(1.45,2,t)*1.1,env);
+      }
+      spr('fx_nam_spores',cx,cy-110,false,1.15*env,.4*env);return;
+    }
     if (hk === "g") {
       if (layer === 0) {
         glow(x, y - fz - 110, 420, "255,140,210", 0.35 * env);
@@ -5053,7 +5102,7 @@
       fxDir(EBOLT[elem], x - vx / sp * back, y - vy / sp * back, vx, vy, m, 0.6 + 0.4 * ga);
       return;
     }
-    const n = hk === "s" ? "fx_bolt_s" : "fx_bolt_g";
+    const n = hk === "n" ? "fx_nam_bolt" : hk === "s" ? "fx_bolt_s" : "fx_bolt_g";
     if (elem) glow(x, y, 60 * sc, ELEM[elem].rgb, (0.45 + 0.08 * Math.sin(G.t * 20)) * ga);
     glow(x, y, 55 * sc, HEROES[hk].rgb, 0.4 * ga);
     fxDir(n, x - vx / sp * 50 * sc, y - vy / sp * 50 * sc, vx, vy, (hk === "g" ? 0.75 : 0.95) * sc, 1);
@@ -5346,6 +5395,7 @@
   function renderHeroes() {
     const box = $("heroes"); box.innerHTML = "";
     for (const [k, h] of Object.entries(HEROES)) {
+      if(!FR[k+"_stand"])continue;
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
       const f = FR[k + "_stand"], c = document.createElement("canvas"), sc = 1.2; c.width = 130 * sc; c.height = 262 * sc;
       const k2 = f.s * sc, g = c.getContext("2d");
@@ -5642,7 +5692,7 @@
     if(msg.topic==="wardrobe"){wardNet(d);return;}
     if(WARD.open)return;
     if (msg.topic === "shots") {   // partner's bolts: only for show, her own page reports what they hit
-      const k = d.k === "s" ? "s" : "g", H = HEROES[k];
+      const k = validHero(d.k), H = HEROES[k];
       for (const b of Array.isArray(d.s) ? d.s.slice(0, 40) : []) {
         if (!Array.isArray(b) || !Q || G.pshots.length >= 40) break;
         const a = num(b[2]) / 100;
@@ -5752,8 +5802,8 @@
     const b = num(gl[4]), k = Math.min(1, dt * 20);
     Q.x = Math.abs(x - Q.x) > 500 ? x : Q.x + (x - Q.x) * k; Q.y = Math.abs(y - Q.y) > 500 ? y : Q.y + (y - Q.y) * k;
     Q.vx = num(gl[10]); Q.vy = num(gl[11]);
-    Q.face = clamp(Math.floor(num(gl[2])), 0, 4); Q.hero = gl[7] === "s" ? "s" : "g";
-    Q.skin = typeof gl[9] === "string" && (/^[gs](\d\d)?$/.test(gl[9])||WARD.bySid.has(gl[9])) && gl[9][0] === Q.hero ? gl[9] : Q.hero;
+    Q.face = clamp(Math.floor(num(gl[2])), 0, 4); Q.hero = validHero(gl[7]);
+    Q.skin = typeof gl[9] === "string" && (/^[gsn](\d\d)?$/.test(gl[9])||WARD.bySid.has(gl[9])) && gl[9][0] === Q.hero ? gl[9] : Q.hero;
     if (Q.skin.length > 1 && !SKIN[Q.skin]) loadSkin(Q.skin);
     // until the partner's outfit has loaded, show her own costume in the same pose
     const fn = typeof gl[3] === "string" ? gl[3] : "", base = Q.hero + fn.slice(fn.indexOf("_"));
@@ -5951,7 +6001,7 @@
       : others.length ? "iPad kia đã mở game. Một bé bấm “Mở phòng”, bé còn lại bấm “Vào chơi cùng”."
       : "Chưa thấy iPad nào khác. Hãy mở cùng đường link này trên iPad thứ hai.";
     for (const h of hosts) {
-      const hk = h.presence.co.hero === "s" ? "s" : "g";
+      const hk = validHero(h.presence.co.hero);
       btn("Vào chơi cùng " + HEROES[hk].name, () => setCo({ role: "join", host: h.peer, hero }));
     }
     btn("Mở phòng", () => setCo({ role: "host", hero }), hosts.length > 0);
@@ -6014,7 +6064,7 @@
     try { await loadAssets(); }
     catch (e) { $("loading").textContent = "Không tải được hình ảnh. Hãy tải lại trang."; return; }
     try { OUTFITS = (await (await fetch("assets/skins/index.json")).json()).outfits || []; } catch (e) { OUTFITS = []; }
-    for (const k of "gs") if (mySkinFor(k).length > 1) loadSkin(mySkinFor(k));
+    for (const k of "gsn") if (mySkinFor(k).length > 1) loadSkin(mySkinFor(k));
     makeProps();
     buildLevel(0); G.mode = "title"; ready = true;
     renderLevels(); renderHeroes(); updateXpHud();
@@ -6022,11 +6072,11 @@
   }
   // test hooks for automated checks. __dcpt3.autopilot = true makes this girl walk the path on her own.
   const API = window.__dcpt3 = {
-    G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
+    validHero, makeSum, hurtHero, comboUlt, cbPose, victoryPortrait, G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
     wardrobe:{open:wardOpen,close:wardClose,buy:wardBuy,wear:wardWear,ready:wardReady,load:wardLoad,owned:wardOwned,catalog:()=>WARD.catalog,state:()=>({run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready,partnerReady:WARD.partnerReady,coins:G.stars,equipped:outfit[hero]}),sync:wardSync},
     autopilot: false,
     getQ: () => Q,
-    setHero: (k) => { hero = k === "s" ? "s" : "g"; loadPets(); renderHeroes(); },
+    setHero: (k) => { hero = validHero(k); loadPets(); renderHeroes(); },
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
     heroFrame, monFrame, guideTarget, heroStats, xpNeed, gainXp, addEnergy, startUlt, rescuePet, ultBlast, startBoss, pets: () => PETE,
