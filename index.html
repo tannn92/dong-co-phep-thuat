@@ -243,7 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261030.1720"></script>
+<script src="wardrobe.js?v=261031.2149"></script>
 <script>
 (() => {
   "use strict";
@@ -277,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261030.1720", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261031.2149", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -740,7 +740,8 @@
       if(m.version!==1||!Array.isArray(m.catalog)||!Array.isArray(m.sheets)||!m.frames)throw Error('catalog');
       WARD.meta=m;
       WARD.catalog=m.catalog.filter(o=>/^[gs]\.[a-z0-9-]+$/.test(o.id)&&o.char===o.id[0]&&o.price===10&&m.frames[o.id+'.stand']);
-      try{const nm=await(await fetch('nam-assets/catalog.json')).json();for(const o of nm.catalog||[])if(/^n\.[a-z0-9-]+$/.test(o.id)&&o.char==='n'&&o.price===10)WARD.catalog.push({...o,nam:true});}catch(e){}
+      // Nấm keeps only her original costume so her face stays consistent.
+      outfit.n='';try{localStorage.removeItem('dcpt3-wardrobe-outfit-n');}catch(e){}
       for(const o of WARD.catalog){WARD.byId.set(o.id,o);WARD.bySid.set(wardSid(o.id),o);}
       for(const c of 'gsn')try{const v=JSON.parse(localStorage.getItem('dcpt3-wardrobe-owned-'+c)||'[]');if(Array.isArray(v))for(const id of v)if(wardEntry(id)?.char===c)WARD.owned[c].add(id);const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c&&wardOwned(chosen)?chosen:'';}catch(e){}
     } catch(e) { WARD.catalog=[]; } // Original clothes always remain playable.
