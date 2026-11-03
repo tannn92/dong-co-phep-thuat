@@ -243,7 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261103.1633"></script>
+<script src="wardrobe.js?v=261103.1649"></script>
 <script>
 (() => {
   "use strict";
@@ -277,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1633", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1649", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -5530,8 +5530,8 @@
       if(!FR[k+"_stand"])continue;
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
       const f = (k === "b" ? gomSelection("base", renderHeroes).frame : null) || FR[k + "_stand"], c = document.createElement("canvas"), sc = 1.2; c.width = 180 * sc; c.height = 262 * sc;
-      // Fit the wide sword-and-cape portrait to the card, independently of gameplay scale.
-      const k2 = k === "b" ? Math.min((c.height - 6) / f.h, (c.width - 4) / f.w) : f.s * sc, g = c.getContext("2d");
+      // Match Mochi's displayed height, independently of Gôm's gameplay scale.
+      const k2 = k === "b" ? Math.min(FR.g_stand.h * FR.g_stand.s * sc / f.h, (c.width - 4) / f.w) : f.s * sc, g = c.getContext("2d");
       g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
       b.append(c, h.name);
       b.addEventListener("click", () => { hero = k; try { localStorage.setItem("dcpt3-hero", k); } catch (e) {} loadPets(); renderHeroes(); });
