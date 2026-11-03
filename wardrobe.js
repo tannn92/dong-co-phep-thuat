@@ -26,7 +26,8 @@
       visible.forEach((x,i)=>{
         const b=el('button','mw-card'),thumb=el('img','mw-thumb'),label=el('span','',x.name),detail=el('small');
         b.dataset.action='select:'+x.id;thumb.alt=x.name;thumb.loading=i<6?'eager':'lazy';thumb.decoding='async';thumb.width=240;thumb.height=280;
-        thumb.src=hero==='b'?'gom-assets/'+(x.id?x.id.slice(2):'base')+'/thumb.webp':hero==='n'?'nam-assets/'+(x.id?x.id.slice(2):'base')+'/thumb.webp':'wardrobe-assets/thumbnails/'+(x.id||hero+'.base')+'.webp';
+        thumb.src=hero==='b'?'gom-assets/'+(x.id?x.id.slice(2):'base')+'/selection.webp':hero==='n'?'nam-assets/'+(x.id?x.id.slice(2):'base')+'/thumb.webp':'wardrobe-assets/thumbnails/'+(x.id||hero+'.base')+'.webp';
+        if(hero==='b')thumb.onerror=()=>{thumb.onerror=null;thumb.src='gom-assets/'+(x.id?x.id.slice(2):'base')+'/thumb.webp';};
         b.append(thumb,label,detail);b.onclick=()=>{if(pending||entering)return;selected=x.id;load();};list.appendChild(b);cardNodes.push({b,detail,x});
       });
     }

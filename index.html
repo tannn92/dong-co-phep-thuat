@@ -243,7 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261103.1137"></script>
+<script src="wardrobe.js?v=261103.1534"></script>
 <script>
 (() => {
   "use strict";
@@ -277,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1137", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1534", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -349,7 +349,7 @@
   async function gomAtlas(outfit='base') {
     if(!GOM_OUTFITS.includes(outfit))throw Error('Trang phục Gôm không hợp lệ');
     const url='gom-assets/'+outfit+'/',res=await fetch(url+'atlas.json'),meta=await res.json();
-    const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
+    const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl','wdr','wdl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
     required.push(...Array.from({length:9},(_,i)=>['atk'+i+'r','atk'+i+'l']).flat());
     if(outfit==='base')required.push('sword_fly','slash0','slash1','slash2','ult_swords','ult_land');
     if(meta.version!==1||!Array.isArray(meta.sheets)||!meta.sheets.length||!meta.sheets.every(n=>/^[a-zA-Z0-9_-]+\.webp$/.test(n))||!meta.frames||required.some(p=>!meta.frames[p]))throw Error('Gôm chưa đủ hình');
@@ -799,7 +799,11 @@
     })();WARD.loading.set(id,task);try{return await task;}finally{WARD.loading.delete(id);}
   }
   function wardRefresh(){const key=[WARD.epoch,G.stars,outfit[hero],WARD.ready,WARD.partnerReady,NET.role,WARD.pending?.id,[...WARD.owned[hero]].join(',')].join('|');if(key===WARD.uiKey)return;WARD.uiKey=key;WARD.ui?.refresh();WARD.ui?.setReadyState({self:WARD.ready,partner:WARD.partnerReady,coop:!!NET.role});}
-  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,owned:wardOwned,equipped:()=>outfit[hero],load:wardLoad,buy:wardBuy,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,background:'wardrobe-assets/background.webp'});}
+  async function wardPreview(id) {
+    const stand = await wardLoad(id);
+    return hero === "b" ? (await gomSelection(id ? id.slice(2) : "base").promise) || stand : stand;
+  }
+  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,owned:wardOwned,equipped:()=>outfit[hero],load:wardPreview,buy:wardBuy,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,background:'wardrobe-assets/background.webp'});}
   function wardOpen(fromNet=false,epoch=null){
     if(epoch!==null&&WARD.open&&WARD.epoch===epoch)return;
     WARD.epoch=epoch===null?WARD.epoch+1:epoch;WARD.open=true;WARD.ready=false;WARD.partnerReady=false;G.mode='shop';P.vx=P.vy=0;P.moving=false;
@@ -1128,7 +1132,7 @@
       addDeco(d);
     }
     // reset the play state
-    P.gomAttack=null;P.gomVisual=null;P.gomIndex=0;G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = [];
+    resetGomCombat();gomReceived.clear();P.gomAttack=null;P.gomVisual=null;P.gomIndex=0;G.nextId = 1; G.mons = []; G.shots = []; G.pshots = []; G.foes = []; G.parts = []; G.drops = []; G.gems = []; G.rings = []; G.quakes = [];
     G.boss = null; G.ult = null; G.quiz = null; G.bcut = null; G.bcutSeen = null; $("quiz").hidden = true; G.arenaLock = false; G.lt = 0; G.lvKills = 0; G.spawnAcc = 0; G.surgeT = 35; G.gateMsg = false; G.tierMsg = false; TIER_FR.clear();
     chunkCache.clear(); miniBase = null;
     $("lvlName").textContent = L.name;
@@ -1373,7 +1377,7 @@
   function heroDown(why) {
     // The girls only rest briefly. Fainting and rescue belong to NPCs.
     if (P.tiredT > 0) return;
-    P.gomAttack=null;P.gomVisual=null; P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
+    resetGomCombat();P.gomAttack=null;P.gomVisual=null; P.dead = false; P.tiredT = 1.4; P.inv = Math.max(P.inv, 1.4); P.hurtT = 0;
     P.vx = P.vy = 0; P.moving = false; G.hearts = 0; renderHearts();
     showBanner(HD().name + " hơi mệt rồi!", "Nghỉ một chút là khỏe lại nhé");
   }
@@ -1382,6 +1386,7 @@
   const rescuing = () => !!(Q && NET.role && !Q.dead && d2(Q.x, Q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
+    resetGomCombat();P.gomAttack=null;P.gomVisual=null;
     for (const e of PETE) e.faintT = 0;
     P.dead = false; P.tiredT = 0; P.hurtT = 0; P.inv = 2.5; G.hearts = maxHearts(); renderHearts(); SFX.heal();
     burst(P.x, P.y - 110, 30, ["#fff4c2", "#ffd34d", ...HD().cols], 380, 0.8);
@@ -1488,25 +1493,56 @@
     }
     play("zap");
   }
+  let gomSequence = 0;
+  const gomWaiting = new Set(), gomReceived = new Map();
+  function resetGomCombat() {
+    P.gomThrowCd=0; P.gomHealTimes=[]; gomWaiting.clear();
+  }
+  function gomHeal() {
+    if(hero!=="b" || P.dead || P.tiredT>0 || G.hearts<=0) return;
+    const now=G.t || 0;
+    P.gomHealTimes=(P.gomHealTimes||[]).filter(t=>now-t<1);
+    if(P.gomHealTimes.length>=5 || G.hearts>=8) return;
+    P.gomHealTimes.push(now); G.hearts=Math.min(8,Math.round((G.hearts+0.1)*1e10)/1e10); renderHearts();
+  }
+  function gomMeleeHit(m, strike, hit) {
+    const hp=m.hp, queued=NET.hq.length; hit();
+    if(NET.role==="guest") {
+      if(NET.hq.length>queued) { NET.hq[NET.hq.length-1][6]=strike.id; gomWaiting.add(strike.id); if(gomWaiting.size>128)gomWaiting.delete(gomWaiting.values().next().value); }
+    } else if(m.hp<hp && !strike.healed) { strike.healed=true; gomHeal(); }
+  }
+  function gomReceiveHit(h, hit) {
+    const token=h[6];
+    if(!Number.isSafeInteger(token) || token<=0 || Q?.hero!=="b") return hit();
+    let record=gomReceived.get(token);
+    if(!record) { record={targets:new Set(),healed:false}; gomReceived.set(token,record); if(gomReceived.size>512)gomReceived.delete(gomReceived.keys().next().value); }
+    const id=Number(h[0]); if(record.targets.has(id))return; record.targets.add(id);
+    const m=id===-1?G.boss:G.mons.find(m=>m.id===id), hp=m?.hp;
+    if(!m?.alive || Q.dead || Q.tiredT>0) return;
+    hit();
+    if(m.hp<hp && !record.healed) { record.healed=true; netEmit("gomheal",{to:NET.partner,id:token}); }
+  }
   const GOM_CHAINS=[[0,1,2],[3,4,5],[6,7,8]];
   function gomSlashFx(pose,x,y,a){G.parts.push({type:'fx',name:'fx_gom_slash'+(pose%3),x:x+Math.cos(a)*95,y:y-75+Math.sin(a)*70,sc:1.25,rot:a,life:.25,max:.25});}
   function gomFire(){
-    if(P.gomAttack)return;
+    if(P.gomAttack || P.dead || P.tiredT>0 || G.ult || P.winT)return;
     const S=heroStats('b',P.lv,P.elem),target=nearestFoes(P.x,P.y,S.range,1)[0];
     if(!target){P.shootCd=.08;return;}
     const a=Math.atan2(target.y-P.y,target.x-P.x);if(!P.moving)setFace(P,Math.cos(a),Math.sin(a));
-    if(d2(P.x,P.y,target.x,target.y)>250*250){fireBolt(a,S);const shot=G.shots[G.shots.length-1];shot.pierce=true;shot.hit=new Set();P.shootCd=S.cd;P.castT=.22;return;}
+    if(d2(P.x,P.y,target.x,target.y)>250*250){if(P.gomThrowCd>0)return;P.gomThrowCd=1;fireBolt(a,S);const shot=G.shots[G.shots.length-1];shot.pierce=true;shot.hit=new Set();P.shootCd=0;P.castT=.22;return;}
     const i=P.gomIndex||0,step=i%3,chain=Math.floor(i/3)%3,pose=GOM_CHAINS[chain][step],weight=step===2?1.3:.85;
-    P.gomIndex=(i+1)%9;P.shootCd=S.cd*weight;P.castT=P.shootCd;P.gomAttack={pose,a,t:0,wind:Math.min(.18,S.cd*.45)*weight,dmg:S.dmg*weight,kb:S.kb,elem:P.elem};play('swoosh');
+    P.gomIndex=(i+1)%9;P.shootCd=S.cd*weight;P.castT=P.shootCd;P.gomAttack={id:++gomSequence,pose,a,t:0,wind:Math.min(.18,S.cd*.45)*weight,dmg:S.dmg*weight,kb:S.kb,elem:P.elem};play('swoosh');
   }
   function updateGom(dt){
+    P.gomThrowCd=Math.max(0,(P.gomThrowCd||0)-dt);
+    if(P.dead || P.tiredT>0 || G.ult || P.winT){P.gomAttack=null;return;}
     if(P.gomVisual&&(P.gomVisual.left-=dt)<=0)P.gomVisual=null;
     const a=P.gomAttack;if(!a)return;a.t+=dt;if(a.t<a.wind)return;P.gomAttack=null;P.gomVisual={pose:a.pose,left:.14};
     gomSlashFx(a.pose,P.x,P.y,a.a);if(NET.role)netEmit('gomslash',{pose:a.pose,x:P.x,y:P.y,a:a.a});
     const half=a.pose===5?Math.PI:a.pose===6?.7:a.pose===8?1.9:1.45;
     for(const m of nearestFoes(P.x,P.y,270,1000)){
       const angle=Math.atan2(m.y-P.y,m.x-P.x)-a.a;if(Math.abs(Math.atan2(Math.sin(angle),Math.cos(angle)))>half)continue;
-      if(m===G.boss)hitBoss(a.elem,P.x,P.y,1.3);else hitMon(m,a.dmg,a.elem,P.x,P.y,a.kb);
+      gomMeleeHit(m,a,()=>{if(m===G.boss)hitBoss(a.elem,P.x,P.y,1.3);else hitMon(m,a.dmg,a.elem,P.x,P.y,a.kb);});
     }
   }
   // where the wand tip is, per facing (0 down .. 4 up, x mirrored when she faces left), relative to her feet;
@@ -1902,7 +1938,7 @@
   }
   function pickDrop(d) {
     if (d.type === "heart") {
-      if (G.hearts < maxHearts()) { G.hearts++; renderHearts(); floatText(d.x, d.y - 60, "+1 tim"); }
+      if (G.hearts < maxHearts()) { G.hearts = Math.min(maxHearts(), G.hearts + 1); renderHearts(); floatText(d.x, d.y - 60, "+1 tim"); }
       else addEnergy(10, d.x, d.y - 60);
       SFX.heal(); burst(d.x, d.y - 40, 14, ["#ff6f8f", "#fff"], 260, 0.5);
     } else if (d.type === "energy") {
@@ -4528,6 +4564,10 @@
     if (o.moving && !o.aim) o = { ...o, castT: 0 };
     const sk = o.skin, base = o.hk;
     if(base==='b'&&o.tiredT>0)return [(WARD.loaded.has(sk)?sk:'b_new')+'_faint',false];
+    if(base==='b'&&o.face===1&&!o.dead&&!o.winT&&!o.gomAttack&&!(o.castT>0)){
+      const pre=WARD.loaded.has(sk)?sk:'b_new',step=o.moving?[0,1,2,1][Math.floor((o.dist||0)/SIDE_CYCLE*4)%4]:1;
+      const name=pre+'_wd'+(o.flip?'l':'r')+step;if(FR[name])return [name,false];
+    }
     if(base==='b'&&o.face>=1&&o.face<=3&&o.gomAttack&&(!o.moving||Math.floor((o.dist||0)/45)%2===0)){
       const pre=WARD.loaded.has(sk)?sk:'b_new',name=pre+'_atk'+o.gomAttack.pose+(o.flip?'l':'r');if(FR[name])return [name,false];
     }
@@ -5397,7 +5437,14 @@
 
 
   // ---------------------------------------------------------------- HUD
-  function renderHearts() { $("hearts").innerHTML = Array.from({ length: maxHearts() }, (_, i) => (i < G.hearts ? '<img src="assets/ui_heart.webp" alt="">' : '<img class="lost" src="assets/ui_heart_empty.webp" alt="">')).join(""); }
+  function renderHearts() {
+    $("hearts").innerHTML=Array.from({length:maxHearts()},(_,i)=>{
+      const fill=clamp(G.hearts-i,0,1);
+      if(fill===1)return '<img src="assets/ui_heart.webp" alt="">';
+      if(fill===0)return '<img class="lost" src="assets/ui_heart_empty.webp" alt="">';
+      return '<span style="position:relative;display:inline-block;width:1.35em;height:1.35em"><img class="lost" src="assets/ui_heart_empty.webp" alt=""><img src="assets/ui_heart.webp" alt="" style="position:absolute;inset:0;clip-path:inset('+Math.round((1-fill)*100)+'% 0 0 0)"></span>';
+    }).join("");
+  }
   function updateHud() {
     $("efill").style.width = G.energy + "%"; $("ebar").classList.toggle("full", G.energy >= 100);
     $("stars").textContent = G.stars;
@@ -5460,13 +5507,30 @@
       box.append(b);
     });
   }
+  // UI portraits are separate from neutral gameplay frames.
+  const GOM_SELECTION = new Map();
+  function gomSelection(outfit = 'base', ready) {
+    let entry = GOM_SELECTION.get(outfit);
+    if (!entry) {
+      entry = { frame: null, promise: null }; GOM_SELECTION.set(outfit, entry);
+      entry.promise = loadImg('gom-assets/' + outfit + '/selection.webp').then(img => {
+        const stand = FR.b_stand;
+        entry.frame = { img, sx: 0, sy: 0, w: img.width, h: img.height,
+          s: stand ? stand.h * stand.s / img.height : 247.5 / img.height,
+          ax: img.width / 2, ay: img.height };
+        if (ready) ready();
+        return entry.frame;
+      }).catch(() => null);
+    }
+    return entry;
+  }
   function renderHeroes() {
     const box = $("heroes"); box.innerHTML = "";
     for (const [k, h] of Object.entries(HEROES)) {
       if(!FR[k+"_stand"])continue;
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
-      const f = FR[k + "_stand"], c = document.createElement("canvas"), sc = 1.2; c.width = 130 * sc; c.height = 262 * sc;
-      const k2 = f.s * sc, g = c.getContext("2d");
+      const f = (k === "b" ? gomSelection("base", renderHeroes).frame : null) || FR[k + "_stand"], c = document.createElement("canvas"), sc = 1.2; c.width = 130 * sc; c.height = 262 * sc;
+      const k2 = k === "b" ? Math.min(f.s * sc, (c.width - 4) / f.w) : f.s * sc, g = c.getContext("2d");
       g.drawImage(f.img, f.sx, f.sy, f.w, f.h, c.width / 2 - f.ax * k2, c.height - f.ay * k2, f.w * k2, f.h * k2);
       b.append(c, h.name);
       b.addEventListener("click", () => { hero = k; try { localStorage.setItem("dcpt3-hero", k); } catch (e) {} loadPets(); renderHeroes(); });
@@ -5611,7 +5675,7 @@
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
-    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout", "say", "wardrobe", "gomslash"]) room.on(t, onNet, () => {});
+    for (const t of ["start", "hits", "ult", "shoo", "portal", "hurt", "pick", "gain", "shots", "xp", "pet", "combo", "shout", "say", "wardrobe", "gomslash", "gomheal"]) room.on(t, onNet, () => {});
     renderCoop();
   }
 
@@ -5779,14 +5843,17 @@
       }
       return;
     }
+    if(msg.topic==="gomheal") { if(NET.role==="guest" && d.to===NET.me && G.mode==="play" && gomWaiting.delete(d.id))gomHeal(); return; }
     if (NET.role === "host") {
       if (msg.topic === "hits") {
         for (const h of Array.isArray(d.h) ? d.h.slice(0, 120) : []) {
           if (!Array.isArray(h)) continue;
+          gomReceiveHit(h,()=>{
           const el = ELS[num(h[1])] || null, id = num(h[0]);
-          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(Q?.hero==='b'?clamp(num(h[2]),0,30):1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); } continue; }
+          if (id === -1) { if (G.boss && G.boss.alive) { damageBoss(Q?.hero==='b'?clamp(num(h[2]),0,30):1, G.boss.x, G.boss.y - 220); applyElem(G.boss, el, "q"); } return; }
           const m = G.mons.find((m) => m.id === id && m.alive);
           if (m) { damageMon(m, clamp((Q?.hero==='b'?num(h[2]):Math.floor(num(h[2]))) || 1, 1, 400), Q ? Q.x : m.x, Q ? Q.y : m.y, false, "q", clamp(num(h[3]) || 60, 0, 250)); applyElem(m, el, "q"); }
+          });
         }
       } else if (msg.topic === "ult") {
         ultBlast(num(d.cx), num(d.cy), clamp(num(d.hw), 0, 2200), clamp(num(d.hh), 0, 1400), "q"); SFX.boom(); G.shake = 20;
