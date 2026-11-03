@@ -247,7 +247,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261103.1849"></script>
+<script src="wardrobe.js?v=261103.2149"></script>
 <script>
 (() => {
   "use strict";
@@ -300,7 +300,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1849", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.2149", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -3614,7 +3614,7 @@
     const [nx, ny] = norm(A.x - P.x, A.y - P.y);
     const BD = G.lvl.boss;
     $("bossName").textContent = BD.name;
-    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: -1, hp: BD.hp, max: BD.hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
+    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: nx > 0 ? -1 : 1, hp: BD.hp, max: BD.hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
     // the maths quizzes: he leaps up twice, at 2/3 and 1/3 of his health (each leap asks 1 or 2 questions in a row)
     if (BD.quiz) G.boss.quizHp = [Math.round(BD.hp * 2 / 3), Math.round(BD.hp / 3)];
     // (the monsters chasing the girls stay and keep fighting)
@@ -3707,6 +3707,7 @@
     const T = targetFor(B.x, B.y), dx = T.x - B.x, dy = T.y - B.y, d = Math.hypot(dx, dy) || 1, fast = B.hp < B.max / 2, A = G.arena;
     if (B.st === "quiz") return updateQuiz(B, dt);
     if (B.st === "enter") {
+      if (Math.abs(dx) > 30) B.dir = Math.sign(dx); // Land and speak facing the players.
       B.dropY = Math.min(0, B.dropY + 1800 * dt);
       if (B.dropY >= 0 && B.t > 0.5) { if (!B.landed) { B.landed = true; SFX.slam(); G.shake = 20; dust(B.x, B.y, 20); } if (B.t > 1.2 && !G.bcut) { B.st = "walk"; B.t = 0; } }
       return;
@@ -3814,6 +3815,7 @@
     const A = G.arena;
     // he leaps out of the arena and hovers beside the fence, laughing, while the girls answer; then he leaps back in
     if (z.hx === undefined) { const sd = B.x < A.x ? -1 : 1; z.hx = A.x + sd * (A.r + 330); z.hy = A.y + 150; z.x0 = B.x; z.y0 = B.y; }
+    B.dir = z.hx < A.x ? 1 : -1; // Face into the arena throughout the quiz.
     const hover = () => { B.x = z.hx; B.y = z.hy; B.jz = QZ_HOV + Math.sin(G.t * 2.4) * 22; };
     if (z.ph === "up") {
       const k = clamp(z.t / QZ_UP, 0, 1), e = rsEase(k);
