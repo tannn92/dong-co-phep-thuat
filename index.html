@@ -247,7 +247,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261103.1752"></script>
+<script src="wardrobe.js?v=261103.1811"></script>
 <script>
 (() => {
   "use strict";
@@ -300,7 +300,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1752", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1811", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -536,6 +536,29 @@
     const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(f); f.connect(g); g.connect(master); s.start(t);
   }
+  function gomSlashSound() {
+    if (!AC) return;
+    const kind=Math.floor(Math.random()*3), t=AC.currentTime, dur=kind===0?.24:.20;
+    const src=AC.createBufferSource(); src.buffer=noiseBuf(dur);
+    const f=AC.createBiquadFilter(); f.type="bandpass"; f.Q.value=kind===0?.65:1.2;
+    f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(kind===0?4200:6500,t+dur*.4); f.frequency.exponentialRampToValueAtTime(1500,t+dur);
+    const g=AC.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.72,t+.04); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t);
+    if(kind!==0) for(const [freq,level] of (kind===1?[[3100,.065],[4700,.025]]:[[1700,.07],[2550,.04]])) {
+      const o=AC.createOscillator(), v=AC.createGain(); o.type="sine";
+      o.frequency.setValueAtTime(freq,t+.045); o.frequency.exponentialRampToValueAtTime(freq*.82,t+.22);
+      v.gain.setValueAtTime(.0001,t+.045); v.gain.exponentialRampToValueAtTime(level,t+.06); v.gain.exponentialRampToValueAtTime(.0001,t+(kind===2?.35:.22));
+      o.connect(v); v.connect(master); o.start(t+.045); o.stop(t+.4);
+    }
+  }
+  function gomWaveSound() {
+    if(!AC)return;
+    const t=AC.currentTime,src=AC.createBufferSource();src.buffer=noiseBuf(.4);
+    const f=AC.createBiquadFilter();f.type="bandpass";f.Q.value=.8;
+    f.frequency.setValueAtTime(450,t);f.frequency.exponentialRampToValueAtTime(4800,t+.12);f.frequency.exponentialRampToValueAtTime(1100,t+.38);
+    const g=AC.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.9,t+.035);g.gain.setValueAtTime(.9,t+.09);g.gain.exponentialRampToValueAtTime(.0001,t+.4);
+    src.connect(f);f.connect(g);g.connect(master);src.start(t);
+  }
   const SFX = {
     zap() { tone("sawtooth", 2000, 420, 0.16, 0.06); tone("sine", 2800, 1200, 0.1, 0.06); },
     shatter() { tone("sine", 2600, 1900, 0.09, 0.05); tone("triangle", 3400, 2500, 0.07, 0.04, 0.05); noise(0.14, 0.07, 5200, 1.5); },
@@ -556,7 +579,8 @@
     fire() { noise(0.35, 0.12, 900, 0.7); tone("sawtooth", 300, 120, 0.3, 0.04); },
     web() { noise(0.2, 0.1, 3000, 2); },
     swoosh() { noise(0.25, 0.08, 1200, 0.8); },
-    slash() { noise(0.20, 0.85, 3200, 0.5); tone("triangle", 1800, 500, 0.12, 0.22); },
+    slash() { gomSlashSound(); },
+    swordWave() { gomWaveSound(); },
     portal() { [392, 523, 659, 784, 1046].forEach((f, i) => tone("sine", f, f, 0.6, 0.06, i * 0.08)); noise(0.8, 0.05, 5000, 0.5); },
     unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone("triangle", f, f, 0.4, 0.07, i * 0.1)); },
     slam() { tone("sine", 90, 30, 0.8, 0.6); noise(0.6, 0.4, 300, 0.6, 0, "lowpass"); },
@@ -1523,9 +1547,9 @@
     play("zap");
   }
   let gomSequence = 0;
-  const gomWaiting = new Set(), gomReceived = new Map();
+  const gomWaiting = new Map(), gomReceived = new Map();
   function resetGomCombat() {
-    P.gomThrowCd=0; P.gomHealTimes=[]; gomWaiting.clear();
+    P.gomThrowCd=0; P.gomHealTimes=[]; P.gomHitCount=0; gomWaiting.clear();
   }
   function gomHeal() {
     if(hero!=="b" || P.dead || P.tiredT>0 || G.hearts<=0) return;
@@ -1534,11 +1558,32 @@
     if(P.gomHealTimes.length>=5 || G.hearts>=8) return;
     P.gomHealTimes.push(now); G.hearts=Math.min(8,Math.round((G.hearts+0.1)*1e10)/1e10); renderHearts();
   }
+  // GOM_WAVE_START
+  function gomWave(strike) {
+    if(!strike || hero!=="b" || P.dead)return;
+    P.gomHitCount=((P.gomHitCount||0)+1)%3;
+    if(P.gomHitCount!==0 || Math.random()>=.35 || G.shots.filter(s=>s.gomWave).length>=4)return;
+    const a=strike.a, x=P.x, y=P.y;
+    G.shots.push({x,y,vx:Math.cos(a)*1000,vy:Math.sin(a)*1000,life:.7,r:45,dmg:strike.dmg,elem:strike.elem,kb:strike.kb,hk:"b",sc:.7,hit:new Set(),pierce:true,gomWave:true});
+    play("swordWave"); netShot(x,y,a,.7,true);
+  }
+  function gomWaveHit(s, x0, y0) {
+    const dx=s.x-x0,dy=s.y-y0,len=dx*dx+dy*dy;
+    const touches=(x,y,r)=>{const k=len?Math.max(0,Math.min(1,((x-x0)*dx+(y-y0)*dy)/len)):0;return (x-x0-k*dx)**2+(y-y0-k*dy)**2<=(s.r+r)**2;};
+    for(const m of G.mons) {
+      if(!m.alive || s.hit.has(m.id) || offStage(m) || !touches(m.x,m.y,m.r||40))continue;
+      s.hit.add(m.id);
+      hitMon(m,s.dmg,s.elem,s.x,s.y,s.kb);
+    }
+    const B=G.boss;
+    if(B && B.alive && B.st!=="enter" && !s.hit.has("boss") && touches(B.x,B.y,120)) { s.hit.add("boss"); hitBoss(s.elem,s.x,s.y,1.3); }
+  }
+  // GOM_WAVE_END
   function gomMeleeHit(m, strike, hit) {
     const hp=m.hp, queued=NET.hq.length; hit();
     if(NET.role==="guest") {
-      if(NET.hq.length>queued) { NET.hq[NET.hq.length-1][6]=strike.id; gomWaiting.add(strike.id); if(gomWaiting.size>128)gomWaiting.delete(gomWaiting.values().next().value); }
-    } else if(m.hp<hp && !strike.healed) { strike.healed=true; play("slash"); gomHeal(); }
+      if(NET.hq.length>queued) { NET.hq[NET.hq.length-1][6]=strike.id; gomWaiting.set(strike.id,strike); if(gomWaiting.size>128)gomWaiting.delete(gomWaiting.keys().next().value); }
+    } else if(m.hp<hp && !strike.healed) { strike.healed=true; play("slash"); gomWave(strike); gomHeal(); }
   }
   function gomReceiveHit(h, hit) {
     const token=h[6];
@@ -1603,13 +1648,15 @@
     G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
     netShot(x, y, a, S.sc);
   }
-  function netShot(x, y, a, sc) {
-    if (NET.role && NET.sq.length < 40) NET.sq.push([x | 0, y | 0, Math.round(a * 100), ELS.indexOf(P.elem), Math.round(sc * 100)]);
+  function netShot(x, y, a, sc, gomWave=false) {
+    if (NET.role && NET.sq.length < 40) NET.sq.push([x | 0, y | 0, Math.round(a * 100), ELS.indexOf(P.elem), Math.round(sc * 100),gomWave?1:0]);
   }
   // this girl's own bolts (on a guest they hit the mirrored monsters and are reported to the host)
   function updateShots(dt) {
     for (const s of G.shots) {
-      s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+      const x0=s.x,y0=s.y,travel=s.gomWave?Math.min(dt,Math.max(0,s.life)):dt;
+      s.x += s.vx * travel; s.y += s.vy * travel; s.life -= dt;
+      if(s.gomWave){gomWaveHit(s,x0,y0);continue;}
       // sparks shed along the way: fewer when many bolts fly at once, and small for the element bolts (their art has its own trail)
       if (Math.random() < (s.pet ? 0.3 : (s.elem ? 0.25 : 0.55) * clamp(20 / G.shots.length, 0.3, 1))) {
         const sc = s.elem && Math.random() < 0.6 ? ELEM[s.elem].cols : s.pet ? ["#fff4c2", "#fff"] : HEROES[s.hk].cols;
@@ -4057,6 +4104,32 @@
   }
 
   // ---------------------------------------------------------------- ultimate
+  // GOM_RING_START — bounded painted swords, shared timing in both games.
+  function gomRingStep(S, x, y, t, cx, cy) {
+    if (!S.gomRing || t < S.gomRing.t - 0.2) S.gomRing = { t, targets:null };
+    const R = S.gomRing; R.t = t;
+    if (t >= 1.1 && !R.targets) {
+      const candidates = G.mons.filter(m => m.alive && Math.abs(m.x-cx)<VW/2 && Math.abs(m.y-cy)<VH/2);
+      const B=G.boss; if(B?.alive && Math.abs(B.x-cx)<VW/2 && Math.abs(B.y-cy)<VH/2) candidates.push(B);
+      R.x=x; R.y=y;
+      R.targets = candidates.length ? Array.from({length:24}, (_,i) => { const m=candidates[i%candidates.length]; return {m,x:m.x,y:m.y}; }) : [];
+    }
+    if (R.targets && t < 1.5) for (const target of R.targets) if(target.m.alive) { target.x=target.m.x; target.y=target.m.y; }
+  }
+  function gomRingPose(S, x, y, t, i, K=1) {
+    const R=S.gomRing, target=R?.targets?.[i], flying=!!target && t>=1.1;
+    const a=i%12*TAU/12+Math.floor(i/12)*0.26+Math.min(t,1.1)*1.8;
+    const radius=(i<12?225:310)*K, fz=150*K*ss(0,.6,Math.min(t,1.1));
+    const ox=(flying?R.x:x)+Math.cos(a)*radius, oy=(flying?R.y:y)-fz-95*K+Math.sin(a)*radius*.48;
+    const k=flying?ss(1.1,1.5,t):0, tx=target?.x??ox, ty=(target?.y??oy)- (target?65*K:0);
+    return {x:ox+(tx-ox)*k,y:oy+(ty-oy)*k,rot:flying?Math.atan2(ty-oy,tx-ox):-Math.PI/2+Math.cos(a)*.12,
+      front:flying || Math.sin(a)>=0, alpha:ss(0,.25,t)*(1-ss(flying?1.5:1.1,flying?1.7:1.6,t)), scale:(i<12?1.05:1.2)*K};
+  }
+  function drawGomRing(S, x, y, t, cx, cy, layer, frame, K=1) {
+    gomRingStep(S,x,y,t,cx,cy);
+    for(let i=0;i<24;i++) { const p=gomRingPose(S,x,y,t,i,K); if(p.alpha>.01 && (p.front?1:0)===layer) spr(frame,p.x,p.y,false,p.scale,p.alpha,p.rot); }
+  }
+  // GOM_RING_END
   const ULT_PACE = 0.62;   // the ultimate's show runs slower than real time so it can be enjoyed
   function startUlt() {
     if (G.energy < 100 || G.ult || P.dead || P.winT || G.mode !== "play" || (G.cine && G.cine.lock)) return;
@@ -4070,7 +4143,8 @@
     U.t += dt * ULT_PACE;
     U.cx = G.camX + VW / 2; U.cy = G.camY + VH / 2;
     P.z = 150 * ss(0, 0.6, U.t) - 150 * ss(2.0, 2.5, U.t);
-    if (U.t > 0.2 && U.t < 1.6) for (let i = 0; i < 3; i++) {
+    if(hero==="b") gomRingStep(U,P.x,P.y,U.t,U.cx,U.cy);
+    if (hero !== "b" && U.t > 0.2 && U.t < 1.6) for (let i = 0; i < 3; i++) {
       const a = Math.random() * TAU, r = rnd(180, 320);
       G.parts.push({ type: "dot", x: P.x + Math.cos(a) * r, y: P.y - P.z - 100 + Math.sin(a) * r, vx: -Math.cos(a) * r * 2.2, vy: -Math.sin(a) * r * 2.2, life: 0.42, max: 0.42, r: rnd(4, 9), col: hero === "n" ? ["#ffb85a", "#fff1b8", "#cba5ff"][i % 3] : hero === "s" ? ["#fff4c2", "#b8ffb0", "#7be04a"][i % 3] : ["#fff4c2", "#ffd34d", "#ffb3e0"][i % 3] });
     }
@@ -4406,7 +4480,7 @@
     if (Q && NET.role) { if (QPETE.map((p) => p.kind).join() !== Q.pets.join()) QPETE = Q.pets.map((k, i) => ({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i })); partnerPets(dt); }
     for (const sh of G.pshots) {
       sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
-      for (const m of G.mons) if (m.alive && d2(sh.x, sh.y, m.x, m.y) < (m.r + 30) ** 2) { sh.life = 0; break; }
+      for (const m of G.mons) if (!sh.gomWave && m.alive && d2(sh.x, sh.y, m.x, m.y) < (m.r + 30) ** 2) { sh.life = 0; break; }
     }
     G.pshots = G.pshots.filter((sh) => sh.life > 0);
     if (NET.role === "guest") guestWorld(dt); else hostWorld(dt);
@@ -4797,7 +4871,7 @@
     const M = CHAR_M * sideK(hk, typeof fn === "string" ? fn : "");
     if (ultT > 0) {
       // the ultimate: she floats up and spins in light
-      const spin = ultT > 0.25 && ultT < 1.7 ? (ultT - 0.25) * 9 : 0, sx = FR[fn]?.redraw ? Math.abs(Math.cos(spin)) : Math.cos(spin), lt = ss(0.05, 0.4, ultT) * (1 - ss(1.9, 2.4, ultT));
+      const spin = hk !== "b" && ultT > 0.25 && ultT < 1.7 ? (ultT - 0.25) * 9 : 0, sx = FR[fn]?.redraw ? Math.abs(Math.cos(spin)) : Math.cos(spin), lt = (hk === "b" ? 0 : 1) * ss(0.05, 0.4, ultT) * (1 - ss(1.9, 2.4, ultT));
       shadow(x, y, 46, 12, 0.25);
       glow(x, y - z - 100, 260, hk === "s" ? "170,255,170" : "255,200,236", 0.55 * lt);
       ctx.save(); ctx.translate(x, y - z); ctx.scale(Math.abs(sx) < 0.08 ? 0.08 * Math.sign(sx || 1) : sx, 1);
@@ -5149,14 +5223,12 @@
   // ---------------------------------------------------------------- ultimates
   // played from the clock t (0..2.6; the blast lands at 1.5) around the view centre (cx, cy).
   // Mochi: heart-meteor shower. Matcha: thorns, an emerald fire dragon and fire pillars.
-  function drawUltFx(hk, x, y, dir, t, cx, cy, layer) {
+  function drawUltFx(hk, x, y, dir, t, cx, cy, layer, state = {}) {
     const env = ss(0, 0.45, t) * (1 - ss(2.1, 2.55, t)), span = VW * 0.92, ox = cx - span / 2, vs = VH * 0.74, oy = cy - vs / 2 + 80;
     const at = (i, a, b) => [ox + ((i * 0.618034 + a) % 1) * span, oy + ((i * 0.754877 + b) % 1) * vs];
     const fz = 150 * ss(0, 0.6, t) - 150 * ss(2.0, 2.5, t);
     if(hk==='b'){
-      if(layer===0){glow(x,y-fz-80,270,'150,205,255',.4*env);return;}
-      for(let i=0;i<9;i++){const [sx,sy]=at(i,.17,.25);if(t>.6+i*.06&&t<2)fx('fx_gom_ult_swords',sx,sy-260+ss(.6,1.6,t)*240,.8,env);}
-      if(t>1.5)fx('fx_gom_ult_land',x,y-60,1.8,env);return;
+      drawGomRing(state,x,y,t,cx,cy,layer,'fx_gom_sword_fly'); return;
     }
     if (hk === "n") {
       if(layer===0){groundCircle("fx_nam_ring",x,y,1.3*env,.8*env);glow(x,y-fz-100,300,"255,184,90",.35*env);return;}
@@ -5231,7 +5303,8 @@
   // while she holds a spell her bolt takes its shape: a fire comet, an icicle, a toxic orb (the art's head is at its right end)
   const EBOLT = { fire: "fx_eb_fire", ice: "fx_eb_ice", poison: "fx_eb_poison" }, EBOLT_M = 0.75;
   const BOLT_VIS = 0.75;   // every bolt is drawn this much smaller than its art: at higher levels many fly at once
-  function drawBolt(x, y, vx, vy, elem, hk, sc = 1) {
+  function drawBolt(x, y, vx, vy, elem, hk, sc = 1, gomWave=false) {
+    if(gomWave){spr("fx_gom_slash0",x,y,false,sc,1,Math.atan2(vy,vx));return;}
     sc *= BOLT_VIS;
     // with many bolts in the air their lights would run together into one blaze: each one glows less
     const sp = Math.hypot(vx, vy) || 1, eb = elem && FR[EBOLT[elem]], ga = clamp(24 / (G.shots.length + G.pshots.length + 1), 0.3, 1);
@@ -5358,8 +5431,8 @@
     drawArena(); drawStage(); drawRings(); drawQuizFloor(); drawGuard();
     drawPickups(L, R, T, B);
     drawGuide();
-    if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 0);
-    if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 0);
+    if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 0, G.ult);
+    if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 0, Q.gomRingState ||= {});
     // the elemental auras' rings lie on the ground, under everything standing
     if (G.mode !== "title" && !G.combo && P.elem && !G.ult && !P.dead) drawAura(P.elem, P.x, P.y, P.elemT, 0);
     if (Q && NET.role && !G.combo && Q.elem && !Q.dead && !(Q.ultT > 0)) drawAura(Q.elem, Q.x, Q.y, qElemLeft(), 0);
@@ -5413,9 +5486,9 @@
     for (const s of G.shots) {
       if (s.knife) drawKnife(s.x, s.y - 60, Math.atan2(s.vy, s.vx), 1);
       else if (s.pet) { const D = PETS[s.pet]; glow(s.x, s.y - 60, 46, D.rgb, 0.75); fx("fx_twinkle", s.x, s.y - 60, 0.45, 1, G.t * 8); }
-      else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk, s.sc);
+      else drawBolt(s.x, s.y - BOLT_Z, s.vx, s.vy, s.elem, s.hk, s.sc, s.gomWave);
     }
-    for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc);
+    for (const sh of G.pshots) drawBolt(sh.x, sh.y - BOLT_Z, sh.vx, sh.vy, sh.elem, sh.hk, sh.sc, sh.gomWave);
     drawGwimaGone();
     drawQuakesAir(); drawMeteors();
     drawQuizRain();
@@ -5425,8 +5498,8 @@
     drawParts(L, R, T, B);
     drawCineFx(L, T);
     drawCombo(L, T);
-    if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 1);
-    if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 1);
+    if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 1, G.ult);
+    if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 1, Q.gomRingState ||= {});
     if (G.ult) {
       const U = G.ult, fl = U.t > 1.5 ? Math.max(0, 1 - (U.t - 1.5) / 0.5) : 0;
       if (fl > 0) { ctx.fillStyle = hero === "s" ? `rgba(210,255,200,${fl * 0.6})` : `rgba(255,228,245,${fl * 0.6})`; ctx.fillRect(L - 50, T - 50, VW + 100, VH + 100); }
@@ -5862,8 +5935,9 @@
       const k = validHero(d.k), H = HEROES[k];
       for (const b of Array.isArray(d.s) ? d.s.slice(0, 40) : []) {
         if (!Array.isArray(b) || !Q || G.pshots.length >= 40) break;
-        const a = num(b[2]) / 100;
-        G.pshots.push({ x: num(b[0]), y: num(b[1]), vx: Math.cos(a) * H.bolt, vy: Math.sin(a) * H.bolt, life: (H.range + 200) / H.bolt, elem: ELS[num(b[3])] || null, hk: k, sc: clamp(num(b[4]) / 100 || 1, 0.5, 3) });
+        const a = num(b[2]) / 100, wave=k==="b" && num(b[5])===1, speed=wave?1000:H.bolt;
+        if(wave)play("swordWave");
+        G.pshots.push({ x: num(b[0]), y: num(b[1]), vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: wave?.7:(H.range + 200) / H.bolt, gomWave:wave, elem: ELS[num(b[3])] || null, hk: k, sc: clamp(num(b[4]) / 100 || 1, 0.5, 3) });
       }
       // their pet's attacks (start of the animation, then the hit), replayed here
       for (const f of Array.isArray(d.f) ? d.f.slice(0, 10) : []) {
@@ -5876,7 +5950,7 @@
       }
       return;
     }
-    if(msg.topic==="gomheal") { if(NET.role==="guest" && d.to===NET.me && G.mode==="play" && gomWaiting.delete(d.id)){play("slash");gomHeal();} return; }
+    if(msg.topic==="gomheal") { if(NET.role==="guest" && d.to===NET.me && G.mode==="play" && gomWaiting.has(d.id)){const strike=gomWaiting.get(d.id);gomWaiting.delete(d.id);play("slash");gomWave(strike);gomHeal();} return; }
     if (NET.role === "host") {
       if (msg.topic === "hits") {
         for (const h of Array.isArray(d.h) ? d.h.slice(0, 120) : []) {
