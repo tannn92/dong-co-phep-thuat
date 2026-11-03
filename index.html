@@ -243,7 +243,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261103.1534"></script>
+<script src="wardrobe.js?v=261103.1542"></script>
 <script>
 (() => {
   "use strict";
@@ -277,7 +277,7 @@
   let META = null, ready = false;
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1534", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1542", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -348,7 +348,7 @@
   const GOM_OUTFITS=['base','candy','pirate','snow','lava','castle1','castle2','castle3'];
   async function gomAtlas(outfit='base') {
     if(!GOM_OUTFITS.includes(outfit))throw Error('Trang phục Gôm không hợp lệ');
-    const url='gom-assets/'+outfit+'/',res=await fetch(url+'atlas.json'),meta=await res.json();
+    const url='gom-assets/'+outfit+'/',res=await fetch(url+'atlas.json?v='+encodeURIComponent(BUILD_VER),{cache:'no-cache'}),meta=await res.json();
     const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl','wdr','wdl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
     required.push(...Array.from({length:9},(_,i)=>['atk'+i+'r','atk'+i+'l']).flat());
     if(outfit==='base')required.push('sword_fly','slash0','slash1','slash2','ult_swords','ult_land');
@@ -5513,7 +5513,7 @@
     let entry = GOM_SELECTION.get(outfit);
     if (!entry) {
       entry = { frame: null, promise: null }; GOM_SELECTION.set(outfit, entry);
-      entry.promise = loadImg('gom-assets/' + outfit + '/selection.webp').then(img => {
+      entry.promise = loadImg('gom-assets/' + outfit + '/selection.webp?v=' + encodeURIComponent(BUILD_VER)).then(img => {
         const stand = FR.b_stand;
         entry.frame = { img, sx: 0, sy: 0, w: img.width, h: img.height,
           s: stand ? stand.h * stand.s / img.height : 247.5 / img.height,
