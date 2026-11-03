@@ -197,7 +197,7 @@
 <div class="screen" id="titleScreen">
   <div class="card">
     <h1>Đồng Cỏ <span>Phép Thuật</span></h1>
-    <p>Yêu quái chiếm năm vùng đất. Chọn Mochi, Matcha, Nấm hoặc Gôm, đi qua đồng cỏ, rừng ma, nghĩa địa, lâu đài và sân khấu cuối cùng để đánh bại <b>Gwi Ma</b>.</p>
+    <p>Yêu quái chiếm năm vùng đất. Chọn Mochi, Matcha hoặc Gôm, đi qua đồng cỏ, rừng ma, nghĩa địa, lâu đài và sân khấu cuối cùng để đánh bại <b>Gwi Ma</b>.</p>
     <div class="heroes" id="heroes"></div>
     <div class="pick">Chọn màn chơi</div>
     <div class="levels" id="levels"></div>
@@ -247,7 +247,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261103.1824"></script>
+<script src="wardrobe.js?v=261103.1849"></script>
 <script>
 (() => {
   "use strict";
@@ -300,7 +300,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261103.1824", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261103.1849", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -432,7 +432,7 @@
     for (const [n, f] of Object.entries(META.frames)) FR[n] = { img: sheets[f[0]], sx: f[1], sy: f[2], w: f[3], h: f[4], s: f[5], ax: f[6], ay: f[7] };
     showLoadProgress(55, "Đang tải Mochi và Matcha…");
     await loadCharacterRedraw();
-    showLoadProgress(65, "Đang tải Nấm…");
+    showLoadProgress(65, "Đang tải nhân vật…");
     await loadNam();
     showLoadProgress(72, "Đang tải đồng đội…");
     await loadTeamRedraw();
@@ -764,6 +764,7 @@
   HEROES.n = { ...HEROES.s, name:"Nấm", rgb:"255,184,90", cols:["#ffd28a","#ffb85a","#dcb7ff"] };
   HEROES.b = { ...HEROES.g, name:"Gôm", rgb:"150,205,255", cols:["#d6eeff","#ffe5a0","#a7caff"] };
   const maxHearts = (hk=hero) => hk==='b'?8:5;
+  const HIDDEN_HEROES = new Set(["n"]); // Temporary UI hide; keep identity, saves and art.
   const validHero = k => typeof k === 'string' && Object.hasOwn(HEROES,k) ? k : 'g';
   // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
@@ -786,6 +787,7 @@
   const petDmg = (lv) => Math.round((3 + Math.floor(lv * 0.8)) * levelDmg());
   let hero = "g";
   try { hero = validHero(localStorage.getItem("dcpt3-hero")); } catch (e) {}
+  if(HIDDEN_HEROES.has(hero)) hero="g";
   const HD = () => HEROES[hero];
   // outfits: every sister can wear any of them; each is its own small atlas (assets/skins/<hero><id>.*), loaded on demand
   let OUTFITS = [];                       // [{ id, name, heroes: "gs" }], from assets/skins/index.json
@@ -3742,11 +3744,13 @@
   // squares, each with an answer. When time is up, bombs / spikes / swords / fireballs (by level) rain on the wrong
   // squares: a girl or a friend standing there faints at once. Then he drops back in and the fight goes on.
   const QZ_UP = 1.0, QZ_DROP = 1.5, QZ_HIT = 0.7, QZ_DOWN = 1.1, QZ_NEXT = 1.2, QZ_HOV = 280, QPH = ["up", "ask", "drop", "down", "next", "wait"];
+  const easyBossMath = () => ["g","b"].includes(hero) || !!(NET.role && ["g","b"].includes(Q?.hero));
   function makeSum(cfg) {
+    if(easyBossMath()) cfg={...cfg,lim:10};
     let a, b, r, carry = false;
     const R = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-    // 80% of all questions carry / borrow (7 + 8, 13 − 9), on every level (Dad, 2026-10-27); the rest stay within the level's limit
-    carry = Math.random() < (["g","b"].includes(hero) || (NET.role && ["g","b"].includes(Q?.hero)) ? 0.1 : 0.8);
+    // Mochi or Gôm in the party: every operand and answer stays within 10.
+    carry = Math.random() < (easyBossMath() ? 0 : 0.8);
     if (carry || cfg.lim > 10) {
       // within 20: with carrying / borrowing, or (on the 20 levels) without (12 + 6, 17 − 4)
       if (cfg.op === "+") {
@@ -3772,8 +3776,8 @@
     ans.sort(() => Math.random() - 0.5);
     return { a, b, op: cfg.op, ans, ok: ans.indexOf(r), carry };
   }
-  // seconds per question: one number, or [without, with] carrying / borrowing
-  const quizT = (cfg, q) => (Array.isArray(cfg.T) ? cfg.T[q.carry ? 1 : 0] : q.carry ? Math.max(7, cfg.T * 2) : cfg.T);   // a carry question on a 10 level gets 7 s
+  // Non-carry questions always allow ten seconds; carry timing keeps the boss setting.
+  const quizT = (cfg, q) => !q.carry ? 10 : Array.isArray(cfg.T) ? cfg.T[1] : Math.max(7, cfg.T * 2);
   function startQuiz(B) {
     const cfg = G.lvl.boss.quiz, q = makeSum(cfg);
     B.st = "quiz"; B.t = 0; B.jz = 0;
@@ -5665,7 +5669,7 @@
   function renderHeroes() {
     const box = $("heroes"); box.innerHTML = "";
     for (const [k, h] of Object.entries(HEROES)) {
-      if(!FR[k+"_stand"])continue;
+      if(HIDDEN_HEROES.has(k) || !FR[k+"_stand"])continue;
       const b = document.createElement("button"); b.className = "hero"; b.setAttribute("aria-pressed", k === hero);
       const f = (k === "b" ? gomSelection("base", renderHeroes).frame : null) || FR[k + "_stand"], c = document.createElement("canvas"), sc = 1.2; c.width = 180 * sc; c.height = 262 * sc;
       // Match Mochi's displayed height, independently of Gôm's gameplay scale.
