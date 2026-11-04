@@ -205,7 +205,7 @@
 <div class="screen" id="titleScreen">
   <div class="card">
     <h1>Đồng Cỏ <span>Phép Thuật</span></h1>
-    <p>Yêu quái chiếm năm vùng đất. Chọn Mochi, Matcha hoặc Gôm, đi qua đồng cỏ, rừng ma, nghĩa địa, lâu đài và sân khấu cuối cùng để đánh bại <b>Gwi Ma</b>.</p>
+    <p>Yêu quái chiếm năm vùng đất. Chọn Mochi, Matcha, Gôm hoặc Nấm, đi qua đồng cỏ, rừng ma, nghĩa địa, lâu đài và sân khấu cuối cùng để đánh bại <b>Gwi Ma</b>.</p>
     <div class="heroes" id="heroes"></div>
     <div class="pick">Chọn màn chơi</div>
     <div class="levels" id="levels"></div>
@@ -256,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261104.1226"></script>
+<script src="wardrobe.js?v=261104.2014"></script>
 <script>
 (() => {
   "use strict";
@@ -309,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.1226", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.2014", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -360,7 +360,7 @@
     } catch (e) { /* Old pictures remain usable if an optional sheet failed to load. */ }
   }
   async function namAtlas(outfit='base') {
-    const url='nam-assets/'+outfit+'/',res=await fetch(url+'atlas.json'),meta=await res.json();
+    const url='nam-assets/'+outfit+'/',res=await fetch(url+'atlas.json?v='+encodeURIComponent(BUILD_VER),{cache:'no-cache'}),meta=await res.json();
     const required=['stand','faint','cheer','ult',...['wr','wl','cr','cl'].flatMap(p=>[0,1,2].map(i=>p+i)),...['wd','wu','cd','cu'].flatMap(p=>[0,1,2,3].map(i=>p+i))];
     if(meta.version!==1 || !meta.sheets?.every(n=>/^nam_\d+\.webp$/.test(n)) || required.some(p=>!meta.frames[p]))throw Error('Incomplete Nấm atlas');
     const imgs=await Promise.all(meta.sheets.map(n=>loadImg(url+n+'?v='+meta.hash))),fresh={},prefix=outfit==='base'?'n_new':'nsksp-'+outfit;
@@ -452,6 +452,7 @@
     bgs.forEach((b, i) => (IMG["bg" + (i + 1)] = b));
     await loadDragon();
     await loadTriDragon();
+    await loadSilverDragon();
     FR.potion_energy = recolor("potion", "#ffc21a");
   }
   // recolour a frame into its own canvas (multiply tint, optional desaturate)
@@ -776,12 +777,13 @@
   HEROES.n = { ...HEROES.s, name:"Nấm", rgb:"255,184,90", cols:["#ffd28a","#ffb85a","#dcb7ff"] };
   HEROES.b = { ...HEROES.g, name:"Gôm", rgb:"150,205,255", cols:["#d6eeff","#ffe5a0","#a7caff"] };
   const maxHearts = (hk=hero) => hk==='b'?8:5;
-  const HIDDEN_HEROES = new Set(["n"]); // Temporary UI hide; keep identity, saves and art.
+  const HIDDEN_HEROES = new Set();
   const validHero = k => typeof k === 'string' && Object.hasOwn(HEROES,k) ? k : 'g';
   // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
   // Cafe (Matcha's Scottish Fold cat) runs at a monster near her girl and scratches it.
   // Coca (Mochi's toy poodle) runs at one and bites: it is knocked back and slowed. at: where its cage sits along the path.
   const PETS = {
+    silverdragon: {name:"Rồng bạc ba đầu",owner:"s",rgb:"205,235,255",col:"#cdebff",cd:2,range:850,tip:"Ba tia chụm thành một quả cầu bạc"},
     tridragon: {name:"Rồng ba đầu",owner:"g",rgb:"255,135,75",col:"#ff874b",cd:2,range:760,tip:"Ba đầu lần lượt phun băng, lửa và độc"},
     dragon: {name:"Rồng con",owner:"b",at:.44,rgb:"130,220,255",col:"#82dcff",cd:2,range:760,tip:"Rồng bay theo Gôm và phóng tia năng lượng xuyên quái"},
     cat: { name: "Cafe", owner: "s", at: 0.5, rgb: "255,190,120", col: "#ffcf8a", cd: 0.8, range: 600, tip: "Cafe sẽ đi theo và cào quái giúp Matcha" },
@@ -833,17 +835,24 @@
   const wardSid = id => id.replace('.', 'sksp-');
   const wardEntry = id => WARD.byId.get(id);
   function wardSave(c) { try { localStorage.setItem('dcpt3-wardrobe-outfit-'+c,outfit[c]); } catch(e) {} }
+  const retiredOutfit = (c, of) => (c === "g" || c === "s") && of === "lava4";
   async function loadWardrobeCatalog() {
     try {
       const r=await fetch('wardrobe-assets/atlas.json',{cache:'no-cache'});if(!r.ok)throw Error('catalog');const m=await r.json();
       if(m.version!==1||!Array.isArray(m.catalog)||!Array.isArray(m.sheets)||!m.frames)throw Error('catalog');
       WARD.meta=m;
-      WARD.catalog=m.catalog.filter(o=>/^[gs]\.[a-z0-9-]+$/.test(o.id)&&o.char===o.id[0]&&o.price===10&&m.frames[o.id+'.stand']);
-      // Nấm keeps only her original costume so her face stays consistent.
-      outfit.n='';try{localStorage.removeItem('dcpt3-wardrobe-outfit-n');}catch(e){}
-      for(const o of WARD.catalog){WARD.byId.set(o.id,o);WARD.bySid.set(wardSid(o.id),o);}
-      for(const c of 'gsn')try{const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c?chosen:'';}catch(e){}
+      WARD.catalog=m.catalog.filter(o=>/^[gs]\.[a-z0-9-]+$/.test(o.id)&&o.char===o.id[0]&&o.price===10&&!retiredOutfit(o.char,o.id.slice(2))&&m.frames[o.id+'.stand']);
     } catch(e) { WARD.catalog=[]; } // Original clothes always remain playable.
+    // Nấm's independent atlas must remain available if the shared catalog is offline.
+    try {
+      const nr=await fetch('nam-assets/catalog.json?v='+encodeURIComponent(BUILD_VER),{cache:'no-cache'}),nm=await nr.json();
+      const allowed=new Set(['mushroom','autumn','starlight']),seen=new Set();
+      for(const o of nm.catalog||[])if(o?.char==='n'&&allowed.has(o.outfit)&&o.id==='n.'+o.outfit&&!seen.has(o.id)){
+        seen.add(o.id);WARD.catalog.push({...o,price:10,nam:true});
+      }
+    } catch(e) { /* Nấm's original dress and friends' clothes remain available. */ }
+    for(const o of WARD.catalog){WARD.byId.set(o.id,o);WARD.bySid.set(wardSid(o.id),o);}
+    for(const c of 'gsn')try{const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c?chosen:'';}catch(e){}
   }
   async function wardLoad(id) {
     if(!id)return hero==='b'?gomAtlas():FR[hero+'_new_stand']||FR[hero+'_stand'];
@@ -1057,6 +1066,7 @@
   }
 
   function buildLevel(i) {
+    P.triRide=false;
     const L = LEVELS[i], R = mulberry(L.seed);
     G.lvl = L; G.level = i; if (NET.role === "host") admitLate(); G.combo = null;
     const path = genPath(L, R); G.path = path;
@@ -1328,6 +1338,7 @@
   }
   joyHome(); window.addEventListener("resize", joyHome);
   zone.addEventListener("pointerdown", (e) => {
+    if(triTap(e))return;
     if (joy.id !== null) return;
     initAudio(); joy.id = e.pointerId; joy.cx = e.clientX; joy.cy = e.clientY; joy.ax = joy.ay = 0;
     try { zone.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1410,6 +1421,7 @@
     return best;
   }
   function hurtTarget(g, fx, fy, web) {
+    if(triRiding(g)&&G.mons.some(m=>m.alive&&Math.hypot(m.x-fx,m.y-fy)<2))return;
     if (g === P) return web ? webHero() : hurtHero(fx, fy);
     if (g.dead || g.inv || g.ultT > 0 || g.win || (!web && g.hostInv > 0)) return;
     if (!web) g.hostInv = 1.3;
@@ -1461,14 +1473,14 @@
     if (P.tiredT > 0) { P.moving = false; P.vx = P.vy = 0; if ((P.tiredT = Math.max(0, P.tiredT - dt)) === 0) reviveHero(); return; }
     if (P.dead) { P.moving = false; P.helped = rescuing(); if ((G.reviveT -= dt * (P.helped ? 5 : 1)) <= 0) reviveHero(); return; }
     if (G.ult || P.winT || (G.cine && G.cine.lock)) { P.vx = P.vy = 0; P.moving = false; return; }
-    const [ax, ay] = readMove(), sp = 360 * (P.slowT > 0 ? 0.55 : 1);
+    const [ax, ay] = readMove(), sp = triRiding()?414:360 * (P.slowT > 0 ? 0.55 : 1);
     if (P.hurtT > 0) { P.vx *= Math.pow(0.01, dt); P.vy *= Math.pow(0.01, dt); }
     else {
       const acc = 3200 * dt;
       P.vx += clamp(ax * sp - P.vx, -acc, acc); P.vy += clamp(ay * sp - P.vy, -acc, acc);
     }
     P.x += P.vx * dt; P.y += P.vy * dt;
-    pushOut(P, HERO_R); fence(P);
+    if(!triRiding())pushOut(P, HERO_R); fence(P);
     const v = Math.hypot(P.vx, P.vy);
     P.moving = v > 50 && (ax || ay);
     if (P.moving) { P.dist += v * dt; setFace(P, P.vx, P.vy); }
@@ -1536,13 +1548,13 @@
       // lead the target a little; repeated bolts on one target fan out
       const tx = t.x + (t.evx || 0) * 0.15, ty = t.y + (t.evy || 0) * 0.15;
       const a = Math.atan2(ty - P.y, tx - P.x) + (k ? (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.16 : 0);
-      fireBolt(a, S);
+      fireBolt(a, S, {x:tx,y:ty});
       if (i === 0 && !P.moving) setFace(P, Math.cos(a), Math.sin(a));
     }
     // Mochi's gift: half the time one more heart flies out, a little off to the side
     if (hero === "g" && Math.random() < 0.5) {
       const t = T[Math.floor(Math.random() * T.length)];
-      fireBolt(Math.atan2(t.y - P.y, t.x - P.x) + (Math.random() < 0.5 ? -1 : 1) * 0.12, S);
+      fireBolt(Math.atan2(t.y - P.y, t.x - P.x) + (Math.random() < 0.5 ? -1 : 1) * 0.12, S, t);
     }
     play("zap");
   }
@@ -1587,6 +1599,7 @@
   }
   function gomReceiveHit(h, hit) {
     const token=h[6];
+    if(typeof token==="string"&&token.startsWith("silver:"))return silverReceiveHit(h,hit);
     if(typeof token==="string"&&token.startsWith("tri:"))return triReceiveHit(h,hit);
     if(typeof token==="string"&&token.startsWith("dragon:"))return dragonReceiveHit(h,hit);
     if(!Number.isSafeInteger(token) || token<=0 || Q?.hero!=="b") return hit();
@@ -1639,13 +1652,14 @@
     }
     const w = (WAND[hk] || WAND.g)[clamp(face, 0, 4)]; return [w[0] * (flip && face !== 0 && face !== 4 ? -1 : 1), w[1]];
   }
-  function fireBolt(a, S) {
+  function fireBolt(a, S, target) {
     // from the wand tip, unless the target is behind her (then from her body, as the wand points the other way)
     const fa = [Math.PI / 2, Math.PI / 4, 0, -Math.PI / 4, -Math.PI / 2][clamp(P.face, 0, 4)], fxv = Math.cos(fa) * (P.flip ? -1 : 1), fyv = Math.sin(fa);
     const ahead = Math.cos(a) * fxv + Math.sin(a) * fyv > 0.2;
     const shotPose = P.fireFn || P.fn, castShown = shotPose && /_cast_|_wc|_new_c[rldu]|sksp-[^_]+_c[rldu]/.test(shotPose[0]);
-    const [wx, wy] = ahead && castShown ? wandTip(hero, P.face, shotPose[1], shotPose[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
+    const [wx, wy] = triRiding()?triWand():ahead && castShown ? wandTip(hero, P.face, shotPose[1], shotPose[0]) : [Math.cos(a) * 46, Math.sin(a) * 30];
     const x = P.x + wx, y = P.y + wy;
+    if(triRiding()&&target)a+=Math.atan2(target.y-y,target.x-x)-Math.atan2(target.y-P.y,target.x-P.x);
     if (G.parts.length < 400) G.parts.push({ type: "fx", name: "fx_twinkle", x, y: y - BOLT_Z, sc: 0.5, life: 0.18, max: 0.18, grow: 1.2, vx: 0, vy: 0 });
     G.shots.push({ x, y, vx: Math.cos(a) * S.speed, vy: Math.sin(a) * S.speed, life: S.range / S.speed + 0.12, r: S.r, dmg: S.dmg, bounce: S.bounce, hit: S.bounce ? new Set() : null, elem: P.elem, hk: hero, sc: S.sc, kb: S.kb });
     netShot(x, y, a, S.sc);
@@ -2239,6 +2253,10 @@
     ctx.restore();
   }
   function rescuePet(kind) {
+    if(kind==='cat'&&hero==='s'){
+      let added=false;for(const k of ['cat','silverdragon'])if(!P.pets.includes(k)){P.pets.push(k);added=true;}
+      if(added){makePetEnts();SFX.meow();showBanner('Matcha đã cứu Cafe và Rồng bạc!','Ba tia chụm thành một quả cầu bạc');}return;
+    }
     if(kind==='dog'&&hero==='g'){
       let added=false;for(const k of ['dog','tridragon'])if(!P.pets.includes(k)){P.pets.push(k);added=true;}
       if(added){makePetEnts();showBanner('Mochi đã cứu Coca và Rồng ba đầu!','Coca cắn quái; rồng lần lượt phun băng, lửa và độc');}
@@ -2273,7 +2291,7 @@
   function dragonBlocked(owner) {
     return !owner || (owner!==P && owner.hearts<=0) || owner.dead || owner.tiredT>0 || owner.winT>0 || owner.win || owner.paused || owner.story || G.mode!=='play' || !!(G.quiz||G.bcut||G.rescue||G.combo||G.ult||G.story||G.cine && (G.cine.lock||G.cine.ph!=='fight'));
   }
-  function dragonLift(p) {return p.sc ? 0 : 38+Math.sin(G.t*4+(p.i||0))*5;}
+  function dragonLift(p) {return p.sc ? 0 : (p.rideScale>1?148:38)+Math.sin(G.t*4+(p.i||0))*5;}
   function dragonMouth(p) {
     const k='attack_'+(p.flip?'l':'r'),f=FR['dragon_'+k],a=dragonMeta.mouth[k],s=f.s*CHAR_M*(p.sc||1);
     return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
@@ -2372,8 +2390,74 @@
       frames['tridragon_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
     }
     for(const d of ['r','l'])for(const e of TRI_ELEMENTS){const k=e+'_'+d,a=m.mouth?.[k],f=m.frames[k];if(!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4])throw Error('Miệng rồng ba đầu bị lỗi');}
-    Object.assign(FR,frames);triMeta=m;
+    Object.assign(FR,frames);triMeta=m;await loadTriRiders();
   }
+
+  // Painted rider frames are keyed by the equipped outfit; mounting never changes the save.
+  const triRiders={};
+  const rideHero=(owner=P)=>owner===P?hero:owner.hero;
+  const rideKind=(owner=P)=>({g:'tridragon',s:'silverdragon'})[rideHero(owner)];
+  const riderFrame=(owner,d)=>'rider_'+rideHero(owner)+'_'+triRiderKey(owner)+'_'+d;
+  function triRideShown(owner=P){return triRiding(owner)&&!G.combo&&!G.rescue&&!G.ult&&!(owner.ultT>0)&&!(G.cine&&(G.cine.lock||G.cine.ph!=='fight'))&&['play','pause'].includes(G.mode);}
+  async function loadTriRiders(char='g'){
+    const root=(char==='g'?'mochi':'matcha')+'-assets/riding/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+    if(m.version!==1||!m.frames||!Array.isArray(m.sheets))throw Error('Thiếu tranh Mochi cưỡi rồng');
+    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash)));
+    for(const [k,f]of Object.entries(m.frames)){
+      if(!/^[a-z0-9]+_[rl]$/.test(k)||!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!ims[f[0]]||f[3]<=0||f[4]<=0||f[5]<=0)throw Error('Tranh cưỡi rồng bị lỗi');
+      FR['rider_'+char+'_'+k]={img:ims[f[0]],sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
+    }
+    triRiders[char]=m;
+  }
+  function triRiderKey(owner=P){ return (owner===P?WARD.bySid.get(mySkin()):WARD.bySid.get(owner.skin))?.id?.slice(2)||'base'; }
+  function triRiderReady(owner=P){const k=triRiderKey(owner);return !!FR[riderFrame(owner,'r')]&&!!FR[riderFrame(owner,'l')];}
+  function triRiding(owner=P){return !!owner?.triRide&&!!rideKind(owner)&&owner.pets?.includes(rideKind(owner))&&!owner.dead&&!(owner.tiredT>0)&&!(owner.winT>0||owner.win)&&triRiderReady(owner);}
+  function triToggleRide(){
+    if(!rideKind()||!P.pets.includes(rideKind())||dragonBlocked(P)||!(hero==='g'?triReady():silverReady())||!triRiderReady())return false;
+    const p=PETE.find(p=>p.kind===rideKind());if(!p)return false;
+    if(P.triRide){
+      const old={x:P.x,y:P.y};let safe=null;
+      for(let r=0;r<=640&&!safe;r+=80)for(let i=0;i<(r?16:1);i++){
+        const q={x:old.x+Math.cos(i*Math.PI/8)*r,y:old.y+Math.sin(i*Math.PI/8)*r},x=q.x,y=q.y;
+        pushOut(q,HERO_R);fence(q);if(Math.hypot(q.x-x,q.y-y)>1)continue;
+        if(false)continue;
+        safe=q;break;
+      }
+      if(!safe){showBanner('Chưa có chỗ đáp','Bay ra chỗ trống rồi chạm rồng nhé');return false;}
+      P.x=safe.x;P.y=safe.y;P.triRide=false;P.inv=Math.max(P.inv||0,.6);
+    }else{P.triRide=true;P.slowT=0;P.hurtT=0;}
+    p.triShot=null;p.silverCharge=null;p.triAlign=false;triRideFollow(p,P);return true;
+  }
+  function triRideFollow(p,owner){
+    p.rideScale=triRiding(owner)?1.25:1;
+    if(p.rideScale>1){p.x=owner.x;p.y=owner.y+105;p.flip=owner.flip;p.moving=owner.moving;p.face=2;p.triAlign=false;}
+  }
+  function triScale(p){return (p.sc||1)*(p.rideScale||1)*(p.kind==='silverdragon'?2:1);}
+  function triSeat(p){
+    if(p.kind==='silverdragon'&&silverReady()){const pose=silverPose(p),f=FR['silverdragon_'+pose],a=silverMeta.seat?.[pose]||[f.ax,f.ay-70],k=f.s*CHAR_M*triScale(p);return {x:p.x+(a[0]-f.ax)*k,y:p.y-dragonLift(p)+(a[1]-f.ay)*k};}
+    return {x:p.x+(p.flip?28:-28),y:p.y-dragonLift(p)-62};
+  }
+  function drawTriRider(p,owner){
+    const seat=triSeat(p),f=FR[riderFrame(owner,p.flip?'l':'r')];
+    spr(f,seat.x,seat.y,false,1,owner.inv&&Math.floor(G.t*16)%2===0?.5:1);
+  }
+  function triWand(owner=P){
+    const p=(owner===P?PETE:owner.pete).find(p=>p.kind===rideKind(owner));if(!p)return [0,0];
+    triRideFollow(p,owner);const seat=triSeat(p),f=FR[riderFrame(owner,p.flip?'l':'r')],mark=triRiders[rideHero(owner)].wand[triRiderKey(owner)+'_'+(p.flip?'l':'r')];
+    return [seat.x-owner.x+(mark[0]-f.ax)*f.s,seat.y-owner.y+(mark[1]-f.ay)*f.s+BOLT_Z];
+  }
+  // The transparent joystick zone covers the left half, so it checks the same tap first.
+  cv.addEventListener('pointerdown',triTap);
+  function triTap(e){
+    if(dragonBlocked(P)||!rideKind())return;const p=PETE.find(p=>p.kind===rideKind());if(!p||!(hero==='g'?triReady():silverReady()))return;
+    const rect=cv.getBoundingClientRect(),zm=rescueZoom()*quizZoom()*comboZoom()*bcutZoom()*cineZoom(),sc=Math.min(cv.width/VW,cv.height/VH),zs=sc*zm;
+    const sx=(e.clientX-rect.left)*cv.width/rect.width,sy=(e.clientY-rect.top)*cv.height/rect.height;
+    const x=G.camX+VW/2+(sx-cv.width/2)/zs,y=G.camY+VH/2+(sy-cv.height/2)/zs;
+    const f=FR[p.kind+'_'+(p.flip?'l':'r')+'1'],k=f.s*CHAR_M*triScale(p),yy=p.y-dragonLift(p);
+    if(x>=p.x-f.ax*k-20&&x<=p.x+(f.w-f.ax)*k+20&&y>=yy-f.ay*k-20&&y<=yy+(f.h-f.ay)*k+20){if(triToggleRide()){e.preventDefault();return true;}}
+    return false;
+  }
+
   function triReady(){return !!triMeta&&TRI_POSES.every(k=>FR['tridragon_'+k]?.img);}
   function drawCocaDragonCage(c){
     shadow(c.x,c.y,105,23);
@@ -2386,13 +2470,14 @@
     }else spr(PROPS.cageOpen,c.x,c.y,false,1.5,.85);
   }
   function triMouth(p,head=p.triShot?.head??p.triNext??0){
-    const k=TRI_ELEMENTS[head]+'_'+(p.flip?'l':'r'),f=FR['tridragon_'+k],a=triMeta.mouth[k],s=f.s*CHAR_M*(p.sc||1);
+    const k=TRI_ELEMENTS[head]+'_'+(p.flip?'l':'r'),f=FR['tridragon_'+k],a=triMeta.mouth[k],s=f.s*CHAR_M*triScale(p);
     return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
   }
   function triClearPaused(){
     for(const [list,owner]of [[PETE,P],...QS.map(q=>[q.pete,q])])for(const p of list)if(p.kind==='tridragon'&&dragonBlocked(owner)){p.triShot=null;p.cd=Math.max(.35,p.cd||0);}
   }
   function triStep(p,owner,dt,act){
+    triRideFollow(p,owner);
     if(!triReady()){p.triShot=null;return;}
     if(owner!==P&&p.triShot&&!dragonBlocked(owner)){if(G.t-p.triShot.start<.65)return;p.triShot=null;}
     if(dragonBlocked(owner)||!act){p.triShot=null;p.triAlign=false;p.cd=Math.max(.35,p.cd||0);}
@@ -2401,13 +2486,13 @@
       if(!shot.fired&&t>=.3){shot.fired=true;const m=triMouth(p,shot.head);shot.x=m.x;shot.y=m.y;triFire(p,owner,shot);}
       if(t>=.65)p.triShot=null;return;
     }
-    const tx=owner.x+(owner.flip?190:-190),ty=owner.y+105,dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy);
+    const riding=triRiding(owner),tx=owner.x+(riding?0:(owner.flip?190:-190)),ty=owner.y+105,dx=tx-p.x,dy=ty-p.y,d=Math.hypot(dx,dy);
     if(d>1400){p.x=tx;p.y=ty;}else if(d>2&&!p.triAlign){const k=Math.min(1,dt*3.2);p.x+=dx*k;p.y+=dy*k;if(Math.abs(dx)>4)p.flip=dx<0;}
     p.moving=d>8;p.face=2;p.at=-1;
     if(!act||dragonBlocked(owner)||(p.cd=(p.cd??.6)-dt)>0)return;
     const target=nearestFoes(owner.x,owner.y,760,1)[0];if(!target){p.cd=.2;p.triAlign=false;return;}
-    const head=p.triNext||0;p.flip=target.x<p.x;const m=triMouth(p,head),a=Math.atan2(dragonAimY(target)-m.y,target.x-m.x),dir=p.flip?-1:1;
-    if((target.x-m.x)*dir<80||Math.cos(a)*dir<.55){p.triAlign=true;const k=Math.min(1,dt*4);p.x+=(target.x-dir*320-p.x)*k;p.y+=(target.y+90-p.y)*k;p.cd=0;return;}
+    const head=p.triNext||0;if(!riding)p.flip=target.x<p.x;const m=triMouth(p,head),a=Math.atan2(dragonAimY(target)-m.y,target.x-m.x),dir=p.flip?-1:1;
+    if(!riding&&((target.x-m.x)*dir<80||Math.cos(a)*dir<.55)){p.triAlign=true;const k=Math.min(1,dt*4);p.x+=(target.x-dir*320-p.x)*k;p.y+=(target.y+90-p.y)*k;p.cd=0;return;}
     p.triAlign=false;p.triShot={id:++triSequence,start:G.t,head,a,x:m.x,y:m.y,fired:false};p.cd=2;
     play('dragonCharge');if(NET.role&&NET.fq.length<10)NET.fq.push(['t',p.i,p.x,p.y,a,0,p.flip?1:0,head]);
   }
@@ -2425,7 +2510,7 @@
   }
   function triReceiveHit(h,hit){
     if(Q?.hero!=='g'||!Q.pets?.includes('tridragon')||dragonBlocked(Q)||!triReady()||!/^tri:[1-9][0-9]{0,12}$/.test(h[6])||!TRI_ELEMENTS.includes(ELS[h[1]]))return;
-    let ids=triReceived.get(h[6]);if(!ids){ids=new Set();triReceived.set(h[6],ids);if(triReceived.size>128)triReceived.delete(triReceived.keys().next().value);}
+    const key=Q.peer+':'+h[6];let ids=triReceived.get(key);if(!ids){ids=new Set();triReceived.set(key,ids);if(triReceived.size>128)triReceived.delete(triReceived.keys().next().value);}
     const id=Number(h[0]);if(ids.has(id))return;if(id===-1&&!triBossOpen(G.boss))return;ids.add(id);
     if(id===-1){damageBoss(2,G.boss.x,G.boss.y-220);applyElem(G.boss,ELS[h[1]],'q');return;}
     hit();
@@ -2437,13 +2522,101 @@
   }
   function drawTriDragon(p){
     if(!triReady())return;
-    const owner=petOwner(p),s=dragonBlocked(owner)?null:p.triShot,t=s?G.t-s.start:9;if(t>=.65)p.triShot=null;
+    const owner=petOwner(p);if(!p.sc)triRideFollow(p,owner);
+    const s=dragonBlocked(owner)?null:p.triShot,t=s?G.t-s.start:9;if(t>=.65)p.triShot=null;
     const active=s&&t<.65,dir=p.flip?'l':'r',pose=active?TRI_ELEMENTS[s.head]+'_'+dir:dir+[0,1,2,1][Math.floor(G.t*8)%4];
-    shadow(p.x,p.y,48*(p.sc||1),12*(p.sc||1),.2);spr('tridragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*(p.sc||1));
+    shadow(p.x,p.y,48*(p.sc||1),12*(p.sc||1),.2);spr('tridragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p));
+    if(!p.sc&&triRideShown(owner))drawTriRider(p,owner);
     if(!active)return;const m=triMouth(p,s.head);if(t<.3){glow(m.x,m.y,16+40*t/.3,TRI_COLORS[s.head],.4+.4*t/.3);return;}
     const f=FR['tridragon_'+TRI_ELEMENTS[s.head]+'_beam'],w=54+8*Math.sin(t*50);ctx.save();ctx.translate(m.x,m.y);ctx.rotate(s.a);ctx.globalAlpha*=Math.min(1,(.65-t)/.12);ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,0,-w/2,850,w);ctx.restore();
   }
   function triHitBoss(m,el){hitBoss(el,m.x,m.y,2);}
+
+  // Matcha's three painted beams converge into a single forward-flying silver orb.
+  const SILVER_POSES=[...['r','l'].flatMap(d=>[d+'0',d+'1',d+'2','charge_'+d,'attack_'+d,'recover_'+d,'converge_'+d]),...['orb','impact'].flatMap(k=>[k+'0',k+'1',k+'2'])];
+  let silverMeta=null,silverSequence=0;
+  const silverReceived=new Map();
+  async function loadSilverDragon(){
+    const root='matcha-assets/dragon/',m=await(await fetch(root+'atlas.json',{cache:'no-cache'})).json();
+    if(m.version!==1||!Array.isArray(m.sheets)||!m.sheets.length||m.sheets.some(s=>!/^silverdragon_[\w-]+\.webp$/.test(s))||SILVER_POSES.some(k=>!m.frames?.[k]))throw Error('Rồng bạc thiếu tranh');
+    const ims=await Promise.all(m.sheets.map(s=>loadImg(root+s+'?v='+m.hash))),fresh={};
+    for(const k of SILVER_POSES){const f=m.frames[k],im=ims[f[0]];
+      if(!Array.isArray(f)||f.length!==8||!f.every(Number.isFinite)||!im||f[3]<=0||f[4]<=0||f[5]<=0||f[1]<0||f[2]<0||f[1]+f[3]>im.width||f[2]+f[4]>im.height||f[6]<0||f[6]>f[3]||f[7]<0||f[7]>f[4])throw Error('Khung rồng bạc bị lỗi');
+      fresh['silverdragon_'+k]={img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7]};
+    }
+    for(const d of ['r','l'])for(const pose of ['charge','attack']){const k=pose+'_'+d,f=m.frames[k],points=[...(m.mouth?.[k]||[]),m.focus?.[k]];
+      if(points.length!==4||points.some(a=>!Array.isArray(a)||a.length!==2||!a.every(Number.isFinite)||a[0]<0||a[0]>f[3]||a[1]<0||a[1]>f[4]))throw Error('Miệng rồng bạc bị lỗi');}
+    Object.assign(FR,fresh);silverMeta=m;await loadTriRiders('s');
+  }
+  function silverReady(){return !!silverMeta&&SILVER_POSES.every(k=>FR['silverdragon_'+k]?.img);}
+  function silverFocus(p){const k='attack_'+(p.flip?'l':'r'),f=FR['silverdragon_'+k],a=silverMeta.focus[k],s=f.s*CHAR_M*triScale(p);return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};}
+  function silverClearPaused(){for(const p of allPets())if(p.kind==='silverdragon'&&dragonBlocked(petOwner(p))){p.silverCharge=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);}}
+  function silverEmit(p,phase,id,x=p.x,y=p.y,dir=p.flip?-1:1){if(NET.role&&NET.fq.length<10)NET.fq.push(['v',p.i,x,y,dir,phase,id]);}
+  function silverBurst(p,owner,o,damage){
+    (p.silverImpacts||=[]).push({id:o.id,x:o.x,y:o.y,start:G.t});if(p.silverImpacts.length>4)p.silverImpacts.shift();
+    if(!damage||dragonBlocked(owner))return;play('dragonBeam');
+    const targets=G.mons.filter(m=>m.alive&&Math.hypot(m.x-o.x,dragonAimY(m)-o.y)<140+(m.r||40));
+    if(triBossOpen(G.boss)&&Math.hypot(G.boss.x-o.x,dragonAimY(G.boss)-o.y)<140+(G.boss.r||100))targets.push(G.boss);
+    for(const m of targets){const n=NET.hq.length;if(m===G.boss)silverHitBoss(m);else hitMon(m,Math.round(petDmg(owner.lv||1)*1.6),null,o.x,o.y,50);
+      if(NET.role==='guest'&&NET.hq.length>n)NET.hq[NET.hq.length-1][6]='silver:'+o.id;}
+    silverEmit(p,2,o.id,o.x,o.y,o.dir);
+  }
+  function silverAdvance(p,owner,dt,damage){
+    const out=[];
+    for(const o of p.silverOrbs||[]){const x0=o.x;o.x+=o.dir*850*dt;o.life-=dt;
+      const targets=G.mons.filter(m=>m.alive);if(triBossOpen(G.boss))targets.push(G.boss);
+      const hits=targets.filter(m=>{const x=clamp(m.x,Math.min(x0,o.x),Math.max(x0,o.x));return Math.hypot(m.x-x,dragonAimY(m)-o.y)<60+(m.r||40);}).sort((a,b)=>(a.x-b.x)*o.dir);
+      if(hits.length||o.life<=0){if(hits.length)o.x=hits[0].x;silverBurst(p,owner,o,damage);}else out.push(o);
+    }
+    p.silverOrbs=out;p.silverImpacts=(p.silverImpacts||[]).filter(o=>G.t-o.start<.45);
+  }
+  function silverStep(p,owner,dt,act){
+    triRideFollow(p,owner);if(!silverReady())return;
+    if(dragonBlocked(owner)){p.silverCharge=null;p.silverOrbs=[];p.silverImpacts=[];p.cd=Math.max(.35,p.cd||0);return;}
+    silverAdvance(p,owner,dt,owner===P&&act);
+    if(!triRiding(owner)){const tx=owner.x+(owner.flip?190:-190),ty=owner.y+105,k=Math.min(1,dt*3.2),dx=tx-p.x;p.x+=dx*k;p.y+=(ty-p.y)*k;if(!p.silverCharge&&Math.abs(dx)>4)p.flip=dx<0;}
+    if(owner!==P)return;
+    if(!act){p.silverCharge=null;return;}p.cd=Math.max(0,(p.cd??.6)-dt);
+    const c=p.silverCharge;if(c){const t=G.t-c.start;
+      if(!c.fired&&t>=.35){c.fired=true;const m=silverFocus(p),dir=p.flip?-1:1;(p.silverOrbs||=[]).push({id:c.id,x:m.x,y:m.y,dir,life:1});silverEmit(p,1,c.id,m.x,m.y,dir);play('dragonBeam');}
+      if(t>=.65)p.silverCharge=null;return;
+    }
+    if(p.cd>0)return;
+    const target=nearestFoes(owner.x,owner.y,850,12).find(m=>!triRiding(owner)||(m.x-owner.x)*(owner.flip?-1:1)>80);
+    if(!target){p.cd=.2;return;}if(!triRiding(owner))p.flip=target.x<p.x;
+    p.silverCharge={id:++silverSequence,start:G.t,fired:false};p.cd=2;play('dragonCharge');silverEmit(p,0,p.silverCharge.id);
+  }
+  function silverReceiveHit(h,hit){
+    if(Q?.hero!=='s'||!Q.pets?.includes('silverdragon')||dragonBlocked(Q)||!silverReady()||!/^silver:[1-9][0-9]{0,12}$/.test(h[6]))return;
+    const id=Number(h[0]),m=id===-1?G.boss:G.mons.find(m=>m.id===id&&m.alive);if(!m?.alive||id===-1&&!triBossOpen(m)||Math.hypot(m.x-Q.x,m.y-Q.y)>1800)return;
+    const key=Q.peer+':'+h[6];let ids=silverReceived.get(key);if(!ids){ids=new Set();silverReceived.set(key,ids);if(silverReceived.size>128)silverReceived.delete(silverReceived.keys().next().value);}if(ids.has(id))return;ids.add(id);
+    if(id===-1){damageBoss(2,m.x,m.y-220);return;}
+    h[1]=0;h[2]=Math.round(petDmg(Q.lv||1)*1.6);h[3]=50;hit();
+  }
+  function silverRemote(p,f){
+    if(p?.kind!=='silverdragon'||Q?.hero!=='s'||dragonBlocked(Q)||!silverReady()||f.length!==7||!f.slice(2).every(Number.isFinite)||![-1,1].includes(f[4])||![0,1,2].includes(f[5])||!Number.isSafeInteger(f[6])||f[6]<=0||Math.hypot(f[2]-Q.x,f[3]-Q.y)>1800)return;
+    const key=f[6]+':'+f[5];p.silverSeen||=new Set();if(p.silverSeen.has(key))return;p.silverSeen.add(key);if(p.silverSeen.size>64)p.silverSeen.delete(p.silverSeen.values().next().value);
+    p.flip=f[4]<0;
+    if(f[5]===0){p.silverCharge={id:f[6],start:G.t,fired:true};play('dragonCharge');}
+    else if(f[5]===1){p.silverCharge={id:f[6],start:G.t-.35,fired:true};(p.silverOrbs||=[]).push({id:f[6],x:f[2],y:f[3],dir:f[4],life:1});play('dragonBeam');}
+    else{p.silverOrbs=(p.silverOrbs||[]).filter(o=>o.id!==f[6]);if(!(p.silverImpacts||[]).some(o=>o.id===f[6]))(p.silverImpacts||=[]).push({id:f[6],x:f[2],y:f[3],start:G.t});}
+  }
+  function silverPose(p){const c=p.silverCharge,t=c?G.t-c.start:9,d=p.flip?'l':'r';return t<.35?'charge_'+d:t<.5?'attack_'+d:t<.65?'recover_'+d:d+[0,1,2,1][Math.floor(G.t*8)%4];}
+  function drawSilverDragon(p){
+    if(!silverReady())return;const owner=petOwner(p);if(!p.sc)triRideFollow(p,owner);
+    const c=dragonBlocked(owner)?null:p.silverCharge,t=c?G.t-c.start:9,d=p.flip?'l':'r',pose=t<.35?'charge_'+d:t<.5?'attack_'+d:t<.65?'recover_'+d:d+[0,1,2,1][Math.floor(G.t*8)%4];
+    shadow(p.x,p.y,48*triScale(p),12*triScale(p),.2);spr('silverdragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p));
+    if(t<.35){spr('silverdragon_converge_'+d,p.x,p.y-dragonLift(p),false,CHAR_M*triScale(p),.5+.5*t/.35);const m=silverFocus(p);glow(m.x,m.y,30+45*t/.35,'205,235,255',.3);}
+    if(!p.sc&&triRideShown(owner))drawTriRider(p,owner);
+  }
+  function drawSilverAir(p){if(!silverReady()||dragonBlocked(petOwner(p)))return;
+    for(const o of p.silverOrbs||[]){const f=FR['silverdragon_orb'+Math.floor(G.t*12)%3];spr(f,o.x,o.y,false,120/(f.w*f.s));glow(o.x,o.y,85,'205,235,255',.25);}
+    for(const o of p.silverImpacts||[]){const f=FR['silverdragon_impact'+Math.min(2,Math.floor((G.t-o.start)/.15))];spr(f,o.x,o.y,false,280/(f.w*f.s),Math.min(1,(.45-G.t+o.start)/.12));}
+  }
+  function drawCafeDragonCage(c){
+    shadow(c.x,c.y,105,23);if(!c.open){glow(c.x,c.y-115,190,'205,235,255',.35+.12*Math.sin(G.t*3));drawPet({kind:'cat',x:c.x-44,y:c.y-12,face:0,flip:false,moving:false,i:0,dist:0,sc:.65,at:-1});drawSilverDragon({kind:'silverdragon',x:c.x+20,y:c.y-105,flip:false,i:0,sc:.5});spr(PROPS.cage,c.x,c.y,false,1.5);label('Cứu Cafe và Rồng bạc!',c.x,c.y-330,36);}else spr(PROPS.cageOpen,c.x,c.y,false,1.5,.85);
+  }
+  function silverHitBoss(m){hitBoss(null,m.x,m.y,2);}
 
   // ---------------------------------------------------------------- pets
   // st: "follow" trails the girl; "pounce" runs at a monster near her; "atk" plays the attack (Cafe's claw swipe,
@@ -2462,6 +2635,7 @@
   function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow", at: -1 })); }
   function followPets(list, owner, dt, act) {
     for (const p of list) {
+      if(p.kind==="silverdragon"){silverStep(p,owner,dt,act);continue;}
       if(p.kind==="tridragon"){triStep(p,owner,dt,act);continue;}
       if(p.kind==="dragon"){dragonStep(p,owner,dt,act);continue;}
       if (G.cine && G.cine.ph === "outro") { p.moving = false; p.at = -1; p.st = "follow"; continue; }   // lined up for the cheer
@@ -2696,6 +2870,8 @@
     for (const p of QPETE) if (p.at >= 0) { p.at += dt; if (p.at > petAtkLen(p.kind)) p.at = -1; }
     if (!pl) return followPets(QPETE, Q, dt, false);
     QPETE.forEach((p, i) => {
+      if(p.kind==="silverdragon"){silverStep(p,Q,dt,false);if(triRiding(Q))return;}
+      if(p.kind==="tridragon"){triRideFollow(p,Q);if(triRiding(Q))return;}
       if(p.kind==="tridragon"&&p.triShot&&G.t-p.triShot.start<.65&&!dragonBlocked(Q))return;
       if(p.kind==="dragon"&&p.dragonShot&&G.t-p.dragonShot.start<.58&&!dragonBlocked(Q))return;
       const a = Array.isArray(pl[i]) ? pl[i] : null; if (!a) return;
@@ -4683,7 +4859,7 @@
   function play(n) { const t = performance.now(); if (t - (sfxT[n] || 0) < (n === "zap" ? 110 : 55)) return; sfxT[n] = t; SFX[n] && SFX[n](); }
   function update(dt) {
     G.t += dt; G.frame++;
-    dragonClearPaused();triClearPaused();
+    dragonClearPaused();triClearPaused();silverClearPaused();
     if (G.fadeDir) {
       G.fade = clamp(G.fade + G.fadeDir * dt / 0.45, 0, 1);
       if (G.fadeDir > 0 && G.fade >= 1) { const f = G.onFade; G.onFade = null; G.fadeDir = -1; f && f(); }
@@ -5207,6 +5383,7 @@
     const blink = P.inv > 0 && !P.dead && !G.ult && Math.floor(G.t * 16) % 2 === 0;
     const aura = P.elem && !G.ult && !P.dead;
     if (aura) drawAura(P.elem, P.x, P.y, P.elemT, 1);
+    if(triRideShown())return;
     if (P.dead) return drawFainted(hero, P.x, P.y, 1 - clamp(G.reviveT / FAINT_T, 0, 1), P.helped, Q && NET.role ? Q : null);
     drawHeroSprite(hero, G.ult ? fr(mySkin() + "_jump", hero + "_jump") : fn, P.x, P.y, P.z, flip, blink ? 0.45 : 1, G.ult ? G.ult.t : 0, stepPose(P, P.moving && !G.ult ? P.dist : -1));
     if (aura) drawAura(P.elem, P.x, P.y, P.elemT, 2);
@@ -5253,7 +5430,7 @@
     Q.wd = (Q.wd || 0) + (mv < 60 ? mv : 0); Q.still = mv > 0.5 ? 0 : (Q.still || 0) + 1;
     const qWalk = Q.ultT > 0 || Q.dead || Q.still > 6 ? -1 : Q.wd;
     if (Q.dead) drawFainted(Q.hero, Q.x, Q.y, Q.rev || 0, Q.helped, P);
-    else if (Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? fr(Q.skin + "_jump", Q.hero + "_jump") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.flip, Q.inv && !Q.dead && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
+    else if (!triRideShown(Q)&&Q.fn) drawHeroSprite(Q.hero, Q.ultT > 0 ? fr(Q.skin + "_jump", Q.hero + "_jump") : Q.fn, Q.x, Q.y, Q.ultT > 0 ? 150 * ss(0, 0.6, Q.ultT) - 150 * ss(2.0, 2.5, Q.ultT) : 0, Q.flip, Q.inv && !Q.dead && Math.floor(G.t * 16) % 2 === 0 ? 0.45 : 1, Q.ultT, stepPose(Q, qWalk));
     if (qa) drawAura(Q.elem, Q.x, Q.y, qa, 2);
     if (Q.slow) drawWeb(Q.x, Q.y - 70, 40, 1);
     // name tag and hearts
@@ -5287,7 +5464,8 @@
     spr(pre + (p.moving ? Math.floor(p.dist / 200 * n) % n : 0), p.x, p.y, p.flip, sc);
   }
   function drawPet(p) {
-    if(p.kind==="tridragon")return drawTriDragon(p);
+    if(p.kind==="silverdragon")return triRiding(petOwner(p))?undefined:drawSilverDragon(p);
+    if(p.kind==="tridragon")return triRiding(petOwner(p))?undefined:drawTriDragon(p);
     if(p.kind==="dragon")return drawDragon(p);
     const D = PETS[p.kind];
     if (G.rescue && G.rescue.kind === p.kind) return;
@@ -5337,6 +5515,7 @@
   }
   function drawCage(c) {
     if(c.kind==='dog')return drawCocaDragonCage(c);
+    if(c.kind==='cat')return drawCafeDragonCage(c);
     const D = PETS[c.kind];
     if (c.big) {
       const cg = FR.cage_big, co = FR.cage_big_open;
@@ -5727,6 +5906,7 @@
         case 11: drawFilmActor(o); break;
       }
     }
+    for(const p of allPets()){if(p.kind==='tridragon'&&triRiding(petOwner(p)))drawTriDragon(p);if(p.kind==='silverdragon'){if(triRiding(petOwner(p)))drawSilverDragon(p);drawSilverAir(p);}}
     // things in the air
     for (const f of G.foes) {
       if (f.type === "fire") { shadow(f.x, f.y, 22, 7, 0.2); glow(f.x, f.y - 90, 70, "130,255,90", 0.4); fxDir("fx_witchfire", f.x - Math.sign(f.vx) * 20, f.y - 90, f.vx, f.vy, 1, 1); }
@@ -6301,6 +6481,7 @@
       for (const f of Array.isArray(d.f) ? d.f.slice(0, 10) : []) {
         if (!Array.isArray(f) || !Q) break;
         const i = Math.floor(num(f[1])), pe = i>=0 && i<QPETE.length ? QPETE[i] : null;
+        if(f[0]==="v"){silverRemote(pe,f);continue;}
         if(f[0]==="t"){triRemote(pe,f);continue;}
         if(f[0]==="d"){dragonRemote(pe,f);continue;}
         if (f[0] === "a" && pe) { pe.at = 0; const fc = num(f[2]); pe.face = clamp(fc & 7, 0, 4); pe.flip = fc >= 8; }
@@ -6392,7 +6573,7 @@
     NET.room.presence(patch).catch(() => {});
   }
   function girlState() {
-    const bits = (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0);
+    const bits = (triRiding()?1024:0) | (P.dead ? 1 : 0) | (P.inv > 0 ? 2 : 0) | (P.slowT > 0 ? 4 : 0) | (P.castT > 0.1 ? 8 : 0) | (P.winT ? 16 : 0) | (P.flip ? 32 : 0);
     return [P.x | 0, P.y | 0, P.face, (G.mode === "play" && P.fn && P.fn[0]) || "", bits, ELS.indexOf(P.elem), G.ult ? Math.round(G.ult.t * 10) : 0, hero, G.hearts, mySkin(), P.vx | 0, P.vy | 0, P.pets.join(","), P.lv,
       PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0];
   }
@@ -6447,7 +6628,7 @@
     Q.fn = fn.startsWith(Q.skin + "_") && FR[fn] ? fn : fn.includes("_") && FR[base] ? base : FR[Q.hero + "_stand"] ? Q.hero + "_stand" : "";
     Q.dead = !!(b & 1); Q.inv = !!(b & 2); Q.slow = !!(b & 4); Q.cast = !!(b & 8); Q.win = !!(b & 16); Q.flip = !!(b & 32);
     Q.elem = ELS[num(gl[5])] || null; Q.ultT = num(gl[6]) / 10; Q.hearts = clamp(num(gl[8]), 0, maxHearts(Q.hero));
-    Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : [];   // their pets (shown following them)
+    Q.pets = typeof gl[12] === "string" ? gl[12].split(",").filter((k) => PETS[k]) : []; Q.triRide=!!(b&1024)&&!!rideKind(Q)&&Q.pets.includes(rideKind(Q));   // their pets (shown following them)
     Q.lv = clamp(Math.floor(num(gl[13])) || 1, 1, MAX_LV);
     Q.rev = clamp(num(gl[15]) / 100, 0, 1); Q.helped = !!gl[16]; Q.elemT = gl.length > 17 ? num(gl[17]) / 10 : -1;
     Q.hostInv -= dt;
@@ -6586,6 +6767,7 @@
     flags(w.ch, G.chests, (c) => { c.t = 0; chestFx(c); });
     flags(w.cg, G.cages, (c) => openCageFx(c));
     if(hero==='g'&&G.cages.some(c=>c.kind==='dog'&&c.open)&&(!P.pets.includes('dog')||!P.pets.includes('tridragon')))rescuePet('dog');
+    if(hero==='s'&&G.cages.some(c=>c.kind==='cat'&&c.open)&&(!P.pets.includes('cat')||!P.pets.includes('silverdragon')))rescuePet('cat');
     if (w.po && !G.portal && G.arena && !G.lvl.stage && LEVELS[G.level + 1]) openFinalPortal();
     if (G.portal && w.po && !G.portal.open) { G.portal.open = true; SFX.unlock(); showBanner("Cổng phép đã mở!", "Đi theo mũi tên nhé"); }
     G.stars = num(w.st); G.kills = num(w.k); G.lvKills = num(w.lk); updateHud();
