@@ -247,7 +247,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261104.0900"></script>
+<script src="wardrobe.js?v=261104.0957"></script>
 <script>
 (() => {
   "use strict";
@@ -300,7 +300,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.0900", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.0957", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -391,8 +391,7 @@
     try{await gomAtlas();}catch(e){return;} // Keep the selected identity; never substitute another child.
     try{const m=await (await fetch('gom-assets/catalog.json')).json();const catalog=Array.isArray(m)?m:m.catalog;
       for(const o of catalog||[])if(o.char==='b'&&GOM_OUTFITS.includes(o.id?.slice(2))&&o.id!=='b.base'&&o.id==='b.'+o.id.slice(2)&&o.price===10){const entry={...o,gom:true};WARD.catalog.push(entry);WARD.byId.set(o.id,entry);WARD.bySid.set(wardSid(o.id),entry);}
-      for(const id of JSON.parse(localStorage.getItem('dcpt3-wardrobe-owned-b')||'[]'))if(wardEntry(id)?.char==='b')WARD.owned.b.add(id);
-      const id=localStorage.getItem('dcpt3-wardrobe-outfit-b');outfit.b=wardEntry(id)?.char==='b'&&wardOwned(id)?id:'';
+      const id=localStorage.getItem('dcpt3-wardrobe-outfit-b');outfit.b=wardEntry(id)?.char==='b'?id:'';
     }catch(e){}
   }
   async function loadTeamRedraw() {
@@ -821,11 +820,10 @@
     SKIN[sid] = p; return p;
   }
   // One cosmetic wardrobe, shared by every map. Gameplay stats never depend on it.
-  const WARD = { catalog: [], byId: new Map(), bySid: new Map(), meta: null, images: new Map(), loading: new Map(), loaded: new Set(), owned: {g:new Set(),s:new Set(),n:new Set(),b:new Set()}, open:false, epoch:0, ready:false, partnerReady:false, bought:new Set(), pending:null, ui:null, run:0, seenStarts:new Set() };
+  const WARD = { catalog: [], byId: new Map(), bySid: new Map(), meta: null, images: new Map(), loading: new Map(), loaded: new Set(), open:false, epoch:0, ready:false, partnerReady:false, ui:null, run:0, seenStarts:new Set() };
   const wardSid = id => id.replace('.', 'sksp-');
   const wardEntry = id => WARD.byId.get(id);
-  const wardOwned = id => !id || !!(wardEntry(id) && WARD.owned[wardEntry(id).char].has(id));
-  function wardSave(c) { try { localStorage.setItem('dcpt3-wardrobe-owned-'+c,JSON.stringify([...WARD.owned[c]]));localStorage.setItem('dcpt3-wardrobe-outfit-'+c,outfit[c]); } catch(e) {} }
+  function wardSave(c) { try { localStorage.setItem('dcpt3-wardrobe-outfit-'+c,outfit[c]); } catch(e) {} }
   async function loadWardrobeCatalog() {
     try {
       const r=await fetch('wardrobe-assets/atlas.json',{cache:'no-cache'});if(!r.ok)throw Error('catalog');const m=await r.json();
@@ -835,7 +833,7 @@
       // Nấm keeps only her original costume so her face stays consistent.
       outfit.n='';try{localStorage.removeItem('dcpt3-wardrobe-outfit-n');}catch(e){}
       for(const o of WARD.catalog){WARD.byId.set(o.id,o);WARD.bySid.set(wardSid(o.id),o);}
-      for(const c of 'gsn')try{const v=JSON.parse(localStorage.getItem('dcpt3-wardrobe-owned-'+c)||'[]');if(Array.isArray(v))for(const id of v)if(wardEntry(id)?.char===c)WARD.owned[c].add(id);const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c&&wardOwned(chosen)?chosen:'';}catch(e){}
+      for(const c of 'gsn')try{const chosen=localStorage.getItem('dcpt3-wardrobe-outfit-'+c)||'';outfit[c]=wardEntry(chosen)?.char===c?chosen:'';}catch(e){}
     } catch(e) { WARD.catalog=[]; } // Original clothes always remain playable.
   }
   async function wardLoad(id) {
@@ -859,12 +857,12 @@
       Object.assign(FR,fresh);WARD.loaded.add(sid);SKIN[sid]={wardrobe:true};return FR[sid+'_stand'];
     })();WARD.loading.set(id,task);try{return await task;}finally{WARD.loading.delete(id);}
   }
-  function wardRefresh(){const key=[WARD.epoch,G.stars,outfit[hero],WARD.ready,WARD.partnerReady,NET.role,WARD.pending?.id,[...WARD.owned[hero]].join(',')].join('|');if(key===WARD.uiKey)return;WARD.uiKey=key;WARD.ui?.refresh();WARD.ui?.setReadyState({self:WARD.ready,partner:WARD.partnerReady,coop:!!NET.role});}
+  function wardRefresh(){const key=[WARD.epoch,G.stars,outfit[hero],WARD.ready,WARD.partnerReady,NET.role].join('|');if(key===WARD.uiKey)return;WARD.uiKey=key;WARD.ui?.refresh();WARD.ui?.setReadyState({self:WARD.ready,partner:WARD.partnerReady,coop:!!NET.role});}
   async function wardPreview(id) {
     const stand = await wardLoad(id);
     return hero === "b" ? (await gomSelection(id ? id.slice(2) : "base").promise) || stand : stand;
   }
-  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,owned:wardOwned,equipped:()=>outfit[hero],load:wardPreview,buy:wardBuy,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,background:'wardrobe-assets/background.webp'});}
+  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,equipped:()=>outfit[hero],load:wardPreview,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,background:'wardrobe-assets/background.webp'});}
   function wardOpen(fromNet=false,epoch=null){
     if(epoch!==null&&WARD.open&&WARD.epoch===epoch)return;
     WARD.epoch=epoch===null?WARD.epoch+1:epoch;WARD.open=true;WARD.ready=false;WARD.partnerReady=false;G.mode='shop';P.vx=P.vy=0;P.moving=false;
@@ -872,34 +870,13 @@
     wardInitUI();WARD.ui?.open();WARD.uiKey='';wardRefresh();
   }
   function wardClose(){WARD.open=false;WARD.ui?.close();if(G.mode==='shop')G.mode='play';}
-  function wardCancel(){WARD.open=false;WARD.ready=false;WARD.ui?.close();if(WARD.pending){clearTimeout(WARD.pending.timer);WARD.pending.resolve(false);WARD.pending=null;}}
+  function wardCancel(){WARD.open=false;WARD.ready=false;WARD.ui?.close();}
   async function wardWear(id){
-    if(!WARD.open||id&&(!wardOwned(id)||wardEntry(id)?.char!==hero))return false;
+    if(!WARD.open||id&&wardEntry(id)?.char!==hero)return false;
     const epoch=WARD.epoch,run=WARD.run,c=hero,token=WARD.wearToken=(WARD.wearToken||0)+1;await wardLoad(id);if(!WARD.open||epoch!==WARD.epoch||run!==WARD.run||c!==hero||token!==WARD.wearToken)return false;
     outfit[hero]=id;WARD.ready=false;wardSave(hero);wardRefresh();return true;
   }
-  async function wardBuy(id){
-    const o=wardEntry(id);if(!WARD.open||!o||o.char!==hero)return false;if(wardOwned(id))return wardWear(id);
-    if(NET.role==='guest'){
-      if(WARD.pending||G.stars<10)return false;
-      const epoch=WARD.epoch,run=WARD.run,c=hero;
-      const ok=await new Promise(resolve=>{const request=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);const timer=setTimeout(()=>{if(WARD.pending?.request===request){WARD.pending=null;resolve(false);wardRefresh();}},8000);WARD.pending={id,request,resolve,timer};netEmit('wardrobe',{op:'buy',id,request,epoch:WARD.epoch,run:WARD.run});});
-      return !!ok&&epoch===WARD.epoch&&run===WARD.run&&c===hero&&wardWear(id);
-    }
-    if(G.stars<10)return false;G.stars-=10;WARD.owned[hero].add(id);wardSave(hero);updateHud();wardRefresh();return wardWear(id);
-  }
-  function wardReady(){if(!WARD.open||WARD.pending||WARD.loading.has(outfit[hero]))return;WARD.ready=true;wardRefresh();if(!NET.role||NET.role==='host'&&WARD.partnerReady)wardClose();}
-  function wardNet(d){
-    if(NET.role==='host'&&d.op==='buy'){
-      const o=wardEntry(d.id),remote=NET.pp?.gl?.[7]||NET.pp?.co?.hero;
-      const valid=WARD.open&&d.run===WARD.run&&d.epoch===WARD.epoch&&o&&o.char===remote&&o.char!==hero&&typeof d.request==='string'&&d.request.length<100;
-      const paid=valid&&WARD.bought.has(o.id),ok=!!(valid&&(paid||G.stars>=10));
-      if(ok&&!paid){G.stars-=10;WARD.bought.add(o.id);updateHud();wardRefresh();}
-      netEmit('wardrobe',{op:'ack',id:d.id,request:d.request,ok,stars:G.stars,epoch:WARD.epoch,run:WARD.run});
-    }else if(NET.role==='guest'&&d.op==='ack'&&d.run===WARD.run&&d.epoch===WARD.epoch&&WARD.pending&&d.request===WARD.pending.request&&d.id===WARD.pending.id){
-      const p=WARD.pending;clearTimeout(p.timer);WARD.pending=null;G.stars=Math.max(0,Number(d.stars)||0);if(d.ok&&wardEntry(d.id)?.char===hero){WARD.owned[hero].add(d.id);wardSave(hero);}p.resolve(!!d.ok);wardRefresh();
-    }
-  }
+  function wardReady(){if(!WARD.open||WARD.loading.has(outfit[hero]))return;WARD.ready=true;wardRefresh();if(!NET.role||NET.role==='host'&&WARD.partnerReady)wardClose();}
   function wardSync(){
     if(!NET.role)return;
     if(NET.role==='host'){
@@ -5991,7 +5968,7 @@
     if(hero==='b'&&!FR.b_stand){$("loading").hidden=false;$("loading").textContent="Chưa tải được hình Gôm. Bé tải lại trang nhé!";return false;}
     i = clamp(Math.floor(i) || 0, 0, LEVELS.length - 1);
     initAudio();
-    wardCancel();WARD.epoch=0;WARD.run=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);WARD.bought.clear();
+    wardCancel();WARD.epoch=0;WARD.run=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
     Object.assign(G, { stars: 10, hearts: maxHearts(), energy: 0, kills: 0, won: false, fade: 1, fadeDir: -1 });
     P.elem = null; P.elemT = 0; P.lv = 1 + i * 4; P.xp = 0; updateElemHud(); updateXpHud();
     // her pet: rescued on the way from Màn 1, already with her when she starts further on
@@ -6182,7 +6159,6 @@
       return;
     }
     if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
-    if(msg.topic==="wardrobe"){wardNet(d);return;}
     if(WARD.open)return;
     if(msg.topic==='gomslash'){if(Q?.hero==='b')gomSlashFx(clamp(Math.floor(num(d.pose)),0,8),num(d.x),num(d.y),num(d.a));return;}
     if (msg.topic === "shots") {   // partner's bolts: only for show, her own page reports what they hit
@@ -6577,7 +6553,7 @@
   // test hooks for automated checks. __dcpt3.autopilot = true makes this girl walk the path on her own.
   const API = window.__dcpt3 = {
     gom:{autoFire,fire:gomFire,update:updateGom,shots:updateShots,revive:reviveHero,atlas:gomAtlas}, validHero, makeSum, hurtHero, comboUlt, cbPose, victoryPortrait, G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
-    wardrobe:{open:wardOpen,close:wardClose,buy:wardBuy,wear:wardWear,ready:wardReady,load:wardLoad,owned:wardOwned,catalog:()=>WARD.catalog,state:()=>({run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready,partnerReady:WARD.partnerReady,coins:G.stars,equipped:outfit[hero]}),sync:wardSync},
+    wardrobe:{open:wardOpen,close:wardClose,wear:wardWear,ready:wardReady,load:wardLoad,catalog:()=>WARD.catalog,state:()=>({run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready,partnerReady:WARD.partnerReady,coins:G.stars,equipped:outfit[hero]}),sync:wardSync},
     autopilot: false,
     getQ: () => Q,
     setHero: (k) => { hero = validHero(k); loadPets(); renderHeroes(); },
