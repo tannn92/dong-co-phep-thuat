@@ -158,6 +158,14 @@
   #rotate { position: fixed; inset: 0; z-index: 9; display: none; place-items: center; text-align: center; background: var(--night); font-family: var(--display); font-weight: 800; font-size: 6vw; padding: 10vw; }
   @media (orientation: portrait) and (max-width: 900px) { #rotate { display: grid; } }
   @media (prefers-reduced-motion: reduce) { #bUlt:not(.off)::before, .bar.full .fill { animation: none; } #bUlt:not(.off)::before { opacity: 1; } }
+  #coopRoster { display: flex; gap: .6em; justify-content: center; margin: .6em 0; }
+  #coopRoster .seat { width: 7em; min-height: 9em; padding: .3em; border-radius: 1em; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.2); }
+  #coopRoster .seat.empty { border-style: dashed; background: none; }
+  #coopRoster .seat.ok { border-color: #7cf2c6; }
+  #coopRoster .seat canvas { width: 100%; height: auto; }
+  #coopRoster .seat small { opacity: .85; }
+  #coopRoster .dots { animation: dotsGo 1.2s ease-in-out infinite alternate; }
+  @keyframes dotsGo { from { opacity: .3; } to { opacity: 1; } }
 </style>
 
 <canvas id="game" aria-label="Màn chơi phiêu lưu"></canvas>
@@ -203,7 +211,7 @@
     <div class="levels" id="levels"></div>
     <div class="help"><span>Cần trái: <b>đi khắp nơi</b></span><span>Bé <b>tự bắn</b> quái gần nhất</span><span>Đầy năng lượng: <b>Tuyệt chiêu</b></span></div>
     <div id="loading"><span id="loadingText" role="status">Đang tải game… 0%</span><progress id="loadingProgress" max="100" value="0" aria-label="Tiến độ tải game"></progress></div>
-    <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi 2 người</button></div>
+    <div class="row"><button class="btn" id="startBtn" hidden>Chơi một mình</button><button class="btn ghost" id="coopBtn" hidden>Chơi cùng bạn</button></div>
   </div>
   <div class="ver"><span id="verNum"></span><button id="verBtn">Kiểm tra bản mới</button></div>
 </div>
@@ -212,6 +220,7 @@
   <div class="card">
     <h1>Chơi <span>cùng nhau</span></h1>
     <p id="coopMsg"></p>
+    <div id="coopRoster" hidden></div>
     <div class="row" id="coopBtns"></div>
     <button class="btn ghost" id="coopBack">Quay lại</button>
   </div>
@@ -247,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261104.0957"></script>
+<script src="wardrobe.js?v=261104.1226"></script>
 <script>
 (() => {
   "use strict";
@@ -300,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261104.0957", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261104.1226", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -880,10 +889,10 @@
   function wardSync(){
     if(!NET.role)return;
     if(NET.role==='host'){
-      const w=NET.pp?.ward;WARD.partnerReady=!!(w&&w.run===WARD.run&&w.epoch===WARD.epoch&&w.ready&&w.lv===G.level);
+      WARD.partnerReady=[...NET.peers.values()].every(e=>{const w=e.pres?.ward;return !!(w&&w.run===WARD.run&&w.epoch===WARD.epoch&&w.ready&&w.lv===G.level);});
       if(WARD.open&&WARD.ready&&WARD.partnerReady)wardClose();
     }else{
-      const w=NET.pp?.w,shop=w?.ward;
+      const w=hostPres()?.w,shop=w?.ward;
       if(shop&&shop.run===WARD.run&&w.lv===G.level){
         if(shop.open&&(!WARD.open||shop.epoch!==WARD.epoch))wardOpen(true,shop.epoch);
         if(!shop.open&&WARD.open&&shop.epoch===WARD.epoch)wardClose();
@@ -1049,7 +1058,7 @@
 
   function buildLevel(i) {
     const L = LEVELS[i], R = mulberry(L.seed);
-    G.lvl = L; G.level = i; G.combo = null;
+    G.lvl = L; G.level = i; if (NET.role === "host") admitLate(); G.combo = null;
     const path = genPath(L, R); G.path = path;
     G.arena = null; G.portal = null;
     if (L.arena) {
@@ -1389,8 +1398,12 @@
 
   // ---------------------------------------------------------------- hero
   const HERO_R = 38;
+  const COOP_HP = 1.5;
+  // health against more girls: 2 girls as ever, then in step with the team, so a fight lasts about as long as with two
+  const teamSize = () => teamAll().length;
+  const coopHpK = (n) => (n <= 1 ? 1 : COOP_HP * n / 2), bossHpK = (n) => Math.max(1, n / 2);
   // everyone the monsters can hit: this girl, plus the co-op partner on the host
-  function girls() { return Q && NET.role === "host" ? [P, Q] : [P]; }
+  function girls() { return NET.role === "host" ? [P, ...QS] : [P]; }
   function targetFor(x, y) {
     let best = P, bd = Infinity;
     for (const g of girls()) { if (g.dead) continue; const d = d2(g.x, g.y, x, y); if (d < bd) { bd = d; best = g; } }
@@ -1400,7 +1413,7 @@
     if (g === P) return web ? webHero() : hurtHero(fx, fy);
     if (g.dead || g.inv || g.ultT > 0 || g.win || (!web && g.hostInv > 0)) return;
     if (!web) g.hostInv = 1.3;
-    netEmit("hurt", { to: NET.partner, fx: fx | 0, fy: fy | 0, web: web ? 1 : 0 });
+    netEmit("hurt", { to: g.peer, fx: fx | 0, fy: fy | 0, web: web ? 1 : 0 });
   }
   function webHero() {
     if (P.inv > 0 || G.ult || P.dead) return;
@@ -1423,7 +1436,7 @@
   }
   // fainting: she lies dizzy for FAINT_T seconds; the partner standing close by revives her five times faster
   const FAINT_T = 10, RESCUE_R = 280;
-  const rescuing = () => !!(Q && NET.role && !Q.dead && d2(Q.x, Q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
+  const rescuing = () => !!NET.role && QS.some((q) => !q.dead && d2(q.x, q.y, P.x, P.y) < RESCUE_R * RESCUE_R);
   // get back up on the spot with full hearts, and shoo the monsters away
   function reviveHero() {
     resetGomCombat();P.gomAttack=null;P.gomVisual=null;
@@ -1714,8 +1727,8 @@
   function makeMon(kind, x, y, elite) {
     const T = tierOf(), base = MON[kind], k = Math.min(1, G.lt / 300);
     const c = T.spd === 1 ? base : { ...base, spd: base.spd * T.spd };
-    const lv = Q && Q.lv ? (P.lv + Q.lv) / 2 : P.lv;
-    const hp = Math.max(1, Math.round(base.hp * T.hp * (1 + 0.55 * (lv - 1)) * (1 + 0.3 * k) * (Q ? 1.5 : 1) * (elite ? 3 : 1)));
+    const lv = teamLv();
+    const hp = Math.max(1, Math.round(base.hp * T.hp * (1 + 0.55 * (lv - 1)) * (1 + 0.3 * k) * coopHpK(teamSize()) * (elite ? 3 : 1)));
     const r = c.r ? c.r : c.gwima ? 200 : c.saja ? 64 : (c.fly ? 46 : kind === "spider" ? 62 : 50) * (elite ? 1.25 : 1);
     return { id: G.nextId++, kind, c, x, y, vx: 0, vy: 0, face: 0, flip: false, hp, max: hp, st: c.fly ? "fly" : "walk", t: 0, cd: rnd(0.4, 1.4), dist: 0, hurt: 0, flash: 0,
       alive: true, die: 0, ph: Math.random() * 10, r, hgt: c.hgt || 0, elite: !!elite };
@@ -1982,7 +1995,7 @@
       if (!T) continue;
       const dist = Math.hypot(T.x - d.x, T.y - d.y) || 1;
       d.x += (T.x - d.x) / dist * 560 * dt; d.y += (T.y - d.y) / dist * 560 * dt;
-      if (dist < 60) { d.life = 0; if (T === P) pickDrop(d); else netEmit("pick", { to: NET.partner, ty: d.type, x: d.x | 0, y: d.y | 0 }); }
+      if (dist < 60) { d.life = 0; if (T === P) pickDrop(d); else netEmit("pick", { to: T.peer, ty: d.type, x: d.x | 0, y: d.y | 0 }); }
     }
     G.drops = G.drops.filter((d) => d.life > 0);
     for (const g of G.gems) {
@@ -1996,7 +2009,7 @@
       g.x += dx / dist * g.fly * dt; g.y += dy / dist * g.fly * dt;
       if (dist < 40) {
         g.t = -1;
-        if (T === P) { gainXp(g.v); play("gem"); } else netEmit("xp", { to: NET.partner, n: g.v });
+        if (T === P) { gainXp(g.v); play("gem"); } else netEmit("xp", { to: T.peer, n: g.v });
       }
     }
     G.gems = G.gems.filter((g) => g.t >= 0 && g.t < 90);
@@ -2100,8 +2113,9 @@
       if (!T) continue;
       c.open = true; openCageFx(c);
       // the pet goes to the sister it belongs to, whoever opened the cage
-      const owner = PETS[c.kind].owner, mine = isAlly(c.kind) ? T === P : hero === owner && (T === P || !Q || Q.hero !== owner);
-      if (mine) rescuePet(c.kind); else if (Q && (isAlly(c.kind) || Q.hero === owner)) netEmit("pet", { to: NET.partner, k: c.kind });
+      const owner = PETS[c.kind].owner;
+      if (isAlly(c.kind)) { if (T === P) rescuePet(c.kind); else netEmit("pet", { to: T.peer, k: c.kind }); }
+      else { if (hero === owner) rescuePet(c.kind); for (const q of QS) if (q.hero === owner) netEmit("pet", { to: q.peer, k: c.kind }); }   // (every girl of that name gets her own)
     }
     for (const it of G.items) {
       if (it.got) continue;
@@ -2109,7 +2123,7 @@
       if (!T) continue;
       it.got = true;
       if (it.type === "star") G.stars++;
-      if (T === P) pickItem(it.type, it.x, it.y); else netEmit("pick", { to: NET.partner, ty: it.type, x: it.x | 0, y: it.y | 0 });
+      if (T === P) pickItem(it.type, it.x, it.y); else netEmit("pick", { to: T.peer, ty: it.type, x: it.x | 0, y: it.y | 0 });
       updateHud();
     }
   }
@@ -2134,8 +2148,8 @@
   const RS_OUT = 0.9, RS_ULT = 1.7, RS_HIT = 2.5, RS_THANK = 3.6, RS_END = 6.0;
   function startRescue(c) {
     if (G.rescue) return;
-    const qNear = Q && NET.role && !Q.dead && d2(Q.x, Q.y, c.x, c.y) < d2(P.x, P.y, c.x, c.y);
-    G.rescue = { kind: c.kind, x: c.x, y: c.y, t: 0, by: qNear ? HEROES[Q.hero].name : HD().name, hit: false };
+    const qNear = NET.role ? QS.filter((q) => !q.dead && d2(q.x, q.y, c.x, c.y) < d2(P.x, P.y, c.x, c.y)).sort((a, b) => d2(a.x, a.y, c.x, c.y) - d2(b.x, b.y, c.x, c.y))[0] : null;
+    G.rescue = { kind: c.kind, x: c.x, y: c.y, t: 0, by: qNear ? HEROES[qNear.hero].name : HD().name, hit: false };
     P.vx = P.vy = 0;
   }
   function updateRescue(dt) {
@@ -2156,7 +2170,7 @@
     if (r.t >= RS_END) {
       G.rescue = null;
       // she steps into the team right where she stood
-      for (const e of [...PETE, ...QPETE]) if (e.kind === r.kind) { e.x = r.x + 40; e.y = r.y + 30; }
+      for (const e of allPets()) if (e.kind === r.kind) { e.x = r.x + 40; e.y = r.y + 30; }
       showBanner(D.name + " đi cùng các bé!", D.tip);
     }
   }
@@ -2210,7 +2224,7 @@
       if (t >= RS_HIT && t < RS_HIT + 0.35) { ctx.save(); ctx.globalAlpha = 0.5 * (1 - (t - RS_HIT) / 0.35); ctx.fillStyle = "#fff"; ctx.fillRect(G.camX - 200, G.camY - 200, VW + 400, VH + 400); ctx.restore(); }
     }
     if (t >= RS_THANK) {
-      const k2 = clamp((t - RS_THANK) / 0.3, 0, 1), names = Q && NET.role ? HEROES.g.name + " và " + HEROES.s.name : r.by;
+      const k2 = clamp((t - RS_THANK) / 0.3, 0, 1), names = NET.role && QS.length ? girlsName() : r.by;
       bubble("Cảm ơn " + names + " nhé!", "Từ giờ mình đi cùng các bé!", x, y - 330, k2);
     }
   }
@@ -2257,7 +2271,7 @@
   }
   function dragonReady() { return !!dragonMeta && DRAGON_POSES.every(k=>FR['dragon_'+k]?.img); }
   function dragonBlocked(owner) {
-    return !owner || (owner===Q && owner.hearts<=0) || owner.dead || owner.tiredT>0 || owner.winT>0 || owner.win || owner.paused || owner.story || G.mode!=='play' || !!(G.quiz||G.bcut||G.rescue||G.combo||G.ult||G.story||G.cine && (G.cine.lock||G.cine.ph!=='fight'));
+    return !owner || (owner!==P && owner.hearts<=0) || owner.dead || owner.tiredT>0 || owner.winT>0 || owner.win || owner.paused || owner.story || G.mode!=='play' || !!(G.quiz||G.bcut||G.rescue||G.combo||G.ult||G.story||G.cine && (G.cine.lock||G.cine.ph!=='fight'));
   }
   function dragonLift(p) {return p.sc ? 0 : 38+Math.sin(G.t*4+(p.i||0))*5;}
   function dragonMouth(p) {
@@ -2267,7 +2281,7 @@
   function dragonAimY(o) {return o.y-Math.max(55,(o.hgt||0)-20);}
   function dragonClearPaused() {
     for(const p of PETE) if(p.kind==='dragon'&&dragonBlocked(P)){p.dragonShot=null;p.cd=Math.max(.35,p.cd||0);}
-    for(const p of QPETE) if(p.kind==='dragon'&&dragonBlocked(Q))p.dragonShot=null;
+    for(const q of QS)for(const p of q.pete) if(p.kind==='dragon'&&dragonBlocked(q))p.dragonShot=null;
   }
   function dragonStep(p,owner,dt,act) {
     if(!dragonReady()){p.dragonShot=null;return;}
@@ -2329,7 +2343,7 @@
   }
   function drawDragon(p) {
     if(!dragonReady())return;
-    const owner=QPETE.includes(p)?Q:P,blocked=dragonBlocked(owner),s=blocked?null:p.dragonShot,t=s?G.t-s.start:9;
+    const owner=petOwner(p),blocked=dragonBlocked(owner),s=blocked?null:p.dragonShot,t=s?G.t-s.start:9;
     if(t>=.58)p.dragonShot=null;
     const active=s&&t<.58,pose=active?'attack_'+(p.flip?'l':'r'):(p.flip?'l':'r')+(Math.floor(G.t*9)%4);
     shadow(p.x,p.y,36*(p.sc||1),9*(p.sc||1),.2);
@@ -2376,11 +2390,11 @@
     return {x:p.x+(a[0]-f.ax)*s,y:p.y-dragonLift(p)+(a[1]-f.ay)*s};
   }
   function triClearPaused(){
-    for(const [list,owner]of [[PETE,P],[QPETE,Q]])for(const p of list)if(p.kind==='tridragon'&&dragonBlocked(owner)){p.triShot=null;p.cd=Math.max(.35,p.cd||0);}
+    for(const [list,owner]of [[PETE,P],...QS.map(q=>[q.pete,q])])for(const p of list)if(p.kind==='tridragon'&&dragonBlocked(owner)){p.triShot=null;p.cd=Math.max(.35,p.cd||0);}
   }
   function triStep(p,owner,dt,act){
     if(!triReady()){p.triShot=null;return;}
-    if(owner===Q&&p.triShot&&!dragonBlocked(owner)){if(G.t-p.triShot.start<.65)return;p.triShot=null;}
+    if(owner!==P&&p.triShot&&!dragonBlocked(owner)){if(G.t-p.triShot.start<.65)return;p.triShot=null;}
     if(dragonBlocked(owner)||!act){p.triShot=null;p.triAlign=false;p.cd=Math.max(.35,p.cd||0);}
     const shot=p.triShot;
     if(shot){p.cd=Math.max(0,(p.cd||0)-dt);const t=G.t-shot.start;
@@ -2423,7 +2437,7 @@
   }
   function drawTriDragon(p){
     if(!triReady())return;
-    const owner=QPETE.includes(p)?Q:P,s=dragonBlocked(owner)?null:p.triShot,t=s?G.t-s.start:9;if(t>=.65)p.triShot=null;
+    const owner=petOwner(p),s=dragonBlocked(owner)?null:p.triShot,t=s?G.t-s.start:9;if(t>=.65)p.triShot=null;
     const active=s&&t<.65,dir=p.flip?'l':'r',pose=active?TRI_ELEMENTS[s.head]+'_'+dir:dir+[0,1,2,1][Math.floor(G.t*8)%4];
     shadow(p.x,p.y,48*(p.sc||1),12*(p.sc||1),.2);spr('tridragon_'+pose,p.x,p.y-dragonLift(p),false,CHAR_M*(p.sc||1));
     if(!active)return;const m=triMouth(p,s.head);if(t<.3){glow(m.x,m.y,16+40*t/.3,TRI_COLORS[s.head],.4+.4*t/.3);return;}
@@ -2443,6 +2457,8 @@
   // and no monster gets inside it until she wakes up
   const GUARD_R = 320, GUARD_SQ = 0.48, GUARD_W = 2.3;
   let PETE = [], QPETE = [];
+  const allPets = () => [...PETE, ...QS.flatMap((q) => q.pete)];
+  const petOwner = (p) => (PETE.includes(p) ? P : QS.find((q) => q.pete.includes(p)) || P);
   function makePetEnts() { PETE = P.pets.map((k, i) => ({ kind: k, x: P.x - 80 - i * 50, y: P.y + 40, face: 0, flip: false, cd: 1 + i * 0.5, dist: 0, i, st: "follow", at: -1 })); }
   function followPets(list, owner, dt, act) {
     for (const p of list) {
@@ -2619,7 +2635,7 @@
   // the girl's guarding pet, if she is down and it is on its ring (also for the partner, from her synced pets)
   function guardPet(g) {
     if (!g || !g.dead || (G.cine && G.cine.ph === "outro")) return null;
-    const hk = g === P ? hero : g.hero, list = g === P ? PETE : QPETE;
+    const hk = g === P ? hero : g.hero, list = g === P ? PETE : g.pete;
     for (const p of list) if (PETS[p.kind] && PETS[p.kind].owner === hk && !(p.faintT > 0) && Math.hypot(p.x - g.x, (p.y - g.y) / GUARD_SQ) < GUARD_R * 1.35) return p;
     return null;
   }
@@ -2649,7 +2665,7 @@
   }
   // the ring on the ground: a warm glow, the painted paw-print circle, sparkles chasing round it
   function drawGuard() {
-    for (const g of [P, Q && NET.role ? Q : null]) {
+    for (const g of teamAll()) {
       const p = guardPet(g); if (!p) continue;
       const D = PETS[p.kind], w = GUARD_R * 2 + 70, pul = 0.85 + 0.15 * Math.sin(G.t * 5);
       ctx.save(); ctx.globalCompositeOperation = "lighter";
@@ -3680,7 +3696,7 @@
     ctx.restore();
   }
   // a friend's place for her line: the team member on this page, else near the girl
-  const friendAt = (k) => { const p = PETE.find((e) => e.kind === k) || QPETE.find((e) => e.kind === k); return p ? [p.x, p.y] : [P.x + (k === "zoey" ? -160 : 160), P.y]; };
+  const friendAt = (k) => { const p = allPets().find((e) => e.kind === k); return p ? [p.x, p.y] : [P.x + (k === "zoey" ? -160 : 160), P.y]; };
   const note = (x, y, s, a, ch) => { ctx.save(); ctx.globalAlpha = a; ctx.font = `800 ${s | 0}px system-ui`; ctx.textAlign = "center"; ctx.fillStyle = "#fff4c2"; ctx.shadowColor = "rgba(255,210,120,.95)"; ctx.shadowBlur = 18; ctx.fillText(ch, x, y); ctx.restore(); };
   function drawFilmFx(L, T) {
     const c = G.cine, A = G.arena; if (!c || !A || !G.lvl || !G.lvl.stage) return;
@@ -3773,7 +3789,7 @@
     } else if (c.ph === "outro" && t < OUT_BOOM + 0.6) {
       // the song of light: golden beams from the girls and HUNTR/X into him, notes flowing along, a ring of light closing in
       const tx = Gw[0], ty = Gw[1] - 300, k = clamp((t - 0.8) / 0.8, 0, 1) * clamp((OUT_BOOM + 0.4 - t) / 0.4, 0, 1);
-      const from = [P, ...(Q && NET.role ? [Q] : []), ...PETE.filter((p) => PETS[p.kind].art), ...(Q && NET.role ? QPETE.filter((p) => PETS[p.kind].art) : [])];
+      const from = [...teamAll(), ...(NET.role ? allPets() : PETE).filter((p) => PETS[p.kind].art)];
       if (k > 0) {
         ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
         for (const o of from) {
@@ -3800,11 +3816,11 @@
     if (d2(P.x, P.y, A.x, A.y) > (A.r - 80) ** 2) fadeTo(() => { const [nx, ny] = norm(P.x - A.x, P.y - A.y); P.x = A.x + nx * (A.r - 260); P.y = A.y + ny * (A.r - 260); });
     // he lands on the far side from where the girl came in
     const [nx, ny] = norm(A.x - P.x, A.y - P.y);
-    const BD = G.lvl.boss;
+    const BD = G.lvl.boss, bossMax = Math.round(BD.hp * bossHpK(teamSize()));
     $("bossName").textContent = BD.name;
-    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: nx > 0 ? -1 : 1, hp: BD.hp, max: BD.hp, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
+    G.boss = { x: A.x + nx * 260, y: A.y + ny * 260, dir: nx > 0 ? -1 : 1, hp: bossMax, max: bossMax, st: "enter", t: 0, flash: 0, hurtPose: 0, cycle: 0, alive: true, die: 0, dropY: -700, iT: 0, vx: 0, vy: 0 };
     // the maths quizzes: he leaps up twice, at 2/3 and 1/3 of his health (each leap asks 1 or 2 questions in a row)
-    if (BD.quiz) G.boss.quizHp = [Math.round(BD.hp * 2 / 3), Math.round(BD.hp / 3)];
+    if (BD.quiz) G.boss.quizHp = [Math.round(bossMax * 2 / 3), Math.round(bossMax / 3)];
     // (the monsters chasing the girls stay and keep fighting)
     $("bossbar").hidden = false; updateBossBar();
     SFX.roar(); G.shake = 18;
@@ -3933,7 +3949,7 @@
   // squares, each with an answer. When time is up, bombs / spikes / swords / fireballs (by level) rain on the wrong
   // squares: a girl or a friend standing there faints at once. Then he drops back in and the fight goes on.
   const QZ_UP = 1.0, QZ_DROP = 1.5, QZ_HIT = 0.7, QZ_DOWN = 1.1, QZ_NEXT = 1.2, QZ_HOV = 280, QPH = ["up", "ask", "drop", "down", "next", "wait"];
-  const easyBossMath = () => ["g","b"].includes(hero) || !!(NET.role && ["g","b"].includes(Q?.hero));
+  const easyBossMath = () => ["g","b"].includes(hero) || !!(NET.role && QS.some((q) => ["g","b"].includes(q.hero)));
   function makeSum(cfg) {
     if(easyBossMath()) cfg={...cfg,lim:10};
     let a, b, r, carry = false;
@@ -4284,16 +4300,16 @@
   }
   function winGame() {
     G.won = true; P.winT = 99; SFX.win();
-    $("againBtn").hidden = NET.role === "guest";
+    $("againBtn").hidden = false;
     try { localStorage.setItem("dcpt3-progress", String(LEVELS.length)); } catch (e) {}
     progress = LEVELS.length;
     setTimeout(() => {
       $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv} và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
       G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
       // the family picture: both sisters if they played together, else the one who played (with her pet in the middle)
-      const pic = $("winPic"), who = Q && NET.role ? [hero,Q.hero].sort().join("") : hero;
+      const pic = $("winPic"), others = NET.role ? QS : [], who = [...new Set([hero, ...others.map((q) => q.hero)])].sort().join("");
       pic.onerror = () => { pic.hidden = true; }; pic.onload = () => { pic.hidden = false; };
-      pic.src = (who.includes("n")||who.includes("b")) ? victoryPortrait([{hk:hero,skin:mySkin()},...(Q&&NET.role?[{hk:Q.hero,skin:Q.skin||Q.hero}]:[])]) : `assets/fin_${who}.jpg`;
+      pic.src = (who.includes("n")||who.includes("b")||others.length>1) ? victoryPortrait([{hk:hero,skin:mySkin()},...others.map((q)=>({hk:q.hero,skin:q.skin||q.hero}))]) : `assets/fin_${who}.jpg`;
     }, 2200);
   }
 
@@ -4385,10 +4401,11 @@
   // src: "p" (this page's girl) or "q" (the partner). Both girls' ultimates within 2 s: the sisters' combo, five times as strong
   function ultBlast(cx, cy, hw, hh, src = "p") {
     let mult = 1;
-    const L = G.ultLast;
-    if (L && L.src !== src && G.t - L.t <= 2) { mult = 5; G.ultLast = null; } else G.ultLast = { src, t: G.t };
+    const L = G.ultLast, who = src === "q" ? (Q ? Q.peer : "q") : NET.me || "p", hk = src === "q" ? Q && Q.hero : hero;
+    let pair = null;   // (two different girls: two of the same name have no sisters' scene, each keeps her own ultimate)
+    if (L && L.who !== who && L.hk !== hk && G.t - L.t <= 2) { mult = 5; pair = [L.who, who]; G.ultLast = null; } else G.ultLast = { src, who, hk, t: G.t };
     // the combo's damage lands at the burst of the sisters' scene (the world waits until then)
-    if (mult > 1) return comboUlt(true, () => ultHit(cx, cy, hw, hh, true));
+    if (mult > 1) return comboUlt(true, () => ultHit(cx, cy, hw, hh, true), pair);
     ultHit(cx, cy, hw, hh, false);
   }
   function ultHit(cx, cy, hw, hh, all) {
@@ -4423,12 +4440,16 @@
   const easeOut = (k) => 1 - Math.pow(1 - clamp(k, 0, 1), 3);
   const easeBack = (k) => { k = clamp(k, 0, 1); const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
   // hit: the combo's damage (host only), landed at the burst
-  function comboUlt(send, hit) {
-    if (send && NET.role) netEmit("combo", { to: NET.partner });
+  // the pair in the scene: the two who pressed (a third girl only watches); peers by id, this page's is NET.me
+  const inCombo = (id) => !!G.combo && (!G.combo.pair || G.combo.pair.includes(id));
+  const pairGirl = (id) => (id === NET.me ? P : QS.find((q) => q.peer === id) || null);
+  function comboUlt(send, hit, pair) {
+    if (send && NET.role) for (const q of QS) netEmit("combo", { to: q.peer, pair });
+    const mine = !pair || pair.includes(NET.me);
     // (never on top of another scene, nor without the partner on this page: then just the damage and a bang)
-    if (G.rescue || G.combo || G.mode !== "play" || !Q) { if (hit) hit(); SFX.boom(); G.shake = 34; return; }
-    G.combo = { t: 0, hit, t0: G.t, parts: [], cx: G.camX + VW / 2, cy: G.camY + VH / 2 };
-    G.ult = null; P.z = 0; P.vx = P.vy = 0; P.moving = false; P.inv = Math.max(P.inv, CB_END + 1.2);
+    if (G.rescue || G.combo || G.mode !== "play" || !Q || (pair && !pair.every(pairGirl))) { if (hit) hit(); SFX.boom(); G.shake = 34; return; }
+    G.combo = { t: 0, hit, t0: G.t, parts: [], cx: G.camX + VW / 2, cy: G.camY + VH / 2, pair: pair || null };
+    if (mine) G.ult = null; P.z = 0; P.vx = P.vy = 0; P.moving = false; P.inv = Math.max(P.inv, CB_END + 1.2);
     SFX.charge();
   }
   const comboZoom = () => {
@@ -4439,9 +4460,10 @@
   };
   // the two girls in the scene: who, where she stands in the world (the partner held to the edge of the view)
   function cbGirls(C) {
+    const held = (q) => ({ hk: q.hero, skin: q.skin || q.hero, x: clamp(q.x, C.cx - VW / 2 - 140, C.cx + VW / 2 + 140), y: clamp(q.y, C.cy - VH / 2 + 260, C.cy + VH / 2 + 160) });
     const me = { hk: hero, skin: mySkin(), x: P.x, y: P.y };
-    const q = Q ? { hk: Q.hero, skin: Q.skin || Q.hero, x: clamp(Q.x, C.cx - VW / 2 - 140, C.cx + VW / 2 + 140), y: clamp(Q.y, C.cy - VH / 2 + 260, C.cy + VH / 2 + 160) } : null;
-    return q ? [me, q] : [me];
+    if (C.pair) return C.pair.map(pairGirl).filter(Boolean).map((g) => (g === P ? me : held(g)));
+    return Q ? [me, held(Q)] : [me];
   }
   // where her wand tip is from her feet, in the side casting pose at size m
   function cbTip(hk, skin, m, flip) {
@@ -4452,7 +4474,7 @@
   }
   // her place in the scene at time t: [x, y, size, frame, mirrored]; Mochi on the left, Matcha on the right, facing in
   function cbPose(C, g, t) {
-    const left = g.hk === [hero,Q?.hero].sort()[0], flip = !left, ox = C.cx, oy = C.cy - 80;
+    const left = g.hk === cbGirls(C).map((x) => x.hk).sort()[0], flip = !left, ox = C.cx, oy = C.cy - 80;
     const [tx, ty] = cbTip(g.hk, g.skin, CB_K, flip), sx = ox + (left ? -CB_D : CB_D) - tx, sy = oy + 20 - ty;
     const bob = Math.sin(t * 5 + (left ? 0 : 2)) * 9;
     if (t < CB_MEET) {
@@ -4523,8 +4545,8 @@
     const dim = ss(0, 0.35, t) * (1 - ss(CB_BOOM + 0.35, CB_END - 0.1, t));
     if (dim > 0) {
       ctx.save(); ctx.globalAlpha = 0.8 * dim; ctx.fillStyle = "#140a24"; ctx.fillRect(ox - big, oy - big, big * 2, big * 2); ctx.restore();
-      glow(ox - 620, oy + 40, 900, HEROES[[hero,Q.hero].sort()[0]].rgb, 0.32 * dim);
-      glow(ox + 620, oy + 40, 900, HEROES[[hero,Q.hero].sort()[1]].rgb, 0.28 * dim);
+      glow(ox - 620, oy + 40, 900, HEROES[cbGirls(C).map((x) => x.hk).sort()[0]].rgb, 0.32 * dim);
+      glow(ox + 620, oy + 40, 900, HEROES[cbGirls(C).map((x) => x.hk).sort()[1]].rgb, 0.28 * dim);
     }
     // the seal behind the orb: her heart circle and her emerald circle turning against each other
     const ch = ss(CB_MEET - 0.2, CB_BOOM - 0.1, t) * (1 - ss(CB_BOOM, CB_BOOM + 0.3, t));
@@ -4705,7 +4727,7 @@
     if (P.elem) { P.elemT -= dt; if (P.elemT <= 0) { P.elem = null; showBanner("Hết phép đặc biệt"); } updateElemHud(); }
     netFrame(dt); updateQuizHud();
     followPets(PETE, P, dt, !P.dead && !G.ult && !P.winT && !(G.cine && G.cine.lock));
-    if (Q && NET.role) { if (QPETE.map((p) => p.kind).join() !== Q.pets.join()) QPETE = Q.pets.map((k, i) => ({ kind: k, x: Q.x, y: Q.y, face: 0, flip: false, dist: 0, i })); partnerPets(dt); }
+    if (NET.role) eachQ((q) => { if (q.pete.map((p) => p.kind).join() !== q.pets.join()) QPETE = q.pete = q.pets.map((k, i) => ({ kind: k, x: q.x, y: q.y, face: 0, flip: false, dist: 0, i })); partnerPets(dt); });
     for (const sh of G.pshots) {
       sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
       for (const m of G.mons) if (!sh.gomWave && m.alive && d2(sh.x, sh.y, m.x, m.y) < (m.r + 30) ** 2) { sh.life = 0; break; }
@@ -5196,7 +5218,7 @@
   // where her eyes are in her hurt pose (fractions of the frame), for the dizzy swirls
   const HURT_EYES = { g: [[0.43, 0.219], [0.53, 0.2]], s: [[0.42, 0.285], [0.55, 0.27]] };
   function drawFainted(hk, x, y, k, helped, friend) {
-    const skin = hk===hero ? mySkin() : Q?.hero===hk ? Q.skin : hk;
+    const skin = friend === P ? Q?.skin || hk : hk===hero ? mySkin() : QS.find((q) => q.hero === hk)?.skin || hk;   // (friend P: this one is a partner)
     const painted = WARD.loaded.has(skin)||CHARACTER_REDRAW.has(hk);
     const f = FR[skin+"_faint"] || FR[hk + (painted ? "_new_faint" : "_hurt")] || FR[hk + "_stand"]; if (!f) return;
     const M = CHAR_M * sideK(hk, hk + "_hurt"), kk = f.s * M, h = f.h * kk, axw = x + h * 0.5, ayw = y - 10;
@@ -5235,7 +5257,7 @@
     if (qa) drawAura(Q.elem, Q.x, Q.y, qa, 2);
     if (Q.slow) drawWeb(Q.x, Q.y - 70, 40, 1);
     // name tag and hearts
-    label(H.name, Q.x, topY, 32, "#fff");
+    label(playerLabel(Q) || H.name, Q.x, topY, 32, "#fff");
     ctx.save();
     for (let i = 0; i < maxHearts(Q.hero); i++) { ctx.fillStyle = i < Q.hearts ? "#ff5a7a" : "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.arc(Q.x - 40 + i * 20, topY + 18, 7, 0, TAU); ctx.fill(); }
     ctx.restore();
@@ -5354,7 +5376,7 @@
     let a = 1;
     if (d.name !== "lantern_on") {
       const f = FR[d.name], h = f ? f.h * f.s * d.m : 300, w = f ? f.w * f.s * d.m * 0.45 : 120;
-      for (const g of (Q && NET.role ? [P, Q] : [P])) if (g.y < d.y && g.y > d.y - h * 0.9 && Math.abs(g.x - d.x) < w) a = 0.38;
+      for (const g of teamAll()) if (g.y < d.y && g.y > d.y - h * 0.9 && Math.abs(g.x - d.x) < w) a = 0.38;
     }
     d.fa = (d.fa === undefined ? 1 : d.fa) + (a - (d.fa === undefined ? 1 : d.fa)) * 0.15;
     spr(d.name, d.x, d.y, d.flip, d.m, d.fa);
@@ -5663,10 +5685,10 @@
     drawPickups(L, R, T, B);
     drawGuide();
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 0, G.ult);
-    if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 0, Q.gomRingState ||= {});
+    if (NET.role && !G.combo) eachQ((q) => { if (q.ultT > 0) drawUltFx(q.hero, q.x, q.y, q.flip ? -1 : 1, q.ultT, q.x, q.y, 0, q.gomRingState ||= {}); });
     // the elemental auras' rings lie on the ground, under everything standing
     if (G.mode !== "title" && !G.combo && P.elem && !G.ult && !P.dead) drawAura(P.elem, P.x, P.y, P.elemT, 0);
-    if (Q && NET.role && !G.combo && Q.elem && !Q.dead && !(Q.ultT > 0)) drawAura(Q.elem, Q.x, Q.y, qElemLeft(), 0);
+    if (NET.role && !G.combo) eachQ((q) => { if (q.elem && !q.dead && !(q.ultT > 0)) drawAura(q.elem, q.x, q.y, qElemLeft(), 0); });
     // everything standing, sorted by the y of its feet
     let n = 0;
     const add = (y, k, o) => { let e = DL[n]; if (!e) DL[n] = e = { y: 0, k: 0, o: null }; e.y = y; e.k = k; e.o = o; n++; };
@@ -5676,8 +5698,8 @@
     }
     for (const m of G.mons) if (m.x > L - 220 && m.x < R + 220 && m.y > T - 120 && m.y < B + 320) add(m.y, 1, m);
     // (in the sisters' combo both girls are drawn by the scene)
-    if (G.mode !== "title" && !G.combo) add(P.y, 2, P);
-    if (Q && NET.role && !G.combo && Q.x > L - 200 && Q.x < R + 200 && Q.y > T - 100 && Q.y < B + 300) add(Q.y, 3, Q);
+    if (G.mode !== "title" && !inCombo(NET.me)) add(P.y, 2, P);
+    if (NET.role) for (const q of QS) if (!inCombo(q.peer) && q.x > L - 200 && q.x < R + 200 && q.y > T - 100 && q.y < B + 300) add(q.y, 3, q);
     if (G.boss) add(G.boss.y + ((G.boss.jz || 0) > 100 ? 1500 : 0), 4, G.boss);   // (up in the air: in front of everything)
     if (G.quiz && G.arena) for (const o of fencePosts()) if (o.x > L - 200 && o.x < R + 200 && o.y > T - 20 && o.y < B + 300) add(o.y, 10, o);
     for (const c of G.chests) if (c.x > L - 150 && c.x < R + 150 && c.y > T - 50 && c.y < B + 200) add(c.y, 5, c);
@@ -5686,7 +5708,7 @@
     if (G.mode !== "title") for (const p of PETE) add(p.y, 8, p);
     if (G.cine) for (const b of cineBoys()) add(b.y, 9, b);
     if (G.cine) for (const a of filmActors()) add(a.y, 11, a);
-    if (Q && NET.role) for (const p of QPETE) add(p.y, 8, p);
+    if (NET.role) for (const q of QS) for (const p of q.pete) add(p.y, 8, p);
     const list = DL.slice(0, n).sort((a, b) => a.y - b.y);
     for (const e of list) {
       const o = e.o;
@@ -5694,7 +5716,7 @@
         case 0: drawDeco(o); break;
         case 1: drawMon(o); break;
         case 2: drawHero(); break;
-        case 3: drawPartner(); break;
+        case 3: setQ(o); drawPartner(); netFocus(); break;
         case 4: drawBoss(); break;
         case 5: drawChest(o); break;
         case 6: drawCage(o); break;
@@ -5730,7 +5752,7 @@
     drawCineFx(L, T);
     drawCombo(L, T);
     if (G.ult) drawUltFx(hero, P.x, P.y, P.flip ? -1 : 1, G.ult.t, G.ult.cx, G.ult.cy, 1, G.ult);
-    if (Q && NET.role && Q.ultT > 0 && !G.combo) drawUltFx(Q.hero, Q.x, Q.y, Q.flip ? -1 : 1, Q.ultT, Q.x, Q.y, 1, Q.gomRingState ||= {});
+    if (NET.role && !G.combo) eachQ((q) => { if (q.ultT > 0) drawUltFx(q.hero, q.x, q.y, q.flip ? -1 : 1, q.ultT, q.x, q.y, 1, q.gomRingState ||= {}); });
     if (G.ult) {
       const U = G.ult, fl = U.t > 1.5 ? Math.max(0, 1 - (U.t - 1.5) / 0.5) : 0;
       if (fl > 0) { ctx.fillStyle = hero === "s" ? `rgba(210,255,200,${fl * 0.6})` : `rgba(255,228,245,${fl * 0.6})`; ctx.fillRect(L - 50, T - 50, VW + 100, VH + 100); }
@@ -5739,7 +5761,7 @@
     if (G.mode === "play" && !G.combo) {
       const goal = G.portal || G.arena;
       if (goal && goal.open && !G.boss && !G.lvl.stage) edgeMarker(goal.x, goal.y - 100, "192,139,255", G.portal ? "Cổng phép" : "Đấu trường", L, R, T, B);
-      if (Q && NET.role) edgeMarker(Q.x, Q.y - 100, HEROES[Q.hero].rgb, HEROES[Q.hero].name, L, R, T, B);
+      if (NET.role) for (const q of QS) edgeMarker(q.x, q.y - 100, HEROES[q.hero].rgb, HEROES[q.hero].name, L, R, T, B);
     }
     // vignette and fade (screen space)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -5767,7 +5789,7 @@
     const goal = G.portal || G.arena;
     if (goal) dot(goal.x, goal.y, goal.open ? 7 + Math.sin(G.t * 6) * 1.5 : 6, goal.open ? "#c08bff" : "#5b4a7a", "#fff");
     if (G.boss && G.boss.alive) dot(G.boss.x, G.boss.y, 7, "#ff6a3d", "#fff");
-    if (Q && NET.role) dot(Q.x, Q.y, 6, Q.hero === "s" ? "#7be04a" : "#ff9ad5", "#fff");
+    if (NET.role) for (const q of QS) dot(q.x, q.y, 6, q.hero === "s" ? "#7be04a" : "#ff9ad5", "#fff");
     dot(P.x, P.y, 7, hero === "s" ? "#7be04a" : "#ff9ad5", "#fff");
   }
 
@@ -5828,7 +5850,7 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden && G.mode === "play" && !NET.role) togglePause(); });
   $("resumeBtn").addEventListener("click", togglePause);
   $("homeBtn").addEventListener("click", () => { $("pauseScreen").hidden = true; toTitle(); });
-  $("againBtn").addEventListener("click", () => { $("winScreen").hidden = true; startGame(0); if (NET.role === "host") sendStart(); });
+  $("againBtn").addEventListener("click", () => { $("winScreen").hidden = true; if (NET.role) roomAgain(); else startGame(0); });
 
   // the home screen: pick a level (any one reached so far, Màn 1 = from the start), then play alone or together.
   // In two-player the room's host picks the level.
@@ -5859,6 +5881,10 @@
       }).catch(() => null);
     }
     return entry;
+  }
+  function seatArt(c, k) {
+    const f = FR[k + "_stand"]; if (!f) return;
+    const m = FR.s_stand || f, g = c.getContext("2d"), th = 176 * (f.h * f.s) / (m.h * m.s), kk = th / f.h;   // (the seats keep the girls' heights: Matcha the tallest) g.drawImage(f.img, f.sx, f.sy, f.w, f.h, 75 - f.w * kk / 2, 184 - th, f.w * kk, th);
   }
   function renderHeroes() {
     const box = $("heroes"); box.innerHTML = "";
@@ -5990,8 +6016,38 @@
   const MKINDS = Object.keys(MON), MST = ["walk", "prep", "atk", "rest", "web", "fly", "back"];
   const BST = ["enter", "walk", "prep", "slam", "rest", "leap", "dash", "quiz"], DTYPES = ["heart", "energy", "fire", "ice", "poison"], ELS = [null, "fire", "ice", "poison"];
   const NET = { hb: 0, room: null, state: "wait", me: null, role: null, partner: null, pp: null, applied: null, co: null,
-    sendT: 0, startT: 0, goneT: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
-  let Q = null;   // the other girl, as last reported in their presence
+    sendT: 0, startT: 0, goneT: 0, peers: new Map(), host: null, order: [], epoch: 0, portalSent: false, lvBusy: false, hq: [], sq: [], fq: [] };   // hq/sq/fq: hits, shots and pet moves batched per send
+  let Q = null, QS = [];   // QS: everyone else in the room, as last reported in their presence; Q: the one in focus (the first, or the one a message or a loop is about)
+  const teamAll = () => (NET.role ? [P, ...QS] : [P]);
+  const teamLv = () => teamAll().reduce((x, g) => x + (g.lv || 1), 0) / teamAll().length;
+  const girlsIn = () => Object.keys(HEROES).filter((k) => k === hero || (NET.role && QS.some((q) => q.hero === k)));
+  const girlsName = () => girlsIn().map((c) => HEROES[c].name).join(" và ");
+  // the peer in focus goes with her: NET.partner, NET.pp and the pets QPETE always belong to Q
+  function setQ(q) { Q = q; QPETE = q.pete; NET.partner = q.peer; NET.pp = q.pres; }
+  function netFocus() {
+    if (QS.length) return setQ(QS[0]);
+    const e = NET.peers.values().next().value; Q = null; QPETE = []; NET.partner = e ? e.peer : NET.partner; NET.pp = e ? e.pres : NET.pp;
+  }
+  function eachQ(f) { for (const q of QS.slice()) { setQ(q); f(q); } netFocus(); }
+  const hostPres = () => { const e = NET.peers.get(NET.host); return e ? e.pres : NET.pp; };
+  function peerAdd(id, pres) {
+    let e = NET.peers.get(id);
+    if (!e) { e = { peer: id, pres: null, goneT: 0, quietT: 0, lastHb: undefined, startT: 0 }; NET.peers.set(id, e); }
+    if (pres !== undefined) e.pres = pres;
+    return e;
+  }
+  // (a page set up by hand, as the tests do, or a partner named before her presence came)
+  function peersEnsure() {
+    if (NET.partner && !NET.peers.size && !NET.seats) { const p = NET.room.peers().find((p) => p.peer === NET.partner); peerAdd(NET.partner, p ? p.presence : NET.pp); }
+    if (NET.role === "guest" && !NET.host) NET.host = NET.partner;
+  }
+  function peersLeave(e, lost) {
+    { const r = (NET.seats || []).find((x) => x.peer === e.peer); if (r) { (NET.gone = NET.gone || {})[r.token] = r.seat; NET.seats = NET.seats.filter((x) => x !== r); if (NET.role === "host" && NET.room) NET.room.presence({ roster: NET.seats }).catch(() => {}); } }
+    if (NET.seats && NET.seats.length && e.peer === NET.host) { if (NET.state === "p2p" || hostHeardByOthers()) { e.goneT = e.quietT = 0; return; } return takeoverBegin(); }
+    NET.peers.delete(e.peer); QS = QS.filter((q) => q.peer !== e.peer);
+    if (e.peer === NET.host || (!NET.peers.size && !(NET.seats && NET.seats.length))) { NET.partner = e.peer; return partnerLeft(lost); }
+    netFocus(); showBanner(lost ? "Mất kết nối với một bạn" : "Một bạn đã rời phòng", "Cả đội chơi tiếp");
+  }
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
 
   async function netInit() {
@@ -6005,10 +6061,16 @@
     NET.room = room;
     room.onPeers((ch) => {
       const me = ch.peers.find((p) => p.sameTab); if (me) NET.me = me.peer;
+      for (const e of NET.peers.values()) { const p = ch.peers.find((p) => p.peer === e.peer); e.pres = p ? p.presence : null; const q = QS.find((q) => q.peer === e.peer); if (q) q.pres = e.pres; }
       if (NET.partner) { const p = ch.peers.find((p) => p.peer === NET.partner); NET.pp = p ? p.presence : null; }
-      if (NET.co && NET.co.role === "host" && !NET.role) {
-        const j = ch.peers.find((p) => !p.sameTab && p.presence.co && p.presence.co.role === "join" && p.presence.co.host === NET.me);
-        if (j) beginHost(j.peer, j.presence);
+      if (NET.role === "guest") for (const p of ch.peers) if (!p.sameTab && p.peer !== NET.exHost && p.presence.co && (p.presence.co.with === NET.host || p.presence.co.host === NET.host)) peerAdd(p.peer, p.presence);   // (the other guests of this room)
+      if (NET.co && NET.co.role === "host" && !NET.role) publishRoster();
+      lateScan();
+      if (NET.role === "host") for (const p of ch.peers) if (!p.sameTab && p.peer !== NET.exHost && !NET.peers.has(p.peer) && !verClash(p.presence) && p.presence.co && p.presence.co.with === NET.me) { peerAdd(p.peer, p.presence); NET.seats = [...(NET.seats || []).filter((r) => r.token !== p.presence.co.token), { peer: p.peer, token: p.presence.co.token, seat: (NET.seats || []).length, hero: validHero(p.presence.co.hero), ready: true }]; setCo({ ...NET.co, with: (NET.co && NET.co.with) || p.peer, team: [...NET.peers.keys()] }); NET.room.presence({ roster: NET.seats }).catch(() => {}); }
+      if (NET.role === "guest") { const hp = ch.peers.find((p) => p.peer === NET.host); if (hp && Array.isArray(hp.presence.roster)) { NET.seats = hp.presence.roster; NET.epoch = Math.max(NET.epoch || 0, num(hp.presence.epoch)); } }
+      if (NET.co && NET.co.role === "join" && !NET.role) {   // (the host closed the room: only once she has been seen, her first news may still be on its way)
+        const here = ch.peers.some((p) => p.peer === NET.co.host);
+        if (here) NET.coSeen = NET.co.host; else if (NET.coSeen === NET.co.host) { NET.co = null; NET.coSeen = null; }
       }
       renderCoop();
     }, () => { if (NET.state === "ok") { NET.state = "none"; NET.room = null; renderCoop(); } });
@@ -6018,6 +6080,7 @@
 
   // ---- room code play: a stand-in for the claude.ai room over one WebRTC link (PeerJS)
   const P2P_PREFIX = "dcpt3-room-";
+  const MAX_PLAYERS = 4;   // (the room's size; 3 is the fallback if a host iPad cannot carry 4)
   function loadPeerJs() {
     if (window.Peer) return Promise.resolve();
     return new Promise((res, rej) => {
@@ -6025,55 +6088,85 @@
       sc.onload = res; sc.onerror = () => rej({ type: "network" }); document.head.append(sc);
     });
   }
-  async function p2pRoom(code, hosting, onState) {
+  async function p2pRoom(code, hosting, onState, epoch = 0) {
     await loadPeerJs();
-    const peer = new window.Peer(hosting ? P2P_PREFIX + code : undefined, { debug: 0 });
-    const peers = new Map(), ph = [], th = {};
-    let mine = Object.freeze({}), conn = null, myId = null, closed = false;
+    const hostId = P2P_PREFIX + code + (epoch ? "-e" + epoch : "");   // (a new host after a takeover has its own id: the server may hold the old one a while)
+    const peer = new window.Peer(hosting ? hostId : undefined, { debug: 0 });
+    const stand = new Map(); let toNext = null, door = null;   // stand: standby links from the guests after this one; toNext: this one's to the next seat
+    // after a takeover: the new host answers at the code's next id and sends new pages on to her own
+    const peers = new Map(), ph = [], th = {}, conns = new Map();   // conns: the guests (host), or just the host (guest)
+    let mine = Object.freeze({}), myId = null, closed = false, tries = 0, everOpen = false;
     const snap = (id, pres) => Object.freeze({ peer: id, by: null, isMe: id === myId, sameTab: id === myId, kind: "viewer", guest: false, presence: pres, updatedAt: Date.now() });
     const list = () => Object.freeze([...peers.values()]);
     const fire = (ch) => setTimeout(() => ph.forEach((h) => h({ peers: list(), joined: [], left: [], updated: [], ...ch })), 0);
-    const send = (m) => { if (conn && conn.open) try { conn.send(m); } catch (e) {} };
+    const send = (m, skip) => { for (const [id, c] of conns) if (id !== skip && c.open) try { c.send(m); } catch (e) {} };
     let remote = null;   // the joining side remembers the host, to dial again if the link drops
+    function dropPeer(id) {
+      const pp = peers.get(id); if (!pp) return;
+      peers.delete(id); fire({ left: [pp] });
+    }
     function wire(c) {
-      // one partner per room; the same partner dialling again replaces its old (maybe half-dead) link
-      if (conn && conn !== c) {
-        if (c.peer !== conn.peer) { c.on("open", () => c.close()); return; }
-        const old = conn; conn = null; try { old.close(); } catch (e) {}
-      }
-      conn = c;
-      c.on("open", () => { send({ k: "pres", presence: mine }); onState("open"); });
+      // the same page dialling again replaces its old (maybe half-dead) link; a full room says so and closes
+      const old = conns.get(c.peer);
+      if (old && old !== c) { conns.delete(c.peer); try { old.close(); } catch (e) {} }
+      else if (hosting && !old && conns.size >= MAX_PLAYERS - 1) { c.on("open", () => { try { c.send({ k: "full" }); } catch (e) {} setTimeout(() => c.close(), 200); }); return; }
+      conns.set(c.peer, c);
+      const opened = () => {
+        everOpen = true;
+        try { c.send({ k: "pres", presence: mine }); } catch (e) {}
+        if (hosting) for (const [id, p] of peers) if (id !== myId && id !== c.peer) try { c.send({ k: "pres", presence: p.presence, from: id }); } catch (e) {}   // (the newcomer meets those already here)
+        onState("open");
+      };
+      if (c.open) setTimeout(opened, 0); else c.on("open", opened);
       c.on("data", (m) => {
         if (!m || typeof m !== "object") return;
+        const from = !hosting && typeof m.from === "string" ? m.from : c.peer;
+        if (hosting && (m.k === "pres" || m.k === "emit")) send({ ...m, from }, c.peer);   // (the host passes it on to the other guests)
         if (m.k === "pres") {
-          const had = peers.has(c.peer); peers.set(c.peer, snap(c.peer, Object.freeze(m.presence && typeof m.presence === "object" ? m.presence : {})));
-          fire(had ? { updated: [peers.get(c.peer)] } : { joined: [peers.get(c.peer)] });
+          const had = peers.has(from); peers.set(from, snap(from, Object.freeze(m.presence && typeof m.presence === "object" ? m.presence : {})));
+          fire(had ? { updated: [peers.get(from)] } : { joined: [peers.get(from)] });
         } else if (m.k === "emit" && typeof m.topic === "string")
-          (th[m.topic] || []).forEach((h) => h({ topic: m.topic, data: m.data, peer: c.peer, by: null, isMe: false, sameTab: false, kind: "viewer", guest: false }));
+          (th[m.topic] || []).forEach((h) => h({ topic: m.topic, data: m.data, peer: from, by: null, isMe: false, sameTab: false, kind: "viewer", guest: false }));
+        else if (m.k === "left" && !hosting) dropPeer(m.peer);
+        else if (m.k === "moved" && !hosting && typeof m.to === "string") { remote = m.to; conns.delete(c.peer); try { c.close(); } catch (e) {} wire(peer.connect(remote, { reliable: true, serialization: "json" })); }
+        else if (m.k === "full") { closed = true; onState("full"); }
       });
       const gone = () => {
-        if (conn !== c) return;
-        conn = null; const pp = peers.get(c.peer); peers.delete(c.peer); if (pp) fire({ left: [pp] }); onState("closed");
+        if (conns.get(c.peer) !== c) return;
+        conns.delete(c.peer);
+        if (hosting) { dropPeer(c.peer); send({ k: "left", peer: c.peer }); }
+        else for (const id of [...peers.keys()]) if (id !== myId) dropPeer(id);   // (all the others came through the host)
+        onState("closed");
         if (remote && !closed) redial();
       };
       c.on("close", gone); c.on("error", gone);
     }
     function redial() {
       setTimeout(() => {
-        if (closed || conn) return;
+        if (closed || conns.size) return;
         try { if (peer.disconnected) peer.reconnect(); } catch (e) {}
         try { wire(peer.connect(remote, { reliable: true, serialization: "json" })); } catch (e) { redial(); return; }
         // still not open a few seconds later: try again
-        setTimeout(() => { if (!closed && conn && !conn.open) { const c = conn; conn = null; try { c.close(); } catch (e) {} redial(); } }, 4000);
+        setTimeout(() => { const c = conns.get(remote); if (!closed && c && !c.open) { conns.delete(remote); try { c.close(); } catch (e) {} redial(); } }, 4000);
       }, 1200);
     }
     await new Promise((res, rej) => {
       peer.on("open", (id) => { myId = id; peers.set(id, snap(id, mine)); res(); });
-      peer.on("error", (e) => { if (!myId) rej(e); else onState("error", e); });
+      peer.on("error", (e) => {
+        if (!myId) return rej(e);
+        const gone = !hosting && e && e.type === "peer-unavailable" && (!e.message || e.message.includes(remote));
+        // (the code still works after a takeover: the door of a later epoch sends her on)
+        if (gone && !everOpen && !epoch && tries < 3) { tries++; conns.delete(remote); remote = P2P_PREFIX + code + "-e" + tries; wire(peer.connect(remote, { reliable: true, serialization: "json" })); return; }
+        // the server itself says nobody is there: the only sure sign that the host is gone, not just this page's link
+        if (gone && everOpen) { conns.delete(remote); onState("hostgone"); if (!closed) redial(); return; }
+        if (e && e.type === "peer-unavailable" && hosting) return;
+        onState("error", e);
+      });
     });
     peer.on("disconnected", () => { if (!closed) try { peer.reconnect(); } catch (e) {} });
-    if (hosting) peer.on("connection", wire);
-    else { remote = P2P_PREFIX + code; wire(peer.connect(remote, { reliable: true, serialization: "json" })); }
+    // not the host: a guest's standby link, kept for the day this page takes over
+    peer.on("connection", (c) => { if (hosting) wire(c); else { stand.set(c.peer, c); c.on("close", () => { if (stand.get(c.peer) === c) stand.delete(c.peer); }); } });
+    if (!hosting) { remote = hostId; wire(peer.connect(remote, { reliable: true, serialization: "json" })); }
     return {
       async emit(topic, data) { send({ k: "emit", topic, data }); },
       on(topic, h) { (th[topic] = th[topic] || []).push(h); return () => {}; },
@@ -6083,9 +6176,35 @@
       },
       peers: list,
       onPeers(h) { ph.push(h); fire({ joined: list() }); return () => {}; },
-      connected: () => !!(conn && conn.open),
-      destroy() { closed = true; try { peer.destroy(); } catch (e) {} },
-      _drop() { if (conn) conn.close(); },   // for testing a dropped link
+      connected: () => [...conns.values()].some((c) => c.open),
+      destroy() { closed = true; try { peer.destroy(); } catch (e) {} try { if (door) door.destroy(); } catch (e) {} },
+      hostId: () => remote || hostId,
+      // the takeover: this page's id stays, the others dial it; the code's next id only points here
+      promote(n) {
+        hosting = true; remote = null;
+        for (const c of stand.values()) wire(c);
+        stand.clear();
+        try { if (door) door.destroy(); door = new window.Peer(P2P_PREFIX + code + "-e" + n, { debug: 0 }); door.on("error", () => {}); door.on("connection", (c) => c.on("open", () => { try { c.send({ k: "moved", to: myId }); } catch (e) {} setTimeout(() => c.close(), 500); })); } catch (e) {}
+      },
+      follow(id) {
+        hosting = false; remote = id;
+        for (const c of conns.values()) try { c.close(); } catch (e) {}
+        conns.clear();
+        const c = toNext && toNext.peer === id && toNext.open ? toNext : null; toNext = null;
+        try { wire(c || peer.connect(id, { reliable: true, serialization: "json" })); } catch (e) { redial(); }
+      },
+      // a link kept ready to the next seat: at a takeover the team must not need the server, it may be away just then
+      standby(id) {
+        if (toNext && toNext.peer === id && (toNext.open || Date.now() - toNext.at < 8000)) return;
+        if (toNext) try { toNext.close(); } catch (e) {}
+        try { toNext = peer.connect(id, { reliable: true, serialization: "json" }); toNext.at = Date.now(); toNext.on("error", () => {}); } catch (e) {}
+      },
+      // has the team moved on without this page? (a host who slept through her own takeover)
+      probe(n, found) {
+        const c = peer.connect(P2P_PREFIX + code + "-e" + n, { reliable: true, serialization: "json" });
+        c.on("data", (m) => { if (m && m.k === "moved") found(); }); c.on("error", () => {});
+      },
+      _drop(id) { for (const [k, c] of conns) if (!id || k === id) c.close(); },   // for testing a dropped link
     };
   }
   function p2pClose() {
@@ -6094,8 +6213,9 @@
   }
   function p2pFail(text) { p2pClose(); NET.co = null; NET.stage = "error"; NET.err = text; renderCoop(); }
   function p2pState(st, e) {
-    if (NET.role) return;   // in a game, a dropped link is handled by the partner-left timeout
-    if (st === "error") p2pFail(e && e.type === "peer-unavailable" ? "Không tìm thấy phòng có mã này. Kiểm tra lại mã nhé." : "Không kết nối được. Kiểm tra mạng rồi thử lại.");
+    if (NET.role) { if (st === "hostgone") hostGone(); return; }   // in a game, a dropped link is handled by the partner-left timeout
+    if (st === "full") p2pFail("Phòng đã đủ " + MAX_PLAYERS + " người.");
+    else if (st === "error") p2pFail(e && e.type === "peer-unavailable" ? "Không tìm thấy phòng có mã này. Kiểm tra lại mã nhé." : "Không kết nối được. Kiểm tra mạng rồi thử lại.");
     else if (st === "closed" && NET.stage === "joining") p2pFail("Phòng đã đóng.");
   }
   async function p2pHost() {
@@ -6112,10 +6232,11 @@
   }
   async function p2pJoin(code) {
     if (!/^\d{4}$/.test(code)) { NET.stage = "join"; NET.err = "Mã phòng gồm 4 chữ số."; renderCoop(); return; }
-    NET.stage = "connecting"; NET.err = ""; renderCoop();
+    NET.stage = "connecting"; NET.err = ""; NET.code = code; renderCoop();
     try {
-      const r = await p2pRoom(code, false, (st, e) => {
-        if (st === "open") { NET.stage = "joining"; setCo({ role: "join", host: P2P_PREFIX + code, hero }); }
+      let r = null;
+      r = await p2pRoom(code, false, (st, e) => {
+        if (st === "open") { if (NET.role) return; NET.stage = "joining"; setCo({ role: "join", host: r ? r.hostId() : P2P_PREFIX + code, hero }); }
         else p2pState(st, e);
       });
       if (NET.stage !== "connecting" && NET.stage !== "joining") { r.destroy(); return; }
@@ -6123,18 +6244,15 @@
     } catch (e) { p2pFail("Không kết nối được. Kiểm tra mạng rồi thử lại."); }
   }
   function netEmit(topic, data) { if (NET.room && NET.role) NET.room.emit(topic, data).catch(() => {}); }
-  function setCo(co) { NET.co = co; if (NET.room) NET.room.presence({ co }).catch(() => {}); renderCoop(); }
-  function beginHost(peer, pres) {
-    NET.role = "host"; NET.partner = peer; NET.pp = pres; NET.applied = null; Q = null; NET.quietT = 0;
-    setCo({ role: "play", with: peer, hero });
-    $("coopScreen").hidden = true;
-    startGame(selLv);
-    sendStart();
-  }
-  function sendStart() { NET.startT = 1; netEmit("start", { to: NET.partner, lv: G.level, run: WARD.run }); }
+  // Pages on different builds never play together: each page tells its build in its lobby state and presence
+  const verClash = (pres) => !!pres && (pres.co ? pres.co.v !== BUILD_VER : "v" in pres && pres.v !== BUILD_VER);
+  const VER_NOTE = "Các iPad đang chạy khác bản game. Hãy mở lại game để cập nhật.";
+  const inLobby = () => !!NET.co && roster().length >= 2 && roster().some((x) => x.peer === NET.me);
+  function setCo(co) { if (co) co = { ...co, v: BUILD_VER, token: roomToken() }; NET.co = co; if (NET.room) NET.room.presence({ co }).catch(() => {}); renderCoop(); }
+  function sendStart(to = NET.partner) { const e = NET.peers.get(to), join = e && e.join; if (e) { e.startT = 1; e.starting = true; } netEmit("start", { to, lv: G.level, run: WARD.run, join }); }
   function leaveCoop() {
     if (NET.room) NET.room.presence({ co: null, gl: null, sh: null, w: null }).catch(() => {});
-    NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null; QPETE = []; NET.hq.length = 0; NET.sq.length = 0; NET.fq.length = 0;
+    NET.role = null; NET.partner = null; NET.pp = null; NET.co = null; Q = null; QS = []; QPETE = []; NET.peers.clear(); NET.host = null; NET.seats = null; NET.take = null; NET.epoch = 0; NET.order = []; NET.rosterKey = null; NET.code = null; NET.hq.length = 0; NET.sq.length = 0; NET.fq.length = 0;
     if (NET.state === "p2p") { p2pClose(); NET.stage = null; }
   }
   function partnerLeft(lost) {
@@ -6147,19 +6265,29 @@
     const d = msg.data && typeof msg.data === "object" ? msg.data : {};
     if (msg.sameTab) return;
     if (msg.topic === "start") {
-      const ok = d.to === NET.me && ((NET.co && NET.co.role === "join" && NET.co.host === msg.peer) || (NET.role === "guest" && NET.partner === msg.peer));
+      const ok = d.to === NET.me && ((NET.co && NET.co.role === "join" && NET.co.host === msg.peer) || (NET.role === "guest" && (NET.host || NET.partner) === msg.peer));
       if (!ok) return;
       if(d.run){const key=msg.peer+':'+d.run;if(WARD.seenStarts.has(key)||NET.role==="guest"&&d.run===WARD.run)return;WARD.seenStarts.add(key);if(WARD.seenStarts.size>100)WARD.seenStarts.delete(WARD.seenStarts.values().next().value);}
-      NET.role = "guest"; NET.partner = msg.peer; NET.applied = null; Q = null; NET.quietT = 0;
-      const p = NET.room.peers().find((p) => p.peer === msg.peer); NET.pp = p ? p.presence : null;
+      NET.role = "guest"; NET.partner = msg.peer; NET.host = msg.peer; NET.applied = null; Q = null; QS = []; NET.peers.clear(); NET.quietT = 0;
+      const p = NET.room.peers().find((p) => p.peer === msg.peer); NET.pp = p ? p.presence : null; peerAdd(msg.peer, NET.pp);
       setCo({ role: "play", with: msg.peer, hero });
+      for (const o of NET.room.peers()) if (!o.sameTab && o.presence.co && (o.presence.co.with === NET.host || o.presence.co.host === NET.host)) peerAdd(o.peer, o.presence);
+      { const hp = NET.room.peers().find((o) => o.peer === NET.host); NET.seats = hp && Array.isArray(hp.presence.roster) ? hp.presence.roster : null; }
       $("coopScreen").hidden = true;
       startGame(clamp(Math.floor(num(d.lv)), 0, LEVELS.length - 1));
+      if (d.join) { P.lv = clamp(Math.floor(num(d.join.lvl)) || 1, 1, MAX_LV); P.xp = 0; updateXpHud(); }
       if(d.run)WARD.run=d.run;
       return;
     }
-    if (msg.peer !== NET.partner || !NET.role || G.mode === "title") return;
+    if (d.to && d.to !== NET.me) return;   // (the host passes everything on: this one is for another page)
+    if (NET.role) peersEnsure();
+    if (!NET.peers.has(msg.peer) || !NET.role || G.mode === "title") return;
     if(WARD.open)return;
+    const q = QS.find((q) => q.peer === msg.peer);
+    if (q) setQ(q); else { Q = null; QPETE = []; NET.partner = msg.peer; }
+    onPeerMsg(msg, d); netFocus();
+  }
+  function onPeerMsg(msg, d) {
     if(msg.topic==='gomslash'){if(Q?.hero==='b')gomSlashFx(clamp(Math.floor(num(d.pose)),0,8),num(d.x),num(d.y),num(d.a));return;}
     if (msg.topic === "shots") {   // partner's bolts: only for show, her own page reports what they hit
       const k = validHero(d.k), H = HEROES[k];
@@ -6207,33 +6335,59 @@
         else if (["star", "candy"].includes(d.ty)) pickItem(d.ty, x, y);
       } else if (msg.topic === "gain") addEnergy(clamp(num(d.n), 0, 30), num(d.x), num(d.y));
       else if (msg.topic === "xp") { gainXp(clamp(Math.floor(num(d.n)), 0, 200)); play("gem"); }
-      else if (msg.topic === "combo") comboUlt(false);
+      else if (msg.topic === "combo") comboUlt(false, undefined, Array.isArray(d.pair) ? d.pair : undefined);
       else if (msg.topic === "shout") gwimaShout();
       else if (msg.topic === "say" && typeof d.a === "string") { showBanner(d.a.slice(0, 60), typeof d.b === "string" ? d.b.slice(0, 80) : ""); SFX.roar(); }
       else if (msg.topic === "pet" && PETS[d.k] && (PETS[d.k].owner === hero || isAlly(d.k))) rescuePet(d.k);
     }
   }
+  // one peer's health: true when that ended the game here
+  function peerTick(e, dt) {
+    // the partner is gone if they left the room or stopped playing with us
+    const pc = e.pres && e.pres.co;
+    if (NET.role === "guest" && pc && pc.role === "join") return false;   // (she waits for the next map)
+    if (NET.role === "guest" && e.peer === NET.host && pc && pc.role === "host") { e.goneT = e.quietT = 0; return false; }   // (the game is over and the host is back in the room, waiting)
+    const linked = pc && (pc.with === NET.me || (pc.role === "join" && pc.host === NET.me) || (pc.team || []).includes(NET.me) || (NET.role === "guest" && (pc.role === "host" || pc.with === NET.host || pc.host === NET.host)));
+    // (generous: an iPad can stall for a few seconds, and a dropped room-code link dials itself again)
+    e.goneT = linked ? 0 : e.goneT + dt;
+    if (e.goneT > (pc ? 6 : 15)) { peersLeave(e, !pc); return !NET.role; }
+    // a link that died silently (e.g. the iPad changed network) stops the partner's heartbeat
+    { const hs = e.pres && e.pres.hs; if (hs !== e.lastHs) { e.lastHs = hs; e.hsT = 0; } else if (e.hsT !== undefined) e.hsT += dt; }
+    const hb = e.pres && e.pres.hb;
+    if (hb !== e.lastHb) { e.lastHb = hb; e.quietT = 0; e.dialed = false; } else e.quietT += dt;
+    // (a dead iPad leaves its link looking open for half a minute: dial again, and the server will say whether she is there)
+    if (NET.p2p && e.peer === NET.host && e.quietT > 8 && !e.dialed) { e.dialed = true; NET.p2p._drop(); }
+    const lost = Math.max(e.quietT, pc ? 0 : e.goneT);
+    if (lost > 2.5 && Math.floor(lost) !== Math.floor(lost - dt)) showBanner("Đang chờ bạn kia…", "Mạng chậm, chờ chút nhé");
+    if (e.quietT > 15) { e.quietT = 0; peersLeave(e, true); return !NET.role; }
+    if (pc && pc.role === "play") e.starting = false;   // (she is in: a "join" from her now is her end screen's way back to the room)
+    if (NET.role === "host" && pc && pc.role === "join" && e.starting && (e.startT -= dt) <= 0) sendStart(e.peer);
+    return false;
+  }
   // presence: my girl (both roles) plus the world (host), about 20 times a second
   function netTick(dt) {
     if (!NET.room || !NET.role) return;
-    // the partner is gone if they left the room or stopped playing with us
-    const pc = NET.pp && NET.pp.co;
-    const linked = pc && (pc.with === NET.me || (pc.role === "join" && pc.host === NET.me));
-    // (generous: an iPad can stall for a few seconds, and a dropped room-code link dials itself again)
-    NET.goneT = linked ? 0 : NET.goneT + dt;
-    if (NET.goneT > (pc ? 6 : 15)) return partnerLeft(!pc);
-    // a link that died silently (e.g. the iPad changed network) stops the partner's heartbeat
-    const hb = NET.pp && NET.pp.hb;
-    if (hb !== NET.lastHb) { NET.lastHb = hb; NET.quietT = 0; } else NET.quietT = (NET.quietT || 0) + dt;
-    const lost = Math.max(NET.quietT, pc ? 0 : NET.goneT);
-    if (lost > 2.5 && Math.floor(lost) !== Math.floor(lost - dt)) showBanner("Đang chờ bạn kia…", "Mạng chậm, chờ chút nhé");
-    if (NET.quietT > 15) { NET.quietT = 0; return partnerLeft(true); }
-    if (NET.role === "host" && pc && pc.role === "join" && (NET.startT -= dt) <= 0) sendStart();
+    peersEnsure();
+    if (NET.role === "guest" && NET.p2p && NET.seats && !NET.take && (NET.standT = (NET.standT || 0) - dt) <= 0) {
+      NET.standT = 2; const next = NET.seats.filter((r) => r.peer !== NET.host).sort((a, b) => a.seat - b.seat)[0];
+      if (next && next.peer !== NET.me) NET.p2p.standby(next.peer);
+    }
+    if (NET.role === "host" && NET.p2p && !NET.peers.size && NET.seats && (NET.probeT = (NET.probeT || 0) - dt) <= 0) {
+      NET.probeT = 6; const code = NET.code;
+      NET.p2p.probe((NET.epoch || 0) + 1, () => { leaveCoop(); toTitle(); $("titleScreen").hidden = true; $("coopScreen").hidden = false; NET.state = "p2p"; p2pJoin(code); });
+    }
+    if (NET.take) {
+      const T = NET.take, e = NET.peers.get(NET.host), c = e && e.pres && e.pres.co;
+      if (c && c.epoch === T.epoch && e.pres.hb) { NET.epoch = T.epoch; NET.take = null; }
+      else if (NET.state !== "p2p" && (T.t += dt) > TAKE_WAIT) { T.tries++; T.epoch++; takeoverStep(); return; }
+      else if (Math.floor((T.b = (T.b || 0) + dt)) !== Math.floor(T.b - dt)) takeoverBanner();
+    } else for (const e of [...NET.peers.values()]) if (peerTick(e, dt)) return;
     if ((NET.sendT -= dt) > 0) return;
     NET.sendT = 1 / 20;
     if (NET.hq.length) netEmit("hits", { h: NET.hq.splice(0, 120) });
     if (NET.sq.length || NET.fq.length) netEmit("shots", { k: hero, s: NET.sq.splice(0), f: NET.fq.splice(0) });
-    const patch = { ward:{run:WARD.run,epoch:WARD.epoch,ready:WARD.ready,lv:G.level}, gl: girlState(), hb: (NET.hb = (NET.hb + 1) % 1e6 || 1) };   // heartbeat: changes every send
+    if (NET.role === "guest") { const hp = hostPres(); NET.hsOut = hp && hp.hb; }
+    const patch = { hs: NET.hsOut, ward:{run:WARD.run,epoch:WARD.epoch,ready:WARD.ready,lv:G.level}, gl: girlState(), hb: (NET.hb = (NET.hb + 1) % 1e6 || 1) };   // heartbeat: changes every send
     if (NET.role === "host") patch.w = worldState();
     NET.room.presence(patch).catch(() => {});
   }
@@ -6243,7 +6397,7 @@
       PETE.map((p) => [p.x | 0, p.y | 0, p.face + (p.flip ? 8 : 0) + (p.faintT > 0 ? 16 : 0)]), P.dead ? Math.round((1 - clamp(G.reviveT / FAINT_T, 0, 1)) * 100) : 0, P.helped ? 1 : 0, P.elem ? Math.ceil(P.elemT * 10) : 0];
   }
   function worldState() {
-    const B = G.boss, near = Q ? (o) => d2(o.x, o.y, Q.x, Q.y) < 1900 * 1900 : () => true;
+    const B = G.boss, near = QS.length ? (o) => QS.some((q) => d2(o.x, o.y, q.x, q.y) < 1900 * 1900) : () => true;
     const sb = (o) => (o.slow > 0 ? 4 : 0) | (o.burn > 0 ? 8 : 0) | (o.poison > 0 ? 16 : 0) | (o.frz > 0 ? 32 : 0);
     const bitsOf = (a) => a.map((o) => (o.got || o.open ? 1 : 0)).join("");
     return {
@@ -6268,9 +6422,16 @@
   // follow the partner's girl smoothly between presence updates
   function netFrame(dt) {
     if (!NET.role) return;
-    const gl = NET.pp && Array.isArray(NET.pp.gl) ? NET.pp.gl : null;
+    peersEnsure();
+    for (const e of NET.peers.values()) peerFrame(e, dt);
+    netFocus();
+  }
+  function peerFrame(e, dt) {
+    const gl = e.pres && Array.isArray(e.pres.gl) ? e.pres.gl : null;
     if (!gl) return;
-    if (!Q) Q = { x: num(gl[0]), y: num(gl[1]), hostInv: 0, pets: [], lv: 1, flip: false };
+    let q = QS.find((q) => q.peer === e.peer);
+    if (!q) { q = { peer: e.peer, pres: e.pres, pete: [], x: num(gl[0]), y: num(gl[1]), hostInv: 0, pets: [], lv: 1, flip: false }; QS.push(q); }
+    q.pres = e.pres; setQ(q);
     // dead-reckoning: carry the last report forward at its velocity, then glide toward that guess
     if (gl !== Q.gl) { Q.gl = gl; Q.age = 0; }
     Q.age += dt;
@@ -6294,9 +6455,9 @@
 
   // ---- guest: mirror the host's world
   function applySnapshot() {
-    const w = NET.pp && NET.pp.w;
+    const hp = hostPres(), w = hp && hp.w;
     if (!w || typeof w !== "object" || w === NET.applied || w.ward&&w.ward.run!==WARD.run) return;
-    NET.applied = w;
+    NET.applied = w; NET.lastW = w;
     const lv = clamp(Math.floor(num(w.lv)), 0, LEVELS.length - 1);
     if (lv !== G.level) {
       if(w.ward?.open){progress=Math.max(progress,lv+1);try{localStorage.setItem("dcpt3-progress",String(progress));}catch(e){}buildLevel(lv);NET.lvBusy=false;NET.applied=null;wardOpen(true,w.ward.epoch);return;}
@@ -6305,7 +6466,7 @@
         progress = Math.max(progress, lv + 1);
         try { localStorage.setItem("dcpt3-progress", String(progress)); } catch (e) {}
         setTimeout(() => fadeTo(() => {
-          const now = NET.pp && NET.pp.w ? clamp(Math.floor(num(NET.pp.w.lv)), 0, LEVELS.length - 1) : lv;
+          const hw = hostPres() && hostPres().w, now = hw ? clamp(Math.floor(num(hw.lv)), 0, LEVELS.length - 1) : lv;
           buildLevel(now); NET.lvBusy = false; NET.applied = null;
           showBanner(LEVELS[now].name.split(": ")[1], LEVELS[now].name.split(": ")[0]);
         }), 900);
@@ -6464,16 +6625,24 @@
   function renderCoop() {
     if ($("coopScreen").hidden) return;
     const msg = $("coopMsg"), box = $("coopBtns"); box.innerHTML = "";
-    const btn = (txt, fn, ghost) => { const b = document.createElement("button"); b.className = "btn" + (ghost ? " ghost" : ""); b.textContent = txt; b.addEventListener("click", fn); box.append(b); };
+    const btn = (txt, fn, ghost) => { const b = document.createElement("button"); b.className = "btn" + (ghost ? " ghost" : ""); b.textContent = txt; b.addEventListener("click", fn); box.append(b); return b; };
+    $("coopRoster").hidden = true;
     // the room-code steps carry their own cancel / back button
     $("coopBack").style.display = NET.state === "p2p" && ["connecting", "joining", "hosting", "join"].includes(NET.stage) ? "none" : "";
     if (NET.state === "wait") { msg.textContent = "Đang kết nối…"; return; }
+    if (NET.room && !NET.role && !inLobby() && NET.room.peers().some((p) => !p.sameTab && verClash(p.presence))) {
+      msg.textContent = VER_NOTE;
+      $("coopBack").style.display = "";
+      btn("Mở lại game", () => reloadTo());
+      if (NET.state === "p2p") btn("Huỷ", () => { p2pClose(); NET.co = null; NET.stage = null; NET.err = ""; renderCoop(); }, true);
+      else if (NET.co) btn("Huỷ", () => setCo(null), true);
+      return;
+    }
+    if (NET.co && ["host", "join"].includes(NET.co.role)) { $("coopBack").style.display = "none"; return renderLobby(msg, box, btn); }
     if (NET.state === "p2p") return renderP2p(msg, box, btn);
-    if (NET.state === "none") { msg.textContent = "Chơi 2 người chỉ chạy khi mở game trên trang claude.ai. Hãy mở cùng đường link này trên cả hai iPad."; return; }
-    if (NET.co && NET.co.role === "host") { msg.textContent = "Đã mở phòng. Trên iPad kia, bấm “Chơi 2 người” rồi bấm “Vào chơi cùng”."; btn("Huỷ phòng", () => setCo(null), true); return; }
-    if (NET.co && NET.co.role === "join") { msg.textContent = "Đang vào phòng…"; btn("Huỷ", () => setCo(null), true); return; }
+    if (NET.state === "none") { msg.textContent = "Chơi cùng bạn chỉ chạy khi mở game trên trang claude.ai. Hãy mở cùng đường link này trên các iPad."; return; }
     const others = NET.room.peers().filter((p) => !p.sameTab);
-    const hosts = others.filter((p) => p.presence.co && p.presence.co.role === "host");
+    const hosts = others.filter((p) => p.presence.co && (p.presence.co.role === "host" || (p.presence.co.role === "play" && p.presence.co.open)));
     msg.textContent = hosts.length ? "Có bạn đang mở phòng. Bấm để vào chơi cùng."
       : others.length ? "iPad kia đã mở game. Một bé bấm “Mở phòng”, bé còn lại bấm “Vào chơi cùng”."
       : "Chưa thấy iPad nào khác. Hãy mở cùng đường link này trên iPad thứ hai.";
@@ -6483,16 +6652,168 @@
     }
     btn("Mở phòng", () => setCo({ role: "host", hero }), hosts.length > 0);
   }
+  // ---- the room before the game: everyone takes a seat and says "Sẵn sàng", then the host presses "Bắt đầu"
+  function roomToken() {
+    try { let t = sessionStorage.getItem("room-token"); if (!t) { t = Math.random().toString(36).slice(2, 10); sessionStorage.setItem("room-token", t); } return t; }
+    catch (e) { return NET.tok || (NET.tok = Math.random().toString(36).slice(2, 10)); }
+  }
+  // the guests in this room, in order of arrival (the host's page keeps the order)
+  function lobbyPeers() {
+    const here = NET.room.peers().filter((p) => !p.sameTab && !verClash(p.presence) && p.presence.co && p.presence.co.role === "join" && p.presence.co.host === NET.me);
+    NET.order = NET.order.filter((id) => here.some((p) => p.peer === id));
+    for (const p of here) if (!NET.order.includes(p.peer) && NET.order.length < MAX_PLAYERS - 1) NET.order.push(p.peer);
+    return NET.order.map((id) => here.find((p) => p.peer === id));
+  }
+  function roster() {
+    if (NET.role) return NET.seats || [];
+    if (!NET.room || !NET.co) return [];
+    if (NET.co.role === "host") return [{ peer: NET.me, token: roomToken(), seat: 0, hero, ready: !!NET.co.ready }, ...lobbyPeers().map((p, i) => ({ peer: p.peer, token: p.presence.co.token, seat: i + 1, hero: validHero(p.presence.co.hero), ready: !!p.presence.co.ready }))];
+    const h = NET.room.peers().find((p) => p.peer === NET.co.host);
+    return h && Array.isArray(h.presence.roster) ? h.presence.roster : [];
+  }
+  // seats while playing (the host's list, taken at the start)
+  const seatOf = (id) => { const x = (NET.seats || []).find((r) => r.peer === id); return x ? x.seat : 9; };
+  function playerLabel(g) {
+    const k = (o) => (o === P ? hero : o.hero), same = teamAll().filter((o) => k(o) === k(g));
+    if (same.length < 2) return "";
+    const s = (o) => seatOf(o === P ? NET.me : o.peer);
+    return HEROES[k(g)].name + " " + (same.map(s).sort((a, b) => a - b).indexOf(s(g)) + 1);
+  }
+  function publishRoster() {
+    const r = roster(), key = JSON.stringify(r);
+    if (key !== NET.rosterKey) { NET.rosterKey = key; NET.room.presence({ roster: r, epoch: NET.epoch || 0 }).catch(() => {}); }
+  }
+  const lobbyCanStart = () => { const r = roster(); return !!NET.co && NET.co.role === "host" && r.length >= 2 && r.every((x) => x.ready); };
+  function setReady(on) { if (NET.co) setCo({ ...NET.co, ready: !!on }); }
+  function lobbyStart() {
+    if (!lobbyCanStart()) return false;
+    const guests = lobbyPeers(); NET.seats = roster();
+    NET.role = "host"; NET.applied = null; Q = null; QS = []; NET.peers.clear(); NET.quietT = 0;
+    for (const p of guests) peerAdd(p.peer, p.presence);
+    NET.partner = guests[0].peer; NET.pp = guests[0].presence;
+    setCo({ role: "play", with: guests[0].peer, team: guests.map((p) => p.peer), hero, open: guests.length < MAX_PLAYERS - 1 });
+    $("coopScreen").hidden = true;
+    startGame(selLv);
+    for (const p of guests) sendStart(p.peer);
+    return true;
+  }
+  function leaveLobby() {
+    if (NET.state === "p2p") { p2pClose(); NET.stage = null; NET.err = ""; }
+    NET.code = null; NET.order = []; NET.rosterKey = null; setCo(null); renderCoop();
+  }
+  function renderLobby(msg, box, btn) {
+    const host = NET.co.role === "host", r = roster(), me = r.find((x) => x.peer === NET.me), all = r.length >= 2 && r.every((x) => x.ready), list = $("coopRoster");
+    if (lateWaiting()) {
+      msg.textContent = "Chờ tới màn sau nhé"; list.hidden = false; list.innerHTML = "";
+      const s = document.createElement("div"); s.className = "seat wait"; const c = document.createElement("canvas"); c.width = 150; c.height = 190; seatArt(c, hero);
+      const dots = document.createElement("b"); dots.className = "dots"; dots.textContent = "• • •"; s.append(c, dots); list.append(s);
+      btn("Rời phòng", leaveLobby, true); return;
+    }
+    msg.innerHTML = "";
+    if (NET.code) { msg.append("Mã phòng:"); const c = document.createElement("span"); c.className = "roomcode"; c.textContent = NET.code; msg.append(c); }
+    msg.append(!me ? "Đang vào phòng…" : r.length < 2 ? "Chờ bạn vào phòng…" : !all ? "Xong thì bấm Sẵn sàng nhé!" : host ? "Cả đội sẵn sàng! Bấm Bắt đầu nhé!" : "Cả đội sẵn sàng! Chờ chủ phòng bấm Bắt đầu.");
+    list.hidden = false; list.innerHTML = "";
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      const x = r[i], s = document.createElement("div"); s.className = "seat" + (x && x.ready ? " ok" : "") + (x ? "" : " empty");
+      if (x) {
+        const c = document.createElement("canvas"); c.width = 150; c.height = 190; seatArt(c, x.hero);
+        const n = document.createElement("b"); n.textContent = HEROES[x.hero].name;
+        const t = document.createElement("small"); t.textContent = x.ready ? "Sẵn sàng" : "đang chọn…";
+        s.append(c, n, t);
+      }
+      list.append(s);
+    }
+    if (me) btn(me.ready ? "Chưa sẵn sàng" : "Sẵn sàng", () => setReady(!me.ready), me.ready);
+    if (host) btn("Bắt đầu", lobbyStart, !all).disabled = !all;
+    btn(host ? "Huỷ phòng" : "Rời phòng", leaveLobby, true);
+  }
+  // ---- a girl who comes while the game runs waits for the next map (and a girl who fell off comes back the same way)
+  function lateScan() {
+    if (NET.role !== "host") return;
+    const here = NET.room.peers().filter((p) => !p.sameTab && !verClash(p.presence) && !NET.peers.has(p.peer) && p.presence.co && p.presence.co.role === "join" && p.presence.co.host === NET.me);
+    NET.late = here.slice(0, Math.max(0, MAX_PLAYERS - 1 - NET.peers.size)).map((p) => p.peer);
+    const open = NET.peers.size + NET.late.length < MAX_PLAYERS - 1;
+    if (NET.co && NET.co.open !== open) setCo({ ...NET.co, open });
+  }
+  function admitLate() {
+    lateScan();
+    for (const id of NET.late) {
+      const p = NET.room.peers().find((o) => o.peer === id); if (!p) continue;
+      const e = peerAdd(id, p.presence), token = p.presence.co.token, was = (NET.gone || {})[token], used = (NET.seats || []).map((r) => r.seat);
+      let seat = was !== undefined && !used.includes(was) ? was : 1; while (used.includes(seat)) seat++;
+      NET.seats = [...(NET.seats || []).filter((r) => r.token !== token), { peer: id, token, seat, hero: validHero(p.presence.co.hero), ready: true }];
+      e.join = { lvl: Math.floor(teamLv()) }; sendStart(id);
+    }
+    if (NET.late.length) { NET.late = []; setCo({ ...NET.co, team: [...NET.peers.keys()] }); NET.room.presence({ roster: NET.seats }).catch(() => {}); }
+    lateScan();
+  }
+  const lateWaiting = () => { if (!NET.room || !NET.co || NET.co.role !== "join" || NET.role) return false; const h = NET.room.peers().find((p) => p.peer === NET.co.host); return !!(h && h.presence.co && h.presence.co.role === "play"); };
+  // the end of the game: everyone back to the same room, same code, for another game
+  function roomAgain() {
+    const host = NET.role === "host", to = NET.host, code = NET.code, room = NET.room;
+    NET.role = null; NET.partner = null; NET.pp = null; Q = null; QS = []; QPETE = []; NET.peers.clear(); NET.seats = null; NET.host = null; NET.late = []; NET.rosterKey = null; NET.code = code;
+    NET.hq.length = 0; NET.sq.length = 0; NET.fq.length = 0;
+    toTitle(); room.presence({ gl: null, w: null, sh: null, roster: null }).catch(() => {});
+    setCo(host ? { role: "host", hero } : { role: "join", host: to, hero });
+    $("titleScreen").hidden = true; $("coopScreen").hidden = false; renderCoop();
+  }
+  // ---- the host fell off: the next seat takes over, from the last world she heard. Everyone keeps their id.
+  // On room codes it starts only when the server says the host is gone (a page that just lost its own link dials back in); the claude.ai room has no such word, so there the others' reports and a wait decide
+  const TAKE_WAIT = 8;
+  function hostHeardByOthers() { return [...NET.peers.values()].some((e) => e.peer !== NET.host && e.hsT !== undefined && e.hsT < 3); }
+  function takeoverBanner() { showBanner("Đang đổi chủ phòng…", "Chờ một chút nhé"); }
+  function hostGone() {
+    if (NET.role !== "guest") return;
+    if (NET.take) { if (++NET.take.miss < 3) return; NET.take.miss = 0; NET.take.tries++; NET.take.epoch++; takeoverStep(); return; }   // (the next seat may just be off the server for a moment)
+    if (NET.seats && NET.seats.length) takeoverBegin();
+  }
+  function takeoverBegin() {
+    const old = NET.host, q = QS.find((x) => x.peer === old); if (q) setQ(q);
+    NET.exHost = old;
+    NET.take = { t: 0, tries: 0, miss: 0, epoch: (NET.epoch || 0) + 1, seats: (NET.seats || []).filter((r) => r.peer !== old).sort((a, b) => a.seat - b.seat) };
+    NET.peers.delete(old); QS = QS.filter((x) => x.peer !== old); NET.seats = NET.take.seats; netFocus();
+    takeoverBanner(); takeoverStep();
+  }
+  function takeoverStep() {
+    const T = NET.take, row = T.seats[T.tries];
+    if (!row || row.token === roomToken()) return takeoverPromote(T.epoch);
+    T.t = 0; NET.host = row.peer; peerAdd(row.peer); netFocus();
+    if (NET.p2p) NET.p2p.follow(row.peer);
+    setCo({ role: "play", with: row.peer, hero });
+  }
+  function takeoverPromote(epoch) {
+    const w = NET.lastW, T = NET.take, me = roomToken();
+    NET.take = null; NET.role = "host"; NET.host = null; NET.epoch = epoch;
+    NET.seats = (NET.seats || []).filter((r) => T.seats.indexOf(r) >= T.tries);   // (those before her in line never answered)
+    for (const r of T.seats.slice(0, T.tries)) { NET.peers.delete(r.peer); QS = QS.filter((x) => x.peer !== r.peer); }
+    NET.peers.delete(NET.me); netFocus();
+    if (NET.p2p) NET.p2p.promote(epoch);
+    setCo({ role: "play", with: [...NET.peers.keys()][0] || null, team: [...NET.peers.keys()], hero, open: NET.peers.size < MAX_PLAYERS - 1, epoch });
+    NET.room && NET.room.presence({ roster: NET.seats, epoch }).catch(() => {});
+    if (!promoteFromSnapshot(w)) { startGame(G.level); for (const id of NET.peers.keys()) sendStart(id); }
+  }
+  // this page has been mirroring the world: from now on it runs it. What the mirror does not carry goes back to rest
+  function promoteFromSnapshot(w) {
+    try {
+      if (!w) return false;
+      G.nextId = Math.max(G.nextId || 1, ...G.mons.map((m) => m.id), ...G.drops.map((d) => d.id), ...G.gems.map((x) => x.id)) + 100000;   // (the mirror's own counter is far behind the host's)
+      G.quakes = []; G.rings = []; G.foes = [];
+      const B = G.boss, BD = G.lvl && G.lvl.boss;
+      if (B && B.alive && BD) {
+        const quiz = !!G.quiz || B.st === "quiz";
+        Object.assign(B, { st: "rest", t: 0, jz: 0, vx: 0, vy: 0, iT: 0, cycle: B.cycle || 0, dropY: -1, die: 0, move: null });
+        if (BD.quiz) B.quizHp = [Math.round(B.max * 2 / 3), Math.round(B.max / 3)].filter((v) => v < B.hp);
+        G.quiz = null; $("quiz").hidden = true;
+        if (quiz) startQuiz(B);
+      }
+      for (const m of G.mons) { m.tt = 0; if (m.alive) { m.x = m.tx === undefined ? m.x : m.tx; m.y = m.ty === undefined ? m.y : m.ty; m.st = "walk"; m.t = 0; } }
+      NET.applied = null; NET.lvBusy = false;
+      return true;
+    } catch (e) { return false; }
+  }
   function renderP2p(msg, box, btn) {
     const cancel = () => { p2pClose(); NET.co = null; NET.stage = null; NET.err = ""; renderCoop(); };
     if (NET.stage === "connecting" || NET.stage === "joining") { msg.textContent = "Đang kết nối…"; btn("Huỷ", cancel, true); return; }
-    if (NET.stage === "hosting") {
-      msg.innerHTML = ""; msg.append("Mã phòng của bé:");
-      const c = document.createElement("span"); c.className = "roomcode"; c.textContent = NET.code; msg.append(c);
-      msg.append("Trên iPad kia, bấm “Chơi 2 người” → “Vào phòng” rồi nhập mã này.");
-      const lv = document.createElement("small"); lv.className = "pick"; lv.style.display = "block"; lv.textContent = "Hai bé sẽ chơi " + LEVELS[selLv].name; msg.append(lv);
-      btn("Huỷ phòng", cancel, true); return;
-    }
     if (NET.stage === "join") {
       msg.textContent = NET.err || "Nhập mã phòng 4 chữ số đang hiện trên iPad kia:";
       const inp = document.createElement("input"); inp.className = "codein"; inp.inputMode = "numeric"; inp.maxLength = 4; inp.autocomplete = "off"; inp.placeholder = "• • • •";
@@ -6500,7 +6821,7 @@
       box.append(inp); btn("Vào", () => p2pJoin(inp.value)); btn("Quay lại", cancel, true);
       setTimeout(() => inp.focus(), 50); return;
     }
-    msg.textContent = NET.stage === "error" ? NET.err : "Hai iPad cần có mạng, tốt nhất cùng một wifi. Một bé bấm “Mở phòng”, bé kia bấm “Vào phòng” rồi nhập mã.";
+    msg.textContent = NET.stage === "error" ? NET.err : "Các iPad cần có mạng, tốt nhất cùng một wifi. Một bé bấm “Mở phòng”, các bé khác bấm “Vào phòng” rồi nhập mã.";
     btn("Mở phòng", p2pHost); btn("Vào phòng", () => { NET.stage = "join"; NET.err = ""; renderCoop(); }, true);
   }
   $("coopBtn").addEventListener("click", () => {
@@ -6555,7 +6876,7 @@
     gom:{autoFire,fire:gomFire,update:updateGom,shots:updateShots,revive:reviveHero,atlas:gomAtlas}, validHero, makeSum, hurtHero, comboUlt, cbPose, victoryPortrait, G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
     wardrobe:{open:wardOpen,close:wardClose,wear:wardWear,ready:wardReady,load:wardLoad,catalog:()=>WARD.catalog,state:()=>({run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready,partnerReady:WARD.partnerReady,coins:G.stars,equipped:outfit[hero]}),sync:wardSync},
     autopilot: false,
-    getQ: () => Q,
+    getQ: () => Q, getQS: () => QS, toTitle, promoteFromSnapshot, ultBlast, lateWaiting, roomAgain, roomToken, admitLate, coopHpK, bossHpK, teamSize, playerLabel, girlsName, easyBossMath, treasure: updateTreasure, roster, lobbyCanStart, lobbyStart, setReady, girls, targetFor, hurtTarget, worldState,
     setHero: (k) => { hero = validHero(k); loadPets(); renderHeroes(); },
     refreshFrames: () => DIRN.clear(),   // call after adding frames to FR at run time
     audio: () => ({ ctx: AC && AC.state, samples: Object.keys(SAMPLE).length, music: !!musicSrc, track: musicNow, want: musicWanted() }),
