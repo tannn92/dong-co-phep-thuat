@@ -256,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261105.0649"></script>
+<script src="wardrobe.js?v=261105.0721"></script>
 <script>
 (() => {
   "use strict";
@@ -309,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.0649", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261105.0721", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -776,7 +776,7 @@
   };
   HEROES.n = { ...HEROES.s, name:"Nấm", rgb:"255,184,90", cols:["#ffd28a","#ffb85a","#dcb7ff"] };
   HEROES.b = { ...HEROES.g, name:"Gôm", rgb:"150,205,255", cols:["#d6eeff","#ffe5a0","#a7caff"] };
-  const maxHearts = (hk=hero) => hk==='b'?8:5;
+  const maxHearts = (hk=hero) => hk==='b'?8:(hk==='g'||hk==='s')?7:5;
   const HIDDEN_HEROES = new Set();
   const validHero = k => typeof k === 'string' && Object.hasOwn(HEROES,k) ? k : 'g';
   // Pets: each belongs to one sister, waits in a cage on a level and follows her once rescued.
@@ -1204,6 +1204,7 @@
     if (L.stage) startStage();
   }
   function respawnHero() {
+    G.heartRegenT = 0;
     const p = G.path, i = Math.min(3, p.n - 1), [dx, dy] = pathDir(i);
     Object.assign(P, { x: p.x[i], y: p.y[i], vx: 0, vy: 0, z: 0, moving: false, inv: 0, hurtT: 0, slowT: 0, castT: 0, shootCd: 0.5, dead: false, tiredT: 0, winT: 0, prog: i });
     setFace(P, dx, dy);
@@ -1468,7 +1469,21 @@
     }
     G.foes = G.foes.filter((f) => d2(f.x, f.y, x, y) > 700 * 700);
   }
+  // Each player heals on their own page; presence already carries fractional hearts.
+  function updateHeartRegen(dt) {
+    if (hero !== 'g' && hero !== 's') { G.heartRegenT = 0; return; }
+    if (P.dead || P.tiredT > 0 || G.hearts <= 0 || G.hearts >= maxHearts()) { G.heartRegenT = 0; return; }
+    if (G.mode !== 'play' || P.winT || G.quiz || G.story || (G.cine && (G.cine.lock || G.cine.ph !== 'fight')) || G.rescue || G.bcut || G.combo || G.ult) return;
+    G.heartRegenT = (G.heartRegenT || 0) + dt;
+    const ticks = Math.floor((G.heartRegenT + 1e-9) / 5);
+    if (!ticks) return;
+    G.heartRegenT = Math.max(0, G.heartRegenT - ticks * 5);
+    G.hearts = Math.min(maxHearts(), G.hearts + ticks / 3);
+    if (maxHearts() - G.hearts < 1e-9) { G.hearts = maxHearts(); G.heartRegenT = 0; }
+    renderHearts();
+  }
   function updateHero(dt) {
+    updateHeartRegen(dt);
     P.inv -= dt; P.hurtT -= dt; P.slowT -= dt; P.castT -= dt;
     if (P.tiredT > 0) { P.moving = false; P.vx = P.vy = 0; if ((P.tiredT = Math.max(0, P.tiredT - dt)) === 0) reviveHero(); return; }
     if (P.dead) { P.moving = false; P.helped = rescuing(); if ((G.reviveT -= dt * (P.helped ? 5 : 1)) <= 0) reviveHero(); return; }
