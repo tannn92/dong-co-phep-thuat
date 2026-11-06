@@ -126,7 +126,7 @@
   /* the ending: everyone together (a picture for who played: Mochi, Matcha or both sisters) */
   #winScreen .card { max-width: 70em; gap: .55em; }
   #winScreen h1 { font-size: 2.2em; }
-  #winPic { display: block; width: auto; max-width: 100%; height: min(58vh, 54vw); aspect-ratio: 3 / 2; object-fit: cover; border-radius: 22px; box-shadow: 0 0 0 4px rgba(255,211,77,.75), 0 0 42px rgba(255,111,168,.55); animation: winPic 1.2s ease-out both; }
+  #winPic { display: block; width: auto; max-width: 100%; height: min(58vh, 54vw); aspect-ratio: 8 / 5; object-fit: contain; border-radius: 22px; box-shadow: 0 0 0 4px rgba(255,211,77,.75), 0 0 42px rgba(255,111,168,.55); animation: winPic 1.2s ease-out both; }
   #winPic[hidden] { display: none; }
   @keyframes winPic { from { opacity: 0; transform: scale(.92); } }
   .ward { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 1em; width: 100%; align-items: center; }
@@ -246,7 +246,7 @@
 
 <div class="screen" id="winScreen" hidden>
   <div class="card">
-    <img id="winPic" alt="Cả nhóm khoác vai nhau cười vui như một gia đình" hidden>
+    <img id="winPic" alt="Cả nhóm và những người bạn đồng hành trong ngày chiến thắng" hidden>
     <h1>Bé đã <span>chiến thắng!</span></h1>
     <p>Gwi Ma đã bị phong ấn. Rumi đã trở lại, Saja Boys được giải cứu, Đồng Cỏ Phép Thuật lại bình yên.</p>
     <p id="winStats"></p>
@@ -256,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261105.1620"></script>
+<script src="wardrobe.js?v=261106.1904"></script>
 <script>
 (() => {
   "use strict";
@@ -309,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261105.1620", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261106.1904", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4695,17 +4695,52 @@
       startBossCut("die");
     }
   }
-  function victoryPortrait(participants) {
-    const c=document.createElement('canvas');c.width=1200;c.height=800;
-    const ctx=c.getContext('2d');ctx.drawImage(IMG.bg1,0,0,1200,800);
-    const frames=participants.map(p=>FR[p.skin+'_cheer']||FR[p.hk+'_cheer']);
-    const maxHeight=Math.max(...frames.map(f=>f.h*f.s)),scale=570/maxHeight;
-    frames.forEach((f,i)=>{const k=f.s*scale,x=participants.length===1?600:390+i*420;
-      ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,x-f.ax*k,740-f.ay*k,f.w*k,f.h*k);
+  // One painted family portrait for any 1–4 seats, including repeated heroes.
+  function endingArtKey(ps) {
+    if(ps.length===1 && ['g','s'].includes(ps[0].hk)) return ps[0].hk;
+    return ps.length===2 && ps.map(p=>p.hk).sort().join('')==='gs' ? 'gs' : null;
+  }
+  function victoryLayout(ps) {
+    const dragons=[],allies=[],pets=[],seen=new Set(),heroes=[];
+    ps.forEach((p,i)=>{
+      heroes.push({...p,type:'hero',owner:i});
+      for(const kind of new Set(p.pets||[])) {
+        if(!PETS[kind])continue;
+        const item={type:'pet',kind,owner:i};
+        if(['dragon','tridragon','silverdragon'].includes(kind))dragons.push(item);
+        else if(PETS[kind].owner==='any') {if(!seen.has(kind)){seen.add(kind);allies.push({...item,type:'ally'});}}
+        else pets.push(item);
+      }
     });
+    const row=(items,y,w,h)=>items.map((p,i)=>({...p,x:800+(i-(items.length-1)/2)*Math.min(w+30,1420/items.length),y,w:Math.min(w,1380/items.length),h}));
+    const crowded=allies.length>0;
+    const rear=row(dragons,crowded?390:470,470,crowded?310:380);
+    const middle=row(allies,650,260,240);
+    const front=row(heroes,875,ps.length===1?430:310,crowded?320:430).map(p=>({...p,h:p.h*({s:1,g:.93,b:.84,n:.9}[p.hk]||1)}));
+    const small=pets.map((p,i)=>({...p,x:Math.max(90,Math.min(1510,front[p.owner].x+100)),y:955,w:160,h:145}));
+    return [...rear,...middle,...front,...small];
+  }
+  function victoryPortrait(ps) {
+    const c=document.createElement('canvas');c.width=1600;c.height=1000;
+    const ctx=c.getContext('2d'),bg=IMG.bg1;
+    if(bg)ctx.drawImage(bg,0,0,1600,1000);
+    for(const item of victoryLayout(ps)) {
+      const f=victoryFrame(item);if(!f)continue;
+      const k=Math.min(item.w/f.w,item.h/f.h);
+      ctx.drawImage(f.img,f.sx,f.sy,f.w,f.h,item.x-f.w*k/2,item.y-f.h*k,f.w*k,f.h*k);
+    }
     return c.toDataURL('image/png');
   }
+  function victoryFrame(p) {
+    if(p.type==='hero')return FR[heroFrame({hk:p.hk,skin:p.skin||p.hk,face:0,winT:1})[0]]||FR[p.hk+'_cheer'];
+    if(p.type==='ally')return FR[PETS[p.kind].art+'_d0_w0']||FR[PETS[p.kind].art+'_d2_w0'];
+    return FR[p.kind+'_r0']||FR['pet_'+p.kind+'_d0_w0']||FR['pet_'+p.kind+'_d2_w0'];
+  }
+  function victoryParticipants() {
+    return [{hk:hero,skin:mySkin(),pets:[...(P.pets||[])]},...(NET.role?QS:[]).map(q=>({hk:q.hero,skin:q.skin||q.hero,pets:[...(q.pets||[])]}))];
+  }
   function winGame() {
+    const participants=victoryParticipants();
     G.won = true; P.winT = 99; SFX.win();
     $("againBtn").hidden = false;
     try { localStorage.setItem("dcpt3-progress", String(LEVELS.length)); } catch (e) {}
@@ -4713,10 +4748,10 @@
     setTimeout(() => {
       $("winStats").textContent = `Bé nhặt được ${G.stars} ngôi sao, lên tới cấp ${P.lv} và hạ ${G.kills} yêu quái.` + (NET.role === "guest" ? " Chờ bạn kia bấm Chơi lại nhé." : "");
       G.mode = "win"; $("winScreen").hidden = false; $("controls").hidden = true; $("bossbar").hidden = true; $("hud").hidden = true;
-      // the family picture: both sisters if they played together, else the one who played (with her pet in the middle)
-      const pic = $("winPic"), others = NET.role ? QS : [], who = [...new Set([hero, ...others.map((q) => q.hero)])].sort().join("");
-      pic.onerror = () => { pic.hidden = true; }; pic.onload = () => { pic.hidden = false; };
-      pic.src = (who.includes("n")||who.includes("b")||others.length>1) ? victoryPortrait([{hk:hero,skin:mySkin()},...others.map((q)=>({hk:q.hero,skin:q.skin||q.hero}))]) : `assets/fin_${who}.jpg`;
+      const pic=$("winPic"),key=endingArtKey(participants);
+      pic.onerror=()=>{pic.hidden=true;};pic.onload=()=>{pic.hidden=false;};
+      pic.style.aspectRatio=key?"3 / 2":"8 / 5";
+      pic.src=key?`assets/fin_${key}.jpg`:victoryPortrait(participants);
     }, 2200);
   }
 
@@ -7297,7 +7332,7 @@
   }
   // test hooks for automated checks. __dcpt3.autopilot = true makes this girl walk the path on her own.
   const API = window.__dcpt3 = {
-    gom:{autoFire,fire:gomFire,update:updateGom,shots:updateShots,revive:reviveHero,atlas:gomAtlas}, validHero, makeSum, hurtHero, comboUlt, cbPose, victoryPortrait, G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
+    gom:{autoFire,fire:gomFire,update:updateGom,shots:updateShots,revive:reviveHero,atlas:gomAtlas}, validHero, makeSum, hurtHero, comboUlt, cbPose, victoryPortrait, victoryLayout, victoryFrame, victoryParticipants, endingArtKey, G, P, IN, joy, keys, NET, FR, LEVELS, MON, HEROES, PETS, startGame, buildLevel, toTitle,
     wardrobe:{open:wardOpen,close:wardClose,wear:wardWear,ready:wardReady,load:wardLoad,catalog:()=>WARD.catalog,state:()=>({run:WARD.run,open:WARD.open,epoch:WARD.epoch,ready:WARD.ready,partnerReady:WARD.partnerReady,coins:G.stars,equipped:outfit[hero]}),sync:wardSync},
     autopilot: false,
     getQ: () => Q, getQS: () => QS, toTitle, promoteFromSnapshot, ultBlast, lateWaiting, roomAgain, roomToken, admitLate, coopHpK, bossHpK, teamSize, playerLabel, girlsName, easyBossMath, treasure: updateTreasure, roster, lobbyCanStart, lobbyStart, setReady, girls, targetFor, hurtTarget, worldState,
