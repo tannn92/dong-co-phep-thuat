@@ -256,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261106.1904"></script>
+<script src="wardrobe.js?v=261106.2010"></script>
 <script>
 (() => {
   "use strict";
@@ -309,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261106.1904", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261106.2010", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -4714,11 +4714,13 @@
     });
     const row=(items,y,w,h)=>items.map((p,i)=>({...p,x:800+(i-(items.length-1)/2)*Math.min(w+30,1420/items.length),y,w:Math.min(w,1380/items.length),h}));
     const crowded=allies.length>0;
-    const rear=row(dragons,crowded?390:470,470,crowded?310:380);
-    const middle=row(allies,650,260,240);
-    const front=row(heroes,875,ps.length===1?430:310,crowded?320:430).map(p=>({...p,h:p.h*({s:1,g:.93,b:.84,n:.9}[p.hk]||1)}));
+    // The five freed boys belong to the finale, not the pet inventory.
+    const rear=row(dragons,270,470,240);
+    const boys=row(SAJA.map((kind,i)=>({type:'saja',kind,frame:'saja_boys_d1_w'+i})),crowded?510:580,230,220);
+    const middle=row(allies,710,260,190);
+    const front=row(heroes,875,ps.length===1?430:310,crowded?290:320).map(p=>({...p,h:p.h*({s:1,g:.93,b:.84,n:.9}[p.hk]||1)}));
     const small=pets.map((p,i)=>({...p,x:Math.max(90,Math.min(1510,front[p.owner].x+100)),y:955,w:160,h:145}));
-    return [...rear,...middle,...front,...small];
+    return [...rear,...boys,...middle,...front,...small];
   }
   function victoryPortrait(ps) {
     const c=document.createElement('canvas');c.width=1600;c.height=1000;
@@ -4732,6 +4734,7 @@
     return c.toDataURL('image/png');
   }
   function victoryFrame(p) {
+    if(p.type==='saja')return FR[p.frame];
     if(p.type==='hero')return FR[heroFrame({hk:p.hk,skin:p.skin||p.hk,face:0,winT:1})[0]]||FR[p.hk+'_cheer'];
     if(p.type==='ally')return FR[PETS[p.kind].art+'_d0_w0']||FR[PETS[p.kind].art+'_d2_w0'];
     return FR[p.kind+'_r0']||FR['pet_'+p.kind+'_d0_w0']||FR['pet_'+p.kind+'_d2_w0'];
