@@ -256,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261106.2010"></script>
+<script src="wardrobe.js?v=261107.1126"></script>
 <script>
 (() => {
   "use strict";
@@ -309,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261106.2010", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261107.1126", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -846,7 +846,7 @@
     // Nấm's independent atlas must remain available if the shared catalog is offline.
     try {
       const nr=await fetch('nam-assets/catalog.json?v='+encodeURIComponent(BUILD_VER),{cache:'no-cache'}),nm=await nr.json();
-      const allowed=new Set(['mushroom','autumn','starlight']),seen=new Set();
+      const allowed=new Set(['mushroom', 'autumn', 'starlight', 'castle1', 'castle2', 'castle3', 'castle4', 'snow11', 'pirate3']),seen=new Set();
       for(const o of nm.catalog||[])if(o?.char==='n'&&allowed.has(o.outfit)&&o.id==='n.'+o.outfit&&!seen.has(o.id)){
         seen.add(o.id);WARD.catalog.push({...o,price:10,nam:true});
       }
@@ -880,7 +880,7 @@
     const stand = await wardLoad(id);
     return hero === "b" ? (await gomSelection(id ? id.slice(2) : "base").promise) || stand : stand;
   }
-  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,equipped:()=>outfit[hero],load:wardPreview,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,background:'wardrobe-assets/background.webp'});}
+  function wardInitUI(){if(WARD.ui||!window.createMeadowWardrobe)return;WARD.ui=window.createMeadowWardrobe({hero:()=>hero,heroName:()=>HD().name,catalog:()=>WARD.catalog,coins:()=>G.stars,equipped:()=>outfit[hero],load:wardPreview,wear:wardWear,ready:wardReady,back:toTitle,label:()=>LEVELS[G.level].name,assetVersion:BUILD_VER,background:'wardrobe-assets/background.webp'});}
   function wardOpen(fromNet=false,epoch=null){
     if(epoch!==null&&WARD.open&&WARD.epoch===epoch)return;
     WARD.epoch=epoch===null?WARD.epoch+1:epoch;WARD.open=true;WARD.ready=false;WARD.partnerReady=false;G.mode='shop';P.vx=P.vy=0;P.moving=false;
