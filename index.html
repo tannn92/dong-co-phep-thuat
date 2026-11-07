@@ -256,7 +256,7 @@
 
 <div id="rotate">Xoay ngang iPad để chơi nhé</div>
 
-<script src="wardrobe.js?v=261107.1309"></script>
+<script src="wardrobe.js?v=261107.1320"></script>
 <script>
 (() => {
   "use strict";
@@ -309,7 +309,7 @@
   }
   function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
   // ---------------------------------------------------------------- version: the site build stamps BUILD_VER and writes version.json beside the page
-  const BUILD_VER = "261107.1309", isBuilt = !BUILD_VER.startsWith("__");
+  const BUILD_VER = "261107.1320", isBuilt = !BUILD_VER.startsWith("__");
   async function latestVer() {
     try { return (await (await fetch("version.json?x=" + Date.now(), { cache: "no-store" })).json()).v; } catch (e) { return null; }
   }
@@ -367,6 +367,7 @@
     for(const [pose,f] of Object.entries(meta.frames)){
       const im=imgs[f[0]];if(!im||f.length!==8||!f.every(Number.isFinite)||f[1]<0||f[2]<0||f[3]<=0||f[4]<=0||f[5]<=0||f[1]+f[3]>im.width||f[2]+f[4]>im.height)throw Error('Invalid Nấm frame');
       const name=prefix+'_'+pose;fresh[name]={name,img:im,sx:f[1],sy:f[2],w:f[3],h:f[4],s:f[5],ax:f[6],ay:f[7],redraw:true,wardrobe:outfit!=='base'};
+      const pivot=meta.ult_pivots?.[pose];if(Array.isArray(pivot)&&pivot.length===2&&pivot.every(Number.isFinite)&&pivot[0]>=0&&pivot[0]<=f[3]&&pivot[1]>=0&&pivot[1]<=f[4])fresh[name].ultPivot=pivot;
     }
     const target=outfit==='base'?'n':prefix;
     for(const pose of required)fresh[target+'_'+pose]=fresh[prefix+'_'+pose];
@@ -5564,8 +5565,24 @@
   // she looks the same size (ratio of body areas, measured from the atlas)
   const SIDE_K = { g: 1.12, s: 1.0 };
   const sideK = (hk, fn) => (FR[fn] && FR[fn].redraw ? 1 : /_d\d_/.test(fn) ? 1 : SIDE_K[hk] || 1);
+  function namUltFrames(fn, t) {
+    const prefix=fn.slice(0,fn.lastIndexOf("_")), poses=["ult","wr1","wu1","wl1","ult"];
+    const phase=clamp((t-.25)/1.45,0,1)*4, i=Math.min(3,Math.floor(phase)), blend=ss(.72,1,phase-i);
+    const frame=pose=>FR[prefix+"_"+pose]||FR[fn];
+    return [[frame(poses[i]),1-blend],[frame(poses[i+1]),blend]].filter(([f,a])=>f&&a>0);
+  }
   function drawHeroSprite(hk, fn, x, y, z, flip, alpha, ultT, step) {
     const M = CHAR_M * sideK(hk, typeof fn === "string" ? fn : "");
+    if (ultT > 0 && hk === "n") {
+      // Turn through separately painted views around the body, never squeeze a foot-anchored picture.
+      shadow(x,y,46,12,.25);
+      glow(x,y-z-100,260,"255,210,160",.55*ss(.05,.4,ultT)*(1-ss(1.9,2.4,ultT)));
+      for(const [f,a] of namUltFrames(fn,ultT)){
+        const pivot=f.ultPivot||[f.w/2,f.ay];
+        spr({...f,ax:pivot[0],ay:pivot[1]},x,y-z,false,M,alpha*a);
+      }
+      return;
+    }
     if (ultT > 0) {
       // the ultimate: she floats up and spins in light
       const spin = hk !== "b" && ultT > 0.25 && ultT < 1.7 ? (ultT - 0.25) * 9 : 0, sx = FR[fn]?.redraw ? Math.abs(Math.cos(spin)) : Math.cos(spin), lt = (hk === "b" ? 0 : 1) * ss(0.05, 0.4, ultT) * (1 - ss(1.9, 2.4, ultT));
